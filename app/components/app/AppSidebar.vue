@@ -5,6 +5,25 @@ const { menu, fetchMenuData, isLoading, error } = useNavigationMenu()
 const collapsed = useState<boolean>('collapsed')
 const isOnMobile = useState<boolean>('isOnMobile')
 
+// 로고 설정
+const logoSettings = ref('/primevue-logo.webp')
+
+// 로고 설정 로드
+const loadLogoSettings = () => {
+  if (process.client) {
+    try {
+      const saved = localStorage.getItem('customLogo')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        logoSettings.value = parsed.logo
+      }
+    } catch (error) {
+      console.error('로고 설정 로드 실패:', error)
+      logoSettings.value = '/primevue-logo.webp'
+    }
+  }
+}
+
 function onResize() {
   if (window.innerWidth <= 980) {
     collapsed.value = true
@@ -22,9 +41,20 @@ function onToggleCollapse() {
 function onItemClick() {
 }
 
+// 이미지 로드 에러 핸들링
+const handleImageError = () => {
+  logoSettings.value = '/primevue-logo.webp'
+}
+
 onMounted(async () => {
   onResize()
   window.addEventListener('resize', onResize)
+  
+  // 로고 설정 로드
+  loadLogoSettings()
+  
+  // 로고 업데이트 이벤트 리스너
+  window.addEventListener('logo-updated', loadLogoSettings)
   
   // 메뉴 데이터 로드
   try {
@@ -32,6 +62,11 @@ onMounted(async () => {
   } catch (err) {
     console.error('메뉴 로드 실패:', err)
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', onResize)
+  window.removeEventListener('logo-updated', loadLogoSettings)
 })
 </script>
 
@@ -64,12 +99,20 @@ onMounted(async () => {
     >
       <template #header>
         <div v-if="!collapsed" class="flex">
-          <img class="m-6 w-8" src="/primevue-logo.webp" alt="PrimeVue">
-          <img class="m-6 w-8" src="/nuxt-logo.svg" alt="Nuxt">
+          <img 
+            class="m-6 w-8" 
+            :src="logoSettings" 
+            alt="Primary Logo"
+            @error="handleImageError"
+          >
         </div>
         <div v-else>
-          <img class="ml-4 mt-6 w-6" src="/primevue-logo.webp" alt="PrimeVue">
-          <img class="ml-4 mt-2 w-6" src="/nuxt-logo.svg" alt="Nuxt">
+          <img 
+            class="ml-4 mt-6 w-6" 
+            :src="logoSettings" 
+            alt="Primary Logo"
+            @error="handleImageError"
+          >
         </div>
       </template>
       <template #footer>
