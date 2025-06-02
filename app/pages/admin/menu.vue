@@ -41,7 +41,7 @@
           
           <Column field="href" header="링크" style="width: 25%">
             <template #body="slotProps">
-              <code v-if="slotProps.node.data.href" class="text-sm bg-gray-100 px-2 py-1 rounded">
+              <code v-if="slotProps.node.data.href" class="text-sm bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 px-2 py-1 rounded">
                 {{ slotProps.node.data.href }}
               </code>
             </template>
