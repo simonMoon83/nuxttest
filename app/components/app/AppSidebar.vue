@@ -1,6 +1,6 @@
 <script setup lang='ts'>
 const config = useRuntimeConfig()
-const { menu } = useNavigationMenu()
+const { menu, fetchMenuData, isLoading, error } = useNavigationMenu()
 
 const collapsed = useState<boolean>('collapsed')
 const isOnMobile = useState<boolean>('isOnMobile')
@@ -22,15 +22,37 @@ function onToggleCollapse() {
 function onItemClick() {
 }
 
-onMounted(() => {
+onMounted(async () => {
   onResize()
   window.addEventListener('resize', onResize)
+  
+  // 메뉴 데이터 로드
+  try {
+    await fetchMenuData()
+  } catch (err) {
+    console.error('메뉴 로드 실패:', err)
+  }
 })
 </script>
 
 <template>
   <div>
+    <!-- 메뉴 로딩 상태 표시 -->
+    <div v-if="isLoading" class="p-4 text-center">
+      <i class="pi pi-spin pi-spinner text-xl text-primary"></i>
+      <p class="mt-2 text-sm text-gray-600">메뉴 로딩 중...</p>
+    </div>
+    
+    <!-- 메뉴 에러 상태 표시 -->
+    <div v-else-if="error" class="p-4 text-center">
+      <i class="pi pi-exclamation-triangle text-xl text-red-500"></i>
+      <p class="mt-2 text-sm text-red-600">메뉴 로드 실패</p>
+      <p class="text-xs text-gray-500">기본 메뉴로 표시됩니다</p>
+    </div>
+    
+    <!-- 정상 메뉴 표시 -->
     <sidebar-menu
+      v-else
       v-model:collapsed="collapsed"
       link-component-name="nuxt-sidebar-link"
       :menu="menu"
@@ -57,6 +79,7 @@ onMounted(() => {
         </div>
       </template>
     </sidebar-menu>
+    
     <div
       v-if="isOnMobile && !collapsed"
       class="sidebar-overlay"
