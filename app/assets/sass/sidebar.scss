@@ -1,9 +1,21 @@
 @use 'sass:color';
+
+// SASS 변수 설정
+$icon-width: 32px;
+
+// 라이트 테마 기본값 - 더 세련된 색상으로 변경
+$primary-color: #3b82f6; // 블루 계열로 변경
+$primary-dark: #1e40af; // 더 진한 블루
+$base-bg: #ffffff;
+$item-color: #374151;
+$border-color: #e5e7eb;
+
+// 라이트 테마 기본값
 @use 'vue-sidebar-menu/src/scss/vue-sidebar-menu.scss' with (
-  $primary-color: var(--p-primary-color),
-  $base-bg: #2a2a2e,
-  $item-color: #fff,
-  $item-active-color: var(--p-primary-color),
+  $primary-color: #3b82f6,
+  $base-bg: #ffffff,
+  $item-color: #374151,
+  $item-active-color: #ffffff,
   $item-font-size: 14px,
   $item-line-height: 18px,
   $item-padding: 8px 14px,
@@ -11,9 +23,464 @@
   $icon-width: 32px
 );
 
-.v-sidebar-menu hr {
-  margin-bottom: 8px;
-  background-color: rgba(color.adjust(#2a2a2e, $lightness: -5%), 0.5);
-  border: 0 none;
-  height: 0.1rem;
+// 기본 라이트 테마 스타일
+.v-sidebar-menu {
+  background-color: var(--p-surface-0, #{$base-bg}) !important;
+  border-right: 1px solid var(--p-surface-200, #{$border-color}) !important;
+  color: var(--p-text-color, #{$item-color}) !important;
+  
+  // 구분선
+  hr {
+    margin-bottom: 8px;
+    background-color: var(--p-surface-200, #{$border-color}) !important;
+    border: 0 none;
+    height: 0.1rem;
+  }
+  
+  // 메뉴 아이템
+  .vsm--item {
+    background-color: transparent !important;
+    
+    &:hover {
+      background-color: var(--p-blue-50, #eff6ff) !important;
+    }
+    
+    &.vsm--item_open {
+      background-color: var(--p-blue-50, #eff6ff) !important;
+    }
+  }
+  
+  // 링크 - 통일된 스타일
+  .vsm--link {
+    color: var(--p-text-color, #{$item-color}) !important;
+    background-color: transparent !important;
+    transition: all 0.2s ease !important;
+    border-radius: 6px !important;
+    margin: 2px 8px !important;
+    
+    &:hover {
+      color: var(--p-blue-600, #2563eb) !important;
+      background-color: var(--p-blue-50, #eff6ff) !important;
+    }
+    
+    &.vsm--link_active {
+      color: var(--p-blue-600, #2563eb) !important;
+      background-color: var(--p-blue-100, #dbeafe) !important;
+      font-weight: 500 !important;
+    }
+  }
+  
+  // 아이콘 - 통일된 스타일
+  .vsm--icon {
+    color: var(--p-text-muted-color, #6b7280) !important;
+    transition: all 0.2s ease !important;
+    
+    .vsm--link:hover & {
+      color: var(--p-blue-600, #2563eb) !important;
+    }
+    
+    .vsm--link_active & {
+      color: var(--p-blue-600, #2563eb) !important;
+    }
+  }
+  
+  // 제목 - 통일된 스타일
+  .vsm--title {
+    color: var(--p-text-color, #{$item-color}) !important;
+    transition: all 0.2s ease !important;
+    
+    .vsm--link:hover & {
+      color: var(--p-blue-600, #2563eb) !important;
+    }
+    
+    .vsm--link_active & {
+      color: var(--p-blue-600, #2563eb) !important;
+      font-weight: 500 !important;
+    }
+  }
+}
+
+// 하위 메뉴 스타일 - 라이트 테마 (최고 우선순위 셀렉터 사용)
+.v-sidebar-menu .vsm--child,
+.v-sidebar-menu .vsm--child.vsm--child,
+.v-sidebar-menu ul.vsm--child,
+.v-sidebar-menu .vsm--list .vsm--child,
+.v-sidebar-menu .vsm--item .vsm--child,
+.vsm--child.vsm--child {
+  background: #f9fafb !important;
+  background-color: #f9fafb !important;
+  border-top: 1px solid #e5e7eb !important;
+  margin-top: 1px !important;
+  position: relative !important;
+  width: 100% !important;
+  overflow: hidden !important;
+  
+  // 모든 하위 요소에 강제 적용
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box !important;
+  }
+  
+  // 강력한 배경 보장 - 여러 레이어
+  &::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: #f9fafb !important;
+    background-color: #f9fafb !important;
+    z-index: -10 !important;
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+  
+  &::after {
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: #f9fafb !important;
+    background-color: #f9fafb !important;
+    z-index: -11 !important;
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+  
+  // 모든 하위 요소 배경 강제 제거
+  *, *:before, *:after {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+  
+  // 예외: 링크의 호버/액티브 상태는 유지
+  .vsm--link:hover {
+    background: #eff6ff !important;
+    background-color: #eff6ff !important;
+  }
+  
+  .vsm--link.vsm--link_active {
+    background: #dbeafe !important;
+    background-color: #dbeafe !important;
+  }
+  
+  .vsm--item,
+  .vsm--item.vsm--item {
+    background: transparent !important;
+    background-color: transparent !important;
+    
+    &:hover {
+      background: transparent !important;
+      background-color: transparent !important;
+    }
+  }
+  
+  .vsm--link,
+  .vsm--link.vsm--link {
+    color: #6b7280 !important;
+    padding-left: 3rem !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    transition: all 0.2s ease !important;
+    border-radius: 6px !important;
+    margin: 2px 12px !important;
+    position: relative !important;
+    z-index: 1 !important;
+    
+    &:hover {
+      color: #2563eb !important;
+      background: #eff6ff !important;
+      background-color: #eff6ff !important;
+    }
+    
+    &.vsm--link_active {
+      color: #2563eb !important;
+      background: #dbeafe !important;
+      background-color: #dbeafe !important;
+      font-weight: 500 !important;
+    }
+  }
+  
+  .vsm--icon,
+  .vsm--icon.vsm--icon {
+    color: #9ca3af !important;
+    transition: all 0.2s ease !important;
+    
+    .vsm--link:hover & {
+      color: #2563eb !important;
+    }
+    
+    .vsm--link_active & {
+      color: #2563eb !important;
+    }
+  }
+  
+  .vsm--title,
+  .vsm--title.vsm--title {
+    color: #6b7280 !important;
+    transition: all 0.2s ease !important;
+    
+    .vsm--link:hover & {
+      color: #2563eb !important;
+    }
+    
+    .vsm--link_active & {
+      color: #2563eb !important;
+      font-weight: 500 !important;
+    }
+  }
+}
+
+// 다크 테마 스타일 - 라이트 테마와 동일한 패턴
+[data-theme="dark"] .v-sidebar-menu,
+.dark .v-sidebar-menu {
+  background-color: var(--p-surface-900, #111827) !important;
+  border-right: 1px solid var(--p-surface-700, #374151) !important;
+  color: var(--p-text-color, #f9fafb) !important;
+  
+  // 구분선
+  hr {
+    background-color: var(--p-surface-700, #374151) !important;
+  }
+  
+  // 메뉴 아이템
+  .vsm--item {
+    &:hover {
+      background-color: var(--p-surface-800, #1f2937) !important;
+    }
+    
+    &.vsm--item_open {
+      background-color: var(--p-surface-800, #1f2937) !important;
+    }
+  }
+  
+  // 링크 - 통일된 스타일
+  .vsm--link {
+    color: var(--p-text-color, #f9fafb) !important;
+    transition: all 0.2s ease !important;
+    border-radius: 6px !important;
+    margin: 2px 8px !important;
+    
+    &:hover {
+      color: var(--p-blue-400, #60a5fa) !important;
+      background-color: var(--p-surface-800, #1f2937) !important;
+    }
+    
+    &.vsm--link_active {
+      color: var(--p-blue-400, #60a5fa) !important;
+      background-color: var(--p-surface-700, #374151) !important;
+      font-weight: 500 !important;
+    }
+  }
+  
+  // 아이콘 - 모든 상태에서 동일한 색상
+  .vsm--icon {
+    color: var(--p-text-muted-color, #9ca3af) !important;
+    transition: all 0.2s ease !important;
+    
+    .vsm--link:hover & {
+      color: var(--p-text-muted-color, #9ca3af) !important;
+    }
+    
+    .vsm--link_active & {
+      color: var(--p-text-muted-color, #9ca3af) !important;
+    }
+  }
+  
+  // 제목 - 통일된 스타일
+  .vsm--title {
+    color: var(--p-text-color, #f9fafb) !important;
+    transition: all 0.2s ease !important;
+    
+    .vsm--link:hover & {
+      color: var(--p-blue-400, #60a5fa) !important;
+    }
+    
+    .vsm--link_active & {
+      color: var(--p-blue-400, #60a5fa) !important;
+      font-weight: 500 !important;
+    }
+  }
+}
+
+// 다크테마 하위 메뉴 스타일 (최고 우선순위 셀렉터 사용)
+[data-theme="dark"] .v-sidebar-menu .vsm--child,
+.dark .v-sidebar-menu .vsm--child,
+[data-theme="dark"] .v-sidebar-menu .vsm--child.vsm--child,
+.dark .v-sidebar-menu .vsm--child.vsm--child,
+[data-theme="dark"] .v-sidebar-menu ul.vsm--child,
+.dark .v-sidebar-menu ul.vsm--child,
+[data-theme="dark"] .v-sidebar-menu .vsm--list .vsm--child,
+.dark .v-sidebar-menu .vsm--list .vsm--child,
+[data-theme="dark"] .v-sidebar-menu .vsm--item .vsm--child,
+.dark .v-sidebar-menu .vsm--item .vsm--child,
+[data-theme="dark"] .vsm--child.vsm--child,
+.dark .vsm--child.vsm--child {
+  background: #030712 !important;
+  background-color: #030712 !important;
+  border-top: 1px solid #374151 !important;
+  position: relative !important;
+  width: 100% !important;
+  overflow: hidden !important;
+  
+  // 모든 하위 요소에 강제 적용
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box !important;
+  }
+  
+  // 강력한 배경 보장 - 여러 레이어
+  &::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: #030712 !important;
+    background-color: #030712 !important;
+    z-index: -10 !important;
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+  
+  &::after {
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: #030712 !important;
+    background-color: #030712 !important;
+    z-index: -11 !important;
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+  
+  // 모든 하위 요소 배경 강제 제거
+  *, *:before, *:after {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+  
+  // 예외: 링크의 호버/액티브 상태는 유지
+  .vsm--link:hover {
+    background: #1f2937 !important;
+    background-color: #1f2937 !important;
+  }
+  
+  .vsm--link.vsm--link_active {
+    background: #374151 !important;
+    background-color: #374151 !important;
+  }
+  
+  .vsm--item,
+  .vsm--item.vsm--item {
+    background: transparent !important;
+    background-color: transparent !important;
+    
+    &:hover {
+      background: transparent !important;
+      background-color: transparent !important;
+    }
+  }
+  
+  .vsm--link,
+  .vsm--link.vsm--link {
+    color: #d1d5db !important;
+    padding-left: 3rem !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    transition: all 0.2s ease !important;
+    border-radius: 6px !important;
+    margin: 2px 12px !important;
+    position: relative !important;
+    z-index: 1 !important;
+    
+    &:hover {
+      color: #60a5fa !important;
+      background: #1f2937 !important;
+      background-color: #1f2937 !important;
+    }
+    
+    &.vsm--link_active {
+      color: #60a5fa !important;
+      background: #374151 !important;
+      background-color: #374151 !important;
+      font-weight: 500 !important;
+    }
+  }
+  
+  // 하위메뉴 아이콘 - 모든 상태에서 동일한 색상
+  .vsm--icon,
+  .vsm--icon.vsm--icon {
+    color: #6b7280 !important;
+    transition: all 0.2s ease !important;
+    
+    .vsm--link:hover & {
+      color: #6b7280 !important;
+    }
+    
+    .vsm--link_active & {
+      color: #6b7280 !important;
+    }
+  }
+  
+  .vsm--title,
+  .vsm--title.vsm--title {
+    color: #d1d5db !important;
+    transition: all 0.2s ease !important;
+    
+    .vsm--link:hover & {
+      color: #60a5fa !important;
+    }
+    
+    .vsm--link_active & {
+      color: #60a5fa !important;
+      font-weight: 500 !important;
+    }
+  }
+}
+
+// 토글 버튼 스타일
+.v-sidebar-menu {
+  .vsm--toggle-btn {
+    background-color: var(--p-surface-0, #ffffff) !important;
+    color: var(--p-text-color, #374151) !important;
+    border: 1px solid var(--p-surface-200, #e5e7eb) !important;
+    transition: all 0.3s ease !important;
+    
+    &:hover {
+      background-color: var(--p-surface-100, #f3f4f6) !important;
+      color: var(--p-blue-600, #2563eb) !important;
+      transform: scale(1.05) !important;
+    }
+  }
+}
+
+[data-theme="dark"] .v-sidebar-menu,
+.dark .v-sidebar-menu {
+  .vsm--toggle-btn {
+    background-color: var(--p-surface-900, #111827) !important;
+    color: var(--p-text-color, #f9fafb) !important;
+    border: 1px solid var(--p-surface-700, #374151) !important;
+    transition: all 0.3s ease !important;
+    
+    &:hover {
+      background-color: var(--p-surface-800, #1f2937) !important;
+      color: var(--p-blue-400, #60a5fa) !important;
+      transform: scale(1.05) !important;
+      box-shadow: 0 0 10px rgba(96, 165, 250, 0.3) !important;
+    }
+  }
 }
