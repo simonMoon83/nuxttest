@@ -4,9 +4,9 @@ import bcrypt from 'bcryptjs'
 const config: sql.config = {
   server: 'localhost',
   port: 1433,
-  user: 'demo',
-  password: 'demo',
-  database: 'bbbb', // 사용자 데이터베이스 이름으로 변경
+  user: 'frame',
+  password: 'frame',
+  database: 'theframework', // 사용자 데이터베이스 이름으로 변경
   options: {
     encrypt: false, // localhost의 경우 false
     trustServerCertificate: true
