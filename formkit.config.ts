@@ -1,9 +1,10 @@
 // formkit.config.ts
 import type { DefaultConfigOptions } from '@formkit/vue'
-import { createAutoAnimatePlugin } from '@formkit/addons'
+import { createAutoAnimatePlugin, createMultiStepPlugin } from '@formkit/addons'
 import { de, en } from '@formkit/i18n'
 import { primeInputs, primeOutputs } from '@sfxcode/formkit-primevue'
 import { addPrimeAsteriskPlugin } from '@sfxcode/formkit-primevue/plugins'
+import '@formkit/addons/css/multistep'
 
 const config: DefaultConfigOptions = {
   locales: { en, de },
@@ -27,6 +28,7 @@ const config: DefaultConfigOptions = {
         repeater: ['items'],
       },
     ),
+    createMultiStepPlugin(),
     addPrimeAsteriskPlugin,
   ],
 }

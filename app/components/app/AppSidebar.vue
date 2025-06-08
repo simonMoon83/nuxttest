@@ -9,15 +9,16 @@ const isOnMobile = useState<boolean>('isOnMobile')
 const logoSettings = ref('/primevue-logo.webp')
 
 // 로고 설정 로드
-const loadLogoSettings = () => {
-  if (process.client) {
+function loadLogoSettings() {
+  if (import.meta.client) {
     try {
       const saved = localStorage.getItem('customLogo')
       if (saved) {
         const parsed = JSON.parse(saved)
         logoSettings.value = parsed.logo
       }
-    } catch (error) {
+    }
+    catch (error) {
       console.error('로고 설정 로드 실패:', error)
       logoSettings.value = '/primevue-logo.webp'
     }
@@ -42,24 +43,28 @@ function onItemClick() {
 }
 
 // 이미지 로드 에러 핸들링
-const handleImageError = () => {
+function handleImageError() {
   logoSettings.value = '/primevue-logo.webp'
 }
 
 onMounted(async () => {
+  // DOM이 완전히 렌더링될 때까지 기다림
+  await nextTick()
+
   onResize()
   window.addEventListener('resize', onResize)
-  
+
   // 로고 설정 로드
   loadLogoSettings()
-  
+
   // 로고 업데이트 이벤트 리스너
   window.addEventListener('logo-updated', loadLogoSettings)
-  
+
   // 메뉴 데이터 로드
   try {
     await fetchMenuData()
-  } catch (err) {
+  }
+  catch (err) {
     console.error('메뉴 로드 실패:', err)
   }
 })
@@ -74,17 +79,23 @@ onUnmounted(() => {
   <div>
     <!-- 메뉴 로딩 상태 표시 -->
     <div v-if="isLoading" class="p-4 text-center">
-      <i class="pi pi-spin pi-spinner text-xl text-primary"></i>
-      <p class="mt-2 text-sm text-gray-600">메뉴 로딩 중...</p>
+      <i class="pi pi-spin pi-spinner text-xl text-primary" />
+      <p class="text-sm text-gray-600 mt-2">
+        메뉴 로딩 중...
+      </p>
     </div>
-    
+
     <!-- 메뉴 에러 상태 표시 -->
     <div v-else-if="error" class="p-4 text-center">
-      <i class="pi pi-exclamation-triangle text-xl text-red-500"></i>
-      <p class="mt-2 text-sm text-red-600">메뉴 로드 실패</p>
-      <p class="text-xs text-gray-500">기본 메뉴로 표시됩니다</p>
+      <i class="pi pi-exclamation-triangle text-xl text-red-500" />
+      <p class="text-sm text-red-600 mt-2">
+        메뉴 로드 실패
+      </p>
+      <p class="text-xs text-gray-500">
+        기본 메뉴로 표시됩니다
+      </p>
     </div>
-    
+
     <!-- 정상 메뉴 표시 -->
     <sidebar-menu
       v-else
@@ -99,17 +110,17 @@ onUnmounted(() => {
     >
       <template #header>
         <div v-if="!collapsed" class="flex">
-          <img 
-            class="m-6 w-8" 
-            :src="logoSettings" 
+          <img
+            class="m-6 w-8"
+            :src="logoSettings"
             alt="Primary Logo"
             @error="handleImageError"
           >
         </div>
         <div v-else>
-          <img 
-            class="ml-4 mt-6 w-6" 
-            :src="logoSettings" 
+          <img
+            class="ml-4 mt-6 w-6"
+            :src="logoSettings"
             alt="Primary Logo"
             @error="handleImageError"
           >
@@ -122,7 +133,7 @@ onUnmounted(() => {
         </div>
       </template>
     </sidebar-menu>
-    
+
     <div
       v-if="isOnMobile && !collapsed"
       class="sidebar-overlay"

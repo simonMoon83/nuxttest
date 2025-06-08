@@ -21,23 +21,25 @@ export const useAuthStore = defineStore('auth', () => {
 
   const login = async (username: string, password: string) => {
     isLoading.value = true
-    
+
     try {
       const data = await $fetch<LoginResponse>('/api/auth/login', {
         method: 'POST',
-        body: { username, password }
+        body: { username, password },
       })
-      
+
       user.value = data.user
       await navigateTo('/')
       return { success: true }
-    } catch (error: any) {
+    }
+    catch (error: any) {
       console.error('Login error:', error)
-      return { 
-        success: false, 
-        error: error.data?.message || 'Login failed' 
+      return {
+        success: false,
+        error: error.data?.message || 'Login failed',
       }
-    } finally {
+    }
+    finally {
       isLoading.value = false
     }
   }
@@ -47,7 +49,8 @@ export const useAuthStore = defineStore('auth', () => {
       await $fetch('/api/auth/logout', { method: 'POST' })
       user.value = null
       await navigateTo('/login')
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Logout error:', error)
       // 에러가 발생해도 로컬 상태는 클리어
       user.value = null
@@ -60,7 +63,8 @@ export const useAuthStore = defineStore('auth', () => {
       const data = await $fetch<AuthResponse>('/api/auth/me')
       user.value = data.user
       return true
-    } catch (error) {
+    }
+    catch (error) {
       console.log('인증 확인 실패:', error)
       user.value = null
       return false
@@ -68,28 +72,34 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const initAuth = async () => {
-    // 이미 사용자 정보가 있다면 재확인하지 않음 (클라이언트에서만)
-    if (process.client && user.value) {
-      return true
-    }
-    
-    try {
-      const result = await checkAuth()
-      return result
-    } catch (error) {
-      console.error('인증 초기화 실패:', error)
-      user.value = null
+    // SSR 중에는 인증 확인을 하지 않음
+    if (import.meta.server) {
       return false
     }
+
+    // 클라이언트에서만 실행
+    if (import.meta.client) {
+      try {
+        const result = await checkAuth()
+        return result
+      }
+      catch (error) {
+        console.error('인증 초기화 실패:', error)
+        user.value = null
+        return false
+      }
+    }
+
+    return false
   }
 
   return {
-    user: readonly(user),
+    user,
     isLoggedIn,
     isLoading,
     login,
     logout,
     checkAuth,
-    initAuth
+    initAuth,
   }
-}) 
+})

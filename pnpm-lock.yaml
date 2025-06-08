@@ -8,6 +8,12 @@ importers:
 
   .:
     dependencies:
+      ag-grid-community:
+        specifier: ^33.3.2
+        version: 33.3.2
+      ag-grid-vue3:
+        specifier: ^33.3.2
+        version: 33.3.2(vue@3.5.14(typescript@5.8.3))
       bcryptjs:
         specifier: ^2.4.3
         version: 2.4.3
@@ -2758,6 +2764,17 @@ packages:
     resolution: {integrity: sha512-OvQ/2pUDKmgfCg++xsTX1wGxfTaszcHVcTctW4UJB4hibJx2HXxxO5UmVgyjMa+ZDsiaf5wWLXYpRWMmBI0QHg==}
     engines: {node: '>=0.4.0'}
     hasBin: true
+
+  ag-charts-types@11.3.2:
+    resolution: {integrity: sha512-trPGqgGYiTeLgtf9nLuztDYOPOFOLbqHn1g2D99phf7QowcwdX0TPx0wfWG8Hm90LjB8IH+G2s3AZe2vrdAtMQ==}
+
+  ag-grid-community@33.3.2:
+    resolution: {integrity: sha512-9bx0e/+ykOyLvUxHqmdy0cRVANH6JAtv0yZdnBZEXYYqBAwN+G5a4NY+2I1KvoOCYzbk8SnStG7y4hCdVAAWOQ==}
+
+  ag-grid-vue3@33.3.2:
+    resolution: {integrity: sha512-O1FS0MQNNBdMZTUTGrk/KjdK9nuPPRbmmL+bFQr8jKp7VCmO9wLV4w9taWbLTgQqGN6rQ4BAb6m2RJ78cHM3tQ==}
+    peerDependencies:
+      vue: ^3.5.0
 
   agent-base@7.1.3:
     resolution: {integrity: sha512-jRR5wdylq8CkOe6hei19GGZnxM6rBGwFl3Bg0YItGDimvjGtAvdZk4Pu6Cl4u4Igsws4a1fd1Vq3ezrhn4KmFw==}
@@ -10897,6 +10914,17 @@ snapshots:
       acorn: 8.14.1
 
   acorn@8.14.1: {}
+
+  ag-charts-types@11.3.2: {}
+
+  ag-grid-community@33.3.2:
+    dependencies:
+      ag-charts-types: 11.3.2
+
+  ag-grid-vue3@33.3.2(vue@3.5.14(typescript@5.8.3)):
+    dependencies:
+      ag-grid-community: 33.3.2
+      vue: 3.5.14(typescript@5.8.3)
 
   agent-base@7.1.3: {}
 
