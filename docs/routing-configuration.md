@@ -31,21 +31,52 @@ graph TD
     B --> C[NuxtPage]
     C --> D{Auth Middleware}
     D -->|Authenticated| E[Protected Pages]
-    D -->|Not Authenticated| F[/login]
+    D -->|Not Authenticated| F[login]
 
-    E --> G[/ - Dashboard]
-    E --> H[/admin/* - Admin Pages]
-    E --> I[/form/* - Form Pages]
-    E --> J[/exam/* - Exam Pages]
-    E --> K[/data/* - Data Pages]
-    E --> L[/cms/* - CMS Pages]
-    E --> M[/ui/* - UI Components]
-    E --> N[/prime/* - PrimeVue Demo]
-    E --> O[/templates/* - Templates]
+    E --> G[Dashboard]
+    E --> H[admin/* - Admin Pages]
+    E --> I[form/* - Form Pages]
+    E --> J[exam/* - Exam Pages]
+    E --> K[data/* - Data Pages]
+    E --> L[cms/* - CMS Pages]
+    E --> M[ui/* - UI Components]
+    E --> N[prime/* - PrimeVue Demo]
+    E --> O[templates/* - Templates]
 
     F --> P[login.vue]
     F --> Q[login2.vue]
+
+    style A fill:#e1f5fe
+    style B fill:#f3e5f5
+    style C fill:#e8f5e8
+    style D fill:#fff3e0
+    style E fill:#e0f2f1
+    style F fill:#ffebee
 ```
+
+프로젝트의 라우팅은 다음과 같은 계층 구조를 가집니다:
+
+- **app.vue** → **NuxtLayout** → **NuxtPage**
+- **Auth Middleware**를 통한 인증 검사
+- 인증된 사용자는 보호된 페이지에 접근
+- 미인증 사용자는 로그인 페이지로 리디렉션
+
+### 보호된 페이지들
+
+- `/` - 메인 대시보드
+- `/admin/*` - 관리자 페이지들
+- `/form/*` - 폼 데모 페이지들
+- `/exam/*` - 실험 페이지들
+- `/data/*` - 데이터 페이지들
+- `/cms/*` - CMS 페이지들
+- `/ui/*` - UI 컴포넌트 페이지들
+- `/prime/*` - PrimeVue 데모 페이지들
+- `/templates/*` - 템플릿 페이지들
+
+### 공개 페이지들
+
+- `/login` - 기본 로그인 페이지
+- `/login2` - 대안 로그인 페이지
 
 ## 📁 페이지 디렉토리 구조
 
@@ -74,23 +105,52 @@ graph LR
     H --> H1[agGrid.vue]
     H --> H2[demo.vue]
     H --> H3[demodetail.vue]
+
+    style A fill:#e3f2fd
+    style F fill:#fff3e0
+    style G fill:#e8f5e8
+    style H fill:#fce4ec
 ```
 
-### 📊 라우팅 테이블
+```
+app/pages/
+├── index.vue              # 메인 대시보드
+├── login.vue              # 기본 로그인
+├── login2.vue             # 대안 로그인
+├── 404.vue                # 404 에러 페이지
+├── admin/                 # 관리자 페이지들
+│   ├── menu.vue
+│   ├── menu2.vue
+│   └── system.vue
+├── form/                  # 폼 데모 페이지들
+│   ├── index.vue
+│   └── toggle.vue
+├── exam/                  # 실험 페이지들
+│   ├── agGrid.vue
+│   ├── demo.vue
+│   └── demodetail.vue
+├── data/                  # 데이터 페이지들
+├── cms/                   # CMS 페이지들
+├── ui/                    # UI 컴포넌트 페이지들
+├── prime/                 # PrimeVue 데모 페이지들
+└── templates/             # 템플릿 페이지들
+```
 
-| 경로               | 파일                  | 설명                | 인증 필요 |
-| ------------------ | --------------------- | ------------------- | --------- |
-| `/`                | `index.vue`           | 메인 대시보드       | ✅        |
+## 📊 라우팅 테이블
+
+| 경로               | 파일                  | 설명                 | 인증 필요 |
+| ------------------ | --------------------- | -------------------- | --------- |
+| `/`                | `index.vue`           | 메인 대시보드        | ✅        |
 | `/login`           | `login.vue`           | 로그인 페이지 (기본) | ❌        |
 | `/login2`          | `login2.vue`          | 로그인 페이지 (대안) | ❌        |
-| `/admin/menu`      | `admin/menu.vue`      | 관리자 메뉴 관리    | ✅        |
-| `/admin/menu2`     | `admin/menu2.vue`     | 고급 메뉴 관리      | ✅        |
-| `/admin/system`    | `admin/system.vue`    | 시스템 설정         | ✅        |
-| `/form`            | `form/index.vue`      | 폼 데모 메인        | ✅        |
-| `/form/toggle`     | `form/toggle.vue`     | 토글 폼 데모        | ✅        |
-| `/exam/agGrid`     | `exam/agGrid.vue`     | AG Grid 데모        | ✅        |
-| `/exam/demo`       | `exam/demo.vue`       | FormKit 데모        | ✅        |
-| `/exam/demodetail` | `exam/demodetail.vue` | 데모 상세 페이지    | ✅        |
+| `/admin/menu`      | `admin/menu.vue`      | 관리자 메뉴 관리     | ✅        |
+| `/admin/menu2`     | `admin/menu2.vue`     | 고급 메뉴 관리       | ✅        |
+| `/admin/system`    | `admin/system.vue`    | 시스템 설정          | ✅        |
+| `/form`            | `form/index.vue`      | 폼 데모 메인         | ✅        |
+| `/form/toggle`     | `form/toggle.vue`     | 토글 폼 데모         | ✅        |
+| `/exam/agGrid`     | `exam/agGrid.vue`     | AG Grid 데모         | ✅        |
+| `/exam/demo`       | `exam/demo.vue`       | FormKit 데모         | ✅        |
+| `/exam/demodetail` | `exam/demodetail.vue` | 데모 상세 페이지     | ✅        |
 
 ## 🎨 레이아웃 시스템
 
@@ -110,26 +170,43 @@ graph TD
     C --> C2[Menu Items]
     C --> C3[Collapse/Expand]
 
-    D --> D1[<slot />]
+    D --> D1[slot]
     D --> D2[Page Content]
+
+    style A fill:#e1f5fe
+    style B fill:#fff3e0
+    style C fill:#e8f5e8
+    style D fill:#fce4ec
+    style E fill:#f3e5f5
 ```
 
-### 📝 레이아웃 구성 요소
+### 기본 레이아웃 구조
 
-- **AppTopbar**: 상단 네비게이션 바
+- **default.vue**: 메인 레이아웃
+  - **AppTopbar**: 상단 네비게이션 바
+  - **AppSidebar**: 사이드 네비게이션
+  - **Main Content Area**: 페이지 컨텐츠 영역
+  - **AppFooter**: 하단 푸터
 
-  - 사용자 프로필 드롭다운
-  - 다크/라이트 모드 토글
-  - GitHub 링크
-  - 로그아웃 버튼
+### 레이아웃 구성 요소
 
-- **AppSidebar**: 사이드 네비게이션
+#### AppTopbar
 
-  - 메뉴 항목들
-  - 접기/펼치기 기능
-  - 반응형 디자인
+- 사용자 프로필 드롭다운
+- 다크/라이트 모드 토글
+- GitHub 링크
+- 로그아웃 버튼
 
-- **AppFooter**: 하단 푸터
+#### AppSidebar
+
+- 네비게이션 메뉴
+- 메뉴 항목들
+- 접기/펼치기 기능
+- 반응형 디자인
+
+#### AppFooter
+
+- 하단 정보 표시
 
 ## 🔐 미들웨어 설정
 
@@ -145,9 +222,27 @@ flowchart TD
     E -->|No| G[Redirect to /login]
     D --> H{Auth Error?}
     H -->|Yes| G
+
+    style A fill:#e3f2fd
+    style B fill:#fff3e0
+    style C fill:#e8f5e8
+    style D fill:#fff3e0
+    style E fill:#fff3e0
+    style F fill:#e8f5e8
+    style G fill:#ffebee
+    style H fill:#fff3e0
 ```
 
-#### 🔧 인증 로직
+인증 미들웨어는 다음과 같은 플로우로 동작합니다:
+
+1. 라우트 요청 수신
+2. 경로가 `/login`인지 확인
+3. 로그인 페이지가 아닌 경우 인증 초기화
+4. 사용자 로그인 상태 확인
+5. 미로그인 시 `/login`으로 리디렉션
+6. 로그인 시 요청된 페이지로 이동
+
+#### 인증 로직 코드
 
 ```typescript
 // app/middleware/auth.ts
@@ -198,6 +293,22 @@ sequenceDiagram
     end
 ```
 
+### 인증된 사용자 플로우
+
+1. 사용자가 라우트 요청
+2. 라우터가 미들웨어 실행
+3. 미들웨어가 인증 상태 확인
+4. 인증 성공 시 요청된 페이지 로드
+5. 페이지 컨텐츠 표시
+
+### 미인증 사용자 플로우
+
+1. 사용자가 라우트 요청
+2. 라우터가 미들웨어 실행
+3. 미들웨어가 인증 상태 확인
+4. 인증 실패 시 `/login`으로 리디렉션
+5. 로그인 폼 표시
+
 ## 📄 페이지별 상세 설명
 
 ### 🏠 메인 페이지 (`/`)
@@ -205,6 +316,7 @@ sequenceDiagram
 - **파일**: `app/pages/index.vue`
 - **기능**: 대시보드 메인 페이지
 - **특징**: 인증 필요, 메인 레이아웃 사용
+- **내용**: 프로젝트 소개, 기능 카드들, 사용자 환영 메시지
 
 ### 🔑 로그인 페이지
 
@@ -213,35 +325,71 @@ sequenceDiagram
 - **파일**: `app/pages/login.vue`
 - **기능**: 기본 로그인 인터페이스
 - **특징**: 인증 불필요, 심플한 로그인 폼
+- **레이아웃**: 별도 레이아웃 사용
 
 #### Alternative Login (`/login2`)
 
 - **파일**: `app/pages/login2.vue`
 - **기능**: 대안 로그인 인터페이스
-- **특징**: 인증 불필요, 향상된 UI/UX
+- **특징**: 인증 불필요, FormKit 기반 향상된 UI/UX
+- **레이아웃**: 별도 레이아웃 사용
 
 ### 🛠️ 관리자 페이지 (`/admin/*`)
 
-관리자 페이지는 다음과 같은 구조를 가집니다:
+```mermaid
+graph LR
+    A[/admin] --> B[/admin/menu<br/>기본 메뉴 관리]
+    A --> C[/admin/menu2<br/>고급 메뉴 관리]
+    A --> D[/admin/system<br/>시스템 설정]
 
-- `/admin/menu` - 기본 메뉴 관리
-- `/admin/menu2` - 고급 메뉴 관리
-- `/admin/system` - 시스템 설정
+    style A fill:#e3f2fd
+    style B fill:#fff3e0
+    style C fill:#e8f5e8
+    style D fill:#fce4ec
+```
+
+관리자 전용 페이지들로 시스템 관리 기능을 제공합니다:
+
+- **`/admin/menu`**: 기본 메뉴 관리 인터페이스
+- **`/admin/menu2`**: 고급 메뉴 관리 기능
+- **`/admin/system`**: 시스템 설정 및 구성
 
 ### 📝 폼 페이지 (`/form/*`)
 
-폼 관련 데모 페이지들:
+```mermaid
+graph LR
+    A[/form] --> B[/form/index<br/>FormKit 기본 데모]
+    A --> C[/form/toggle<br/>토글 컴포넌트 데모]
 
-- `/form/index` - FormKit 기본 데모
-- `/form/toggle` - 토글 컴포넌트 데모
+    style A fill:#e3f2fd
+    style B fill:#e8f5e8
+    style C fill:#fff3e0
+```
+
+FormKit을 활용한 폼 데모 페이지들:
+
+- **`/form/index`**: FormKit 기본 데모 및 예제
+- **`/form/toggle`**: 토글 컴포넌트 데모
 
 ### 🧪 실험 페이지 (`/exam/*`)
 
+```mermaid
+graph LR
+    A[/exam] --> B[/exam/agGrid<br/>AG Grid 데모]
+    A --> C[/exam/demo<br/>FormKit 고급 데모]
+    A --> D[/exam/demodetail<br/>데모 상세 페이지]
+
+    style A fill:#e3f2fd
+    style B fill:#fce4ec
+    style C fill:#e8f5e8
+    style D fill:#fff3e0
+```
+
 실험적 기능들을 테스트하는 페이지들:
 
-- `/exam/agGrid` - AG Grid 데모
-- `/exam/demo` - FormKit 고급 데모
-- `/exam/demodetail` - 데모 상세 페이지
+- **`/exam/agGrid`**: AG Grid 데이터 테이블 데모
+- **`/exam/demo`**: FormKit 고급 기능 데모
+- **`/exam/demodetail`**: 데모 상세 페이지
 
 ## ⚙️ 라우팅 설정 방법
 
@@ -260,6 +408,7 @@ definePageMeta({
 <template>
   <div>
     <h1>새 페이지</h1>
+    <p>페이지 내용</p>
   </div>
 </template>
 ```
@@ -283,6 +432,12 @@ app/pages/
 const route = useRoute()
 const userId = route.params.id
 </script>
+
+<template>
+  <div>
+    <h1>사용자 ID: {{ userId }}</h1>
+  </div>
+</template>
 ```
 
 ### 4. 페이지 미들웨어 적용
@@ -294,6 +449,12 @@ definePageMeta({
   middleware: 'auth' // 인증 미들웨어 적용
 })
 </script>
+
+<template>
+  <div>
+    <h1>보호된 페이지</h1>
+  </div>
+</template>
 ```
 
 ## 🔧 Nuxt.config.ts 라우팅 설정
@@ -314,7 +475,14 @@ export default defineNuxtConfig({
   modules: [
     '@pinia/nuxt',
     '@nuxt/content',
-    // ... 기타 모듈들
+    '@vueuse/nuxt',
+    '@nuxt/test-utils/module',
+    '@nuxt/eslint',
+    '@nuxt/image',
+    '@nuxt/fonts',
+    '@sfxcode/formkit-primevue-nuxt',
+    '@unocss/nuxt',
+    '@pinia/colada-nuxt',
   ],
 
   // SSR 설정
@@ -364,10 +532,7 @@ const LazyComponent = defineAsyncComponent(() => import('~/components/Heavy.vue'
 
 ### 2. 페이지 분할
 
-```typescript
-// 라우트별 코드 분할 자동 적용
-// Nuxt가 각 페이지를 별도 청크로 분할
-```
+Nuxt는 각 페이지를 자동으로 별도 청크로 분할하여 초기 로딩 시간을 최적화합니다.
 
 ### 3. 미들웨어 최적화
 
@@ -385,6 +550,8 @@ if (import.meta.server && !authStore.initialized) {
 3. **미들웨어**: 최소한의 로직으로 유지
 4. **메타데이터**: 각 페이지에 적절한 메타 설정
 5. **에러 처리**: 404 페이지 및 에러 바운더리 구현
+6. **SEO**: 각 페이지에 적절한 title과 description 설정
+7. **접근성**: 적절한 ARIA 라벨과 시맨틱 HTML 사용
 
 ---
 

@@ -25,20 +25,22 @@ graph TB
         UI --> LoginForm
         UI --> Store
     end
-    
+
     subgraph "🔄 Nuxt 3 Server Layer"
         API[Server API Routes]
-        LoginAPI[/api/auth/login]
-        LogoutAPI[/api/auth/logout]
-        MeAPI[/api/auth/me]
-        
+        LoginAPI[api/auth/login]
+        LogoutAPI[api/auth/logout]
+        MeAPI[api/auth/me]
+
+
+
         Utils[Server Utils]
         JWT[JWT Utils]
         DB[Database Utils]
-        
+
         Plugins[Server Plugins]
         InitDB[init-db.ts]
-        
+
         API --> LoginAPI
         API --> LogoutAPI
         API --> MeAPI
@@ -46,13 +48,13 @@ graph TB
         Utils --> DB
         Plugins --> InitDB
     end
-    
+
     subgraph "🗄️ Database Layer"
         MSSQL[(MSSQL Database)]
         Users[app_users Table]
         MSSQL --> Users
     end
-    
+
     %% Connections
     Store -.->|HTTP Requests| API
     LoginAPI -.->|JWT Operations| JWT
@@ -61,12 +63,12 @@ graph TB
     LogoutAPI -.->|Cookie Management| Store
     DB -.->|SQL Queries| MSSQL
     InitDB -.->|Initialize| DB
-    
+
     %% Styling
     classDef clientClass fill:#e1f5fe
     classDef serverClass fill:#f3e5f5
     classDef dbClass fill:#e8f5e8
-    
+ 
     class UI,LoginForm,Store clientClass
     class API,LoginAPI,LogoutAPI,MeAPI,Utils,JWT,DB,Plugins,InitDB serverClass
     class MSSQL,Users dbClass
@@ -200,7 +202,117 @@ graph LR
     LocalDB -.->|Optimized with| ConnPool
 ```
 
+### 🔐 인증 플로우 다이어그램
+
+```mermaid
+flowchart TD
+    A[사용자 로그인 시도] --> B{입력값 검증}
+    B -->|유효하지 않음| C[에러 메시지 반환]
+    B -->|유효함| D[데이터베이스에서 사용자 조회]
+    
+    D --> E{사용자 존재?}
+    E -->|없음| F[사용자 없음 에러]
+    E -->|있음| G[비밀번호 검증]
+    
+    G --> H{bcrypt.compare}
+    H -->|실패| I[인증 실패 에러]
+    H -->|성공| J[JWT 토큰 생성]
+    
+    J --> K[HTTP-only 쿠키 설정]
+    K --> L[사용자 정보 반환]
+    L --> M[로그인 성공]
+    
+    C --> N[로그인 폼 유지]
+    F --> N
+    I --> N
+    M --> O[대시보드 리다이렉트]
+    
+    style A fill:#e3f2fd
+    style M fill:#e8f5e8
+    style O fill:#e8f5e8
+    style C fill:#ffebee
+    style F fill:#ffebee
+    style I fill:#ffebee
+    style N fill:#fff3e0
+```
+
+### 🛡️ 보안 레이어 다이어그램
+
+```mermaid
+graph TB
+    subgraph "🌐 Network Layer"
+        HTTPS[HTTPS/TLS 1.3]
+        CORS[CORS Policy]
+        CSP[Content Security Policy]
+    end
+    
+    subgraph "🍪 Cookie Security"
+        HttpOnly[HTTP-only Flag]
+        Secure[Secure Flag]
+        SameSite[SameSite=Strict]
+        MaxAge[24h Expiry]
+    end
+    
+    subgraph "🎫 Token Security"
+        JWTSign[JWT Signing]
+        JWTVerify[JWT Verification]
+        TokenExp[Token Expiration]
+        SecretKey[Environment Secret]
+    end
+    
+    subgraph "🔐 Password Security"
+        Bcrypt[bcrypt Hashing]
+        Salt[Salt Rounds: 10]
+        NoPlaintext[No Plaintext Storage]
+    end
+    
+    subgraph "🗄️ Database Security"
+        SQLInjection[SQL Injection Prevention]
+        ParamQueries[Parameterized Queries]
+        ConnPool[Connection Pooling]
+        Encryption[Data Encryption]
+    end
+    
+    HTTPS --> HttpOnly
+    HttpOnly --> JWTSign
+    JWTSign --> Bcrypt
+    Bcrypt --> SQLInjection
+    
+    style HTTPS fill:#e8f5e8
+    style HttpOnly fill:#e3f2fd
+    style JWTSign fill:#fff3e0
+    style Bcrypt fill:#fce4ec
+    style SQLInjection fill:#f3e5f5
+```
+
 ## 📁 프로젝트 구조
+
+```mermaid
+graph LR
+    A[server/] --> B[api/]
+    A --> C[utils/]
+    A --> D[plugins/]
+    
+    B --> B1[auth/]
+    B1 --> B2[login.post.ts]
+    B1 --> B3[logout.post.ts]
+    B1 --> B4[me.get.ts]
+    
+    C --> C1[db.ts]
+    C --> C2[jwt.ts]
+    
+    D --> D1[init-db.ts]
+    
+    E[stores/] --> E1[auth.ts]
+    F[components/] --> F1[LoginForm.vue]
+    
+    style A fill:#e3f2fd
+    style B fill:#fff3e0
+    style C fill:#e8f5e8
+    style D fill:#fce4ec
+    style E fill:#f3e5f5
+    style F fill:#e1f5fe
+```
 
 ```
 server/
@@ -225,6 +337,20 @@ components/
 ## 🗄 데이터베이스 설정
 
 ### 테이블 구조 (`app_users`)
+
+```mermaid
+erDiagram
+    app_users {
+        int id PK "IDENTITY(1,1)"
+        nvarchar username UK "UNIQUE NOT NULL"
+        nvarchar email UK "UNIQUE NOT NULL"
+        nvarchar password "NOT NULL"
+        nvarchar full_name
+        datetime2 created_at "DEFAULT GETDATE()"
+        datetime2 updated_at "DEFAULT GETDATE()"
+        bit is_active "DEFAULT 1"
+    }
+```
 
 ```sql
 CREATE TABLE app_users (
