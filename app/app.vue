@@ -1,6 +1,6 @@
 <script setup>
 useHead({
-  title: 'Nuxt 3 PrimeVue Starter',
+  title: 'SMART MES',
 })
 
 // Favicon 자동 로딩
