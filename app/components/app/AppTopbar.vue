@@ -30,11 +30,11 @@ function toggleProfileCard() {
         >
           <!-- 사용자 아바타 -->
           <div class="relative">
-            <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center mr-3 shadow-sm">
-              <i class="pi pi-user text-white text-sm"></i>
+            <div class="w-8 h-8 bg-blue-500 dark:bg-white dark:bg-opacity-20 rounded-full flex items-center justify-center mr-3 backdrop-blur-sm shadow-sm flex-shrink-0">
+              <i class="pi pi-user text-white dark:text-white text-sm" aria-hidden="true"></i>
             </div>
             <!-- 온라인 상태 표시 -->
-            <div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div>
+            <div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full shadow-md ring-1 ring-green-200 dark:ring-green-900/30"></div>
           </div>
           
           <!-- 사용자 정보 - 항상 두 줄로 표시 -->
@@ -73,7 +73,7 @@ function toggleProfileCard() {
     </Toolbar>
 
     <!-- 사용자 프로필 카드 -->
-    <AppUserProfileCard 
+    <AppUserProfileCard2
       v-model:visible="showProfileCard"
       :user="authStore.user"
       @logout="handleLogout"
