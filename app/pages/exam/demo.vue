@@ -1,13 +1,21 @@
 <script setup lang='ts'>
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
 import { AgGridVue } from 'ag-grid-vue3'
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed, watch } from 'vue'
 // Legacy 테마 사용 시 필요한 CSS 파일들 임포트
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
 
 const { addElement } = useFormKitSchema()
 const { t } = useI18n()
+
+// 컬러 모드 감지
+const colorMode = useColorMode()
+
+// AG-Grid 테마 클래스 계산
+const agGridThemeClass = computed(() => {
+  return colorMode.value === 'dark' ? 'ag-theme-quartz-dark' : 'ag-theme-quartz'
+})
 
 const data = ref()
 
@@ -145,6 +153,22 @@ const rowSelection = ref({
   headerCheckbox: true,
 })
 
+// 테마 업데이트 함수
+const updateGridTheme = () => {
+  const gridDiv = document.querySelector('.ag-grid-demo')
+  if (gridDiv) {
+    // 기존 테마 클래스 제거
+    gridDiv.classList.remove('ag-theme-quartz', 'ag-theme-quartz-dark')
+    // 새 테마 클래스 추가
+    gridDiv.classList.add(agGridThemeClass.value)
+  }
+}
+
+// 컬러 모드 변경 감지
+watch(() => colorMode.value, () => {
+  updateGridTheme()
+}, { immediate: true })
+
 // 이벤트 핸들러
 function onCellClicked(event: any) {
   console.warn('Cell clicked:', event.data)
@@ -176,7 +200,7 @@ function onCellClicked(event: any) {
       </div>
 
       <ClientOnly>
-        <div class="ag-theme-quartz" style="height: 500px; width: 100%;">
+        <div :class="agGridThemeClass" class="ag-grid-demo" style="height: 500px; width: 100%;">
           <AgGridVue
             :row-data="rowData"
             :column-defs="columnDefs"

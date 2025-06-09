@@ -88,7 +88,7 @@ export default defineNuxtConfig({
       ripple: true,
     },
     components: {
-      exclude: [...wrappedPrimeInputs, 'Button', 'Form', 'FormField', 'Chart'],
+      exclude: [...wrappedPrimeInputs, 'Form', 'FormField', 'Chart'],
     },
 
   },

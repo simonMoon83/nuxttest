@@ -2,6 +2,13 @@
 useHead({
   title: 'Nuxt 3 PrimeVue Starter',
 })
+
+// Favicon 자동 로딩
+const { loadFaviconFromSettings } = useFavicon()
+
+onMounted(() => {
+  loadFaviconFromSettings()
+})
 </script>
 
 <template>

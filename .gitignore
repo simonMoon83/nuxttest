@@ -24,6 +24,10 @@ dist
 .build-*
 .netlify
 
+# Storage (app settings and uploads)
+storage/
+public/uploads/
+
 # Env
 .env
 

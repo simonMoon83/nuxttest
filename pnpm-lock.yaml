@@ -28,7 +28,7 @@ importers:
         version: 10.0.4
       nuxt3-primevue-starter:
         specifier: 'file:'
-        version: 'file:'
+        version: file:(vue@3.5.14(typescript@5.8.3))
     devDependencies:
       '@antfu/eslint-config':
         specifier: ^4.13.2
@@ -14189,14 +14189,17 @@ snapshots:
     transitivePeerDependencies:
       - magicast
 
-  'nuxt3-primevue-starter@file:':
+  nuxt3-primevue-starter@file:(vue@3.5.14(typescript@5.8.3)):
     dependencies:
+      ag-grid-community: 33.3.2
+      ag-grid-vue3: 33.3.2(vue@3.5.14(typescript@5.8.3))
       bcryptjs: 2.4.3
       cookie: 0.6.0
       jsonwebtoken: 9.0.2
       mssql: 10.0.4
     transitivePeerDependencies:
       - supports-color
+      - vue
 
   nuxt@3.17.4(@libsql/client@0.14.0)(@parcel/watcher@2.5.1)(@types/node@22.15.21)(better-sqlite3@11.10.0)(db0@0.3.2(@libsql/client@0.14.0)(better-sqlite3@11.10.0))(encoding@0.1.13)(eslint@9.27.0(jiti@2.4.2))(ioredis@5.6.1)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.41.1)(sass@1.89.0)(terser@5.39.2)(tsx@4.19.2)(typescript@5.8.3)(vite@6.3.5(@types/node@22.15.21)(jiti@2.4.2)(sass@1.89.0)(terser@5.39.2)(tsx@4.19.2)(yaml@2.8.0))(yaml@2.8.0):
     dependencies:
