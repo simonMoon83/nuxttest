@@ -338,9 +338,9 @@ sequenceDiagram
 
 ```mermaid
 graph LR
-    A[/admin] --> B[/admin/menu<br/>기본 메뉴 관리]
-    A --> C[/admin/menu2<br/>고급 메뉴 관리]
-    A --> D[/admin/system<br/>시스템 설정]
+    A[admin] --> B[admin/menu<br/>기본 메뉴 관리]
+    A --> C[admin/menu2<br/>고급 메뉴 관리]
+    A --> D[admin/system<br/>시스템 설정]
 
     style A fill:#e3f2fd
     style B fill:#fff3e0
@@ -358,8 +358,8 @@ graph LR
 
 ```mermaid
 graph LR
-    A[/form] --> B[/form/index<br/>FormKit 기본 데모]
-    A --> C[/form/toggle<br/>토글 컴포넌트 데모]
+    A[form] --> B[form/index<br/>FormKit 기본 데모]
+    A --> C[form/toggle<br/>토글 컴포넌트 데모]
 
     style A fill:#e3f2fd
     style B fill:#e8f5e8
@@ -375,9 +375,9 @@ FormKit을 활용한 폼 데모 페이지들:
 
 ```mermaid
 graph LR
-    A[/exam] --> B[/exam/agGrid<br/>AG Grid 데모]
-    A --> C[/exam/demo<br/>FormKit 고급 데모]
-    A --> D[/exam/demodetail<br/>데모 상세 페이지]
+    A[exam] --> B[exam/agGrid<br/>AG Grid 데모]
+    A --> C[exam/demo<br/>FormKit 고급 데모]
+    A --> D[exam/demodetail<br/>데모 상세 페이지]
 
     style A fill:#e3f2fd
     style B fill:#fce4ec
