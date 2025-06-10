@@ -26,34 +26,8 @@ onMounted(async () => {
   }
 })
 
-const schema = ref<any>([
-  addElement('h5', ['SMART MES 로그인']),
-  {
-    $formkit: 'primeInputText',
-    name: 'username',
-    label: '사용자명',
-    outerClass: 'col-12',
-    validation: 'required',
-  },
-  {
-    $formkit: 'primePassword',
-    name: 'password',
-    label: '비밀번호',
-    outerClass: 'col-12',
-    validation: 'required',
-    toggleMask: true, // 암호 미리보기 버튼 활성화
-  },
-  {
-    $formkit: 'primeCheckbox',
-    name: 'rememberMe',
-    label: '로그인 상태 유지',
-    outerClass: 'col-12',
-  },
-])
-
 async function handleLogin() {
-  if (!data.value)
-    return
+  if (!data.value) return
 
   error.value = ''
   console.warn('로그인 시도:', data.value)
@@ -70,20 +44,13 @@ async function handleLogin() {
     if (result && result.success) {
       console.warn('로그인 성공!')
       await navigateTo('/')
-    }
-    else {
+    } else {
       error.value = result?.error || '로그인에 실패했습니다.'
     }
-  }
-  catch (err: any) {
+  } catch (err: any) {
     error.value = '로그인 중 오류가 발생했습니다.'
     console.error('Login error:', err)
   }
-}
-
-async function submitHandler(_formData: any) {
-  // FormKitDataEdit의 @data-saved 이벤트 처리
-  await handleLogin()
 }
 
 function resetForm() {
@@ -91,6 +58,71 @@ function resetForm() {
     data.value = { username: '', password: '', rememberMe: false }
     error.value = ''
   }
+}
+
+const schema = ref<any>([
+  addElement('h5', ['SMART MES 로그인']),
+  {
+    $formkit: 'primeInputText',
+    name: 'username',
+    label: '사용자명',
+    outerClass: 'col-12',
+    validation: 'required',
+  },
+  {
+    $formkit: 'primePassword',
+    name: 'password',
+    label: '비밀번호',
+    outerClass: 'col-12',
+    validation: 'required',
+    toggleMask: true,
+  },
+  {
+    $formkit: 'primeCheckbox',
+    name: 'rememberMe',
+    label: '로그인 상태 유지',
+    outerClass: 'col-12',
+  },
+  
+  // 버튼 그룹
+  {
+    $el: 'div',
+    attrs: {
+      class: 'col-12 w-full mt-6 space-y-3'
+    },
+    children: [
+      // 초기화 버튼 - PrimeVue Button 컴포넌트 사용
+      {
+        $cmp: 'Button',
+        props: {
+          label: '초기화',
+          outlined: true,
+          severity: 'secondary',
+          size: 'large',
+          class: 'w-full transition-all duration-200 hover:shadow-lg',
+          onClick: () => resetForm()
+        }
+      },
+      
+      // 로그인 버튼 - PrimeVue Button 컴포넌트 사용
+      {
+        $cmp: 'Button',
+        props: {
+          label: authStore.isLoading ? '로그인 중...' : '로그인',
+          size: 'large',
+          class: 'w-full transition-all duration-200 hover:shadow-lg',
+          loading: authStore.isLoading,
+          disabled: authStore.isLoading,
+          onClick: () => handleLogin()
+        }
+      }
+    ]
+  }
+])
+
+async function submitHandler(_formData: any) {
+  // FormKitDataEdit의 @data-saved 이벤트 처리 (사용하지 않음)
+  // await handleLogin()
 }
 
 definePageMeta({
@@ -120,26 +152,6 @@ useHead({
           submit-label=""
           @data-saved="submitHandler"
         />
-
-        <!-- 버튼 그룹 -->
-        <div class="col-12 mt-4 flex gap-x-2 w-full items-center justify-end">
-          <button
-            type="button"
-            class="p-button p-component p-button-outlined p-button-secondary"
-            @click="resetForm"
-          >
-            초기화
-          </button>
-          <button
-            type="submit"
-            class="p-button p-component"
-            :disabled="authStore.isLoading"
-            @click="handleLogin"
-          >
-            <i v-if="authStore.isLoading" class="pi pi-spinner pi-spin mr-2" />
-            로그인
-          </button>
-        </div>
       </div>
 
       <!-- 로딩 상태 표시 -->
@@ -151,18 +163,18 @@ useHead({
       </div>
 
       <!-- 에러 메시지 표시 -->
-      <div v-if="error" class="mt-4 p-3 border border-red-200 rounded-md bg-red-50">
-        <p class="text-sm text-red-600">
+      <div v-if="error" class="mt-4 p-3 border border-red-200 rounded-md bg-red-50 dark:border-red-800 dark:bg-red-900/20">
+        <p class="text-sm text-red-600 dark:text-red-400">
           <i class="pi pi-exclamation-triangle mr-2" />
           {{ error }}
         </p>
       </div>
     </div>
 
-    <!-- 데이터 조건 출력 부분 -->
-    <div class="mt-8 w-full">
-      <div class="p-3 border border-yellow-200 rounded-md bg-yellow-50">
-        <h3 class="text-yellow-800 font-medium">
+    <!-- 안내 정보 -->
+    <div class="mt-8 w-full max-w-md">
+      <div class="p-3 border border-yellow-200 rounded-md bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20">
+        <h3 class="text-yellow-800 dark:text-yellow-200 font-medium">
           <i class="pi pi-info-circle mr-2" />
           기본 계정: admin / admin123
         </h3>
@@ -176,8 +188,13 @@ useHead({
   </div>
 </template>
 
-<style lang='scss' scoped>
+<style scoped>
+/* FormKit 기본 submit 버튼 숨기기 */
 :deep(.formkit-actions) {
+  display: none !important;
+}
+
+:deep(.formkit-outer[data-type='submit']) {
   display: none !important;
 }
 </style>

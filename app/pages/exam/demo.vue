@@ -17,6 +17,7 @@ const agGridThemeClass = computed(() => {
   return colorMode.value === 'dark' ? 'ag-theme-quartz-dark' : 'ag-theme-quartz'
 })
 
+const error = ref('')
 const data = ref()
 
 onMounted(() => {
@@ -82,33 +83,33 @@ const schema = ref<any>([
     },
     children: [
       {
-        $formkit: 'button',
-        name: 'customDataCheckButton',
-        label: '데이터 확인',
-        inputClass: 'p-button p-component p-button-secondary',
-        outerClass: '',
-        wrapperClass: '',
-        on: {
-          click: () => dataCheck(),
-        },
+        $cmp: 'Button',
+        props: {
+          label: '데이터 확인',
+          severity: 'secondary',
+          class: '',
+          onClick: () => dataCheck()
+        }
       },
       {
-        $formkit: 'button',
-        name: 'customResetButton',
-        label: '초기화',
-        type: 'reset',
-        inputClass: 'p-button p-component p-button-outlined p-button-secondary',
-        outerClass: '',
-        wrapperClass: '',
+        $cmp: 'Button',
+        props: {
+          label: '초기화',
+          outlined: true,
+          severity: 'secondary',
+          type: 'reset',
+          class: '',
+          onClick: () => resetForm()
+        }
       },
       {
-        $formkit: 'button',
-        name: 'customSaveButton',
-        label: t('save'),
-        type: 'submit',
-        inputClass: 'p-button p-component',
-        outerClass: '',
-        wrapperClass: '',
+        $cmp: 'Button',
+        props: {
+          label: t('save'),
+          type: 'submit',
+          name: 'customSaveButton',
+          class: ''
+        }
       },
     ],
   },
@@ -118,8 +119,16 @@ function dataCheck() {
   console.warn(data.value)
 }
 
+function resetForm() {
+  if (data.value) {
+    data.value = { search_condition1: '', search_condition2: '', search_condition3: '', search_condition4: '', search_condition5: '', search_condition6: '', search_condition7: '', search_condition8: '' }
+    error.value = ''
+  }
+}
+
 async function submitHandler() {
   // Lets pretend this is an ajax request:
+  alert('submitHandler')
   await new Promise(resolve => setTimeout(resolve, 1000))
 }
 
