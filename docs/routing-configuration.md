@@ -291,8 +291,8 @@ sequenceDiagram
         R->>P: Load Requested Page
         P-->>U: Show Page Content
     end
+  
 ```
-
 ### 인증된 사용자 플로우
 
 1. 사용자가 라우트 요청
