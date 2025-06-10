@@ -5,17 +5,26 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
   if (to.path === '/login') {
     return
   }
-  
-  // 서버사이드와 클라이언트사이드 모두에서 실행
+
+  // 서버사이드에서는 인증 체크 건너뛰기
+  if (import.meta.server) {
+    console.log('🔄 서버사이드에서는 인증 체크 건너뛰기')
+    return
+  }
+
+  // 클라이언트에서만 인증 확인
   try {
+    console.log('🔍 미들웨어: 클라이언트에서 인증 확인 중...')
     await authStore.initAuth()
     
     if (!authStore.isLoggedIn) {
-      console.log('사용자가 로그인되지 않음, 로그인 페이지로 리다이렉트')
+      console.log('❌ 사용자가 로그인되지 않음, 로그인 페이지로 리다이렉트')
       return navigateTo('/login')
     }
+    
+    console.log('✅ 인증 확인 완료, 페이지 접근 허용')
   } catch (error) {
-    console.error('인증 확인 중 오류:', error)
+    console.error('❌ 인증 확인 중 오류:', error)
     return navigateTo('/login')
   }
 }) 
