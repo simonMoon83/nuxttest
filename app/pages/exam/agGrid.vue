@@ -110,12 +110,15 @@ const resetFilters = () => {
 
 // 테마 업데이트 함수
 const updateGridTheme = () => {
-  const gridDiv = document.querySelector('#myGrid')
-  if (gridDiv) {
-    // 기존 테마 클래스 제거
-    gridDiv.classList.remove('ag-theme-quartz', 'ag-theme-quartz-dark')
-    // 새 테마 클래스 추가
-    gridDiv.classList.add(agGridThemeClass.value)
+  // 클라이언트에서만 실행
+  if (import.meta.client) {
+    const gridDiv = document.querySelector('#myGrid')
+    if (gridDiv) {
+      // 기존 테마 클래스 제거
+      gridDiv.classList.remove('ag-theme-quartz', 'ag-theme-quartz-dark')
+      // 새 테마 클래스 추가
+      gridDiv.classList.add(agGridThemeClass.value)
+    }
   }
 }
 

@@ -72,25 +72,25 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const initAuth = async () => {
-    // SSR 중에는 인증 확인을 하지 않음
-    if (import.meta.server) {
+    // 이미 사용자가 설정되어 있으면 다시 확인하지 않음
+    if (user.value) {
+      return true
+    }
+    
+    // 서버와 클라이언트 모두에서 인증 상태 확인 시도
+    try {
+      const data = await $fetch<AuthResponse>('/api/auth/me')
+      if (data && data.user) {
+        user.value = data.user
+        return true
+      }
+      user.value = null
       return false
     }
-
-    // 클라이언트에서만 실행
-    if (import.meta.client) {
-      try {
-        const result = await checkAuth()
-        return result
-      }
-      catch (error) {
-        console.error('인증 초기화 실패:', error)
-        user.value = null
-        return false
-      }
+    catch (error) {
+      user.value = null
+      return false
     }
-
-    return false
   }
 
   return {

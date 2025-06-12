@@ -21,38 +21,40 @@ function toggleProfileCard() {
       <template #start />
 
       <template #end>
-        <!-- 사용자 프로필 영역 -->
-        <div 
-          v-if="authStore.user" 
-          class="flex items-center mr-4 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 group"
-          @click="toggleProfileCard"
-          v-tooltip.bottom="'프로필 보기'"
-        >
-          <!-- 사용자 아바타 -->
-          <div class="relative">
-            <div class="w-8 h-8 bg-blue-500 dark:bg-white dark:bg-opacity-20 rounded-full flex items-center justify-center mr-3 backdrop-blur-sm shadow-sm flex-shrink-0">
-              <i class="pi pi-user text-white dark:text-white text-sm" aria-hidden="true"></i>
+        <!-- 사용자 프로필 영역 - ClientOnly로 감싸서 hydration mismatch 방지 -->
+        <ClientOnly>
+          <div 
+            v-show="authStore.user" 
+            class="flex items-center mr-4 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 group"
+            @click="toggleProfileCard"
+            v-tooltip.bottom="'프로필 보기'"
+          >
+            <!-- 사용자 아바타 -->
+            <div class="relative">
+              <div class="w-8 h-8 bg-blue-500 dark:bg-white dark:bg-opacity-20 rounded-full flex items-center justify-center mr-3 backdrop-blur-sm shadow-sm flex-shrink-0">
+                <i class="pi pi-user text-white dark:text-white text-sm" aria-hidden="true"></i>
+              </div>
+              <!-- 온라인 상태 표시 -->
+              <div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full shadow-md ring-1 ring-green-200 dark:ring-green-900/30"></div>
             </div>
-            <!-- 온라인 상태 표시 -->
-            <div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full shadow-md ring-1 ring-green-200 dark:ring-green-900/30"></div>
+            
+            <!-- 사용자 정보 - 항상 두 줄로 표시 -->
+            <div class="flex flex-col min-w-0 flex-1">
+              <span class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+                {{ authStore.user?.full_name || authStore.user?.username }}
+              </span>
+              <span class="text-xs text-gray-500 dark:text-gray-400 truncate">
+                {{ authStore.user?.email || 'user@example.com' }}
+              </span>
+            </div>
+            
+            <!-- 드롭다운 화살표 -->
+            <i 
+              class="pi pi-chevron-down ml-2 text-gray-400 text-xs transition-transform duration-200 group-hover:text-gray-600 dark:group-hover:text-gray-300"
+              :class="{ 'rotate-180': showProfileCard }"
+            ></i>
           </div>
-          
-          <!-- 사용자 정보 - 항상 두 줄로 표시 -->
-          <div class="flex flex-col min-w-0 flex-1">
-            <span class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
-              {{ authStore.user.full_name || authStore.user.username }}
-            </span>
-            <span class="text-xs text-gray-500 dark:text-gray-400 truncate">
-              {{ authStore.user.email || 'user@example.com' }}
-            </span>
-          </div>
-          
-          <!-- 드롭다운 화살표 -->
-          <i 
-            class="pi pi-chevron-down ml-2 text-gray-400 text-xs transition-transform duration-200 group-hover:text-gray-600 dark:group-hover:text-gray-300"
-            :class="{ 'rotate-180': showProfileCard }"
-          ></i>
-        </div>
+        </ClientOnly>
         
         <!-- 다른 버튼들 -->
         <AppColorMode class="ml-2 mr-2" />

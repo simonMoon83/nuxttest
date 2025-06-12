@@ -164,19 +164,27 @@ const rowSelection = ref({
 
 // 테마 업데이트 함수
 const updateGridTheme = () => {
-  const gridDiv = document.querySelector('.ag-grid-demo')
-  if (gridDiv) {
-    // 기존 테마 클래스 제거
-    gridDiv.classList.remove('ag-theme-quartz', 'ag-theme-quartz-dark')
-    // 새 테마 클래스 추가
-    gridDiv.classList.add(agGridThemeClass.value)
+  // 클라이언트에서만 실행
+  if (import.meta.client) {
+    const gridDiv = document.querySelector('.ag-grid-demo')
+    if (gridDiv) {
+      // 기존 테마 클래스 제거
+      gridDiv.classList.remove('ag-theme-quartz', 'ag-theme-quartz-dark')
+      // 새 테마 클래스 추가
+      gridDiv.classList.add(agGridThemeClass.value)
+    }
   }
 }
 
-// 컬러 모드 변경 감지
+// 컬러 모드 변경 감지 - immediate 제거하여 서버에서 실행되지 않도록 함
 watch(() => colorMode.value, () => {
   updateGridTheme()
-}, { immediate: true })
+})
+
+// 클라이언트에서만 초기 테마 설정
+onMounted(() => {
+  updateGridTheme()
+})
 
 // 이벤트 핸들러
 function onCellClicked(event: any) {

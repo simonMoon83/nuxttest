@@ -58,7 +58,7 @@
     "eslint-plugin-format": "^1.0.1",
     "happy-dom": "^17.4.7",
     "jsdom": "^26.1.0",
-    "nuxt": "^3.17.4",
+    "nuxt": "^3.17.5",
     "pinia": "^3.0.2",
     "pinia-colada": "^0.0.1",
     "sass": "1.89.0",
