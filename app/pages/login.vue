@@ -1,6 +1,8 @@
 <script setup lang="ts">
 definePageMeta({
   layout: false,
+  name: 'Login',
+  noTab: true,
 })
 
 const authStore = useAuthStore()
