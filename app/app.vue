@@ -13,7 +13,8 @@ onMounted(() => {
 
 <template>
   <NuxtLayout>
-    <NuxtPage />
+    <DynamicTabs />
+    <NuxtPage keepalive />
   </NuxtLayout>
 </template>
 
