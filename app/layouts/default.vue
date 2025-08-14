@@ -2,6 +2,7 @@
 const collapsed = useState<boolean>('collapsed')
 const isOnMobile = useState<boolean>('isOnMobile')
 const authStore = useAuthStore()
+const headerCollapsed = useState<boolean>('headerCollapsed', () => false)
 </script>
 
 <template>
@@ -14,11 +15,11 @@ const authStore = useAuthStore()
       <!-- 사이드바: 서버에서는 숨김, 클라이언트에서만 조건부 표시 -->
       <AppSidebar v-show="authStore.isLoggedIn" />
 
-      <div id="workspace" :class="[{ collapsed }, { mobile: isOnMobile }]">
+      <div id="workspace" :class="[{ collapsed }, { mobile: isOnMobile }, headerCollapsed ? 'workspace-compact' : 'workspace-default']">
         <!-- 탑바: 서버에서는 숨김, 클라이언트에서만 조건부 표시 -->
         <AppTopbar v-show="authStore.isLoggedIn" />
 
-        <div class="m-1 mt-4">
+        <div :class="headerCollapsed ? 'm-0 mt-0' : 'm-1 mt-2'">
           <slot />
         </div>
       </div>
@@ -27,5 +28,10 @@ const authStore = useAuthStore()
 </template>
 
 <style lang="scss">
-
+.workspace-compact {
+  padding-top: 0 !important;
+}
+.workspace-default {
+  padding-top: 0;
+}
 </style>

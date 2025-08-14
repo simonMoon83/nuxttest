@@ -21,7 +21,7 @@ function onClose(key: string) {
 </script>
 
 <template>
-  <div v-if="tabsStore.tabs.length && authStore.isLoggedIn" class="mb-2" data-testid="tabs">
+  <div v-if="tabsStore.tabs.length && authStore.isLoggedIn" class="mb-2 sticky top-0 z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm" data-testid="tabs">
     <div class="flex gap-1 flex-wrap">
       <div
         v-for="tab in tabsStore.tabs"
