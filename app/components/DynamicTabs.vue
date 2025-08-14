@@ -21,12 +21,14 @@ function onClose(key: string) {
 </script>
 
 <template>
-  <div v-if="tabsStore.tabs.length && authStore.isLoggedIn" class="mb-2">
+  <div v-if="tabsStore.tabs.length && authStore.isLoggedIn" class="mb-2" data-testid="tabs">
     <div class="flex gap-1 flex-wrap">
       <div
         v-for="tab in tabsStore.tabs"
         :key="tab.key"
         class="inline-flex items-center border rounded px-2 py-1 cursor-pointer"
+        :data-tab-key="tab.key"
+        :data-tab-title="tab.title"
         :class="{ 'bg-primary text-primary-contrast': tab.key === tabsStore.activeKey }"
         @click="activeKey = tab.key"
       >

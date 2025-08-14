@@ -1,4 +1,5 @@
 <script setup lang='ts'>
+const tabsStore = useTabsStore()
 const config = useRuntimeConfig()
 const { menu, fetchMenuData, isLoading, error } = useNavigationMenu()
 
@@ -89,7 +90,20 @@ function onResize() {
 function onToggleCollapse() {
 }
 
-function onItemClick() {
+function getItemLabel(item: any): string | undefined {
+  return item?.title || item?.label || item?.text || item?.name
+}
+
+function onItemClick(payloadOrEvent?: any, maybeItem?: any) {
+  // vue-sidebar-menu는 (event, item) 또는 ({ item, event }) 형태로 전달될 수 있음
+  const item = maybeItem ?? payloadOrEvent?.item ?? payloadOrEvent
+  const label = getItemLabel(item)
+  if (!label)
+    return
+  // 라우팅 미들웨어가 탭 생성 전에 제목을 미리 지정 (특수 경로 하드코딩 제거)
+  const path = item?.href || item?.to || item?.path || item?.url || item?.link
+  if (path)
+    tabsStore.setPendingTitle(path, label)
 }
 
 // 이미지 로드 에러 핸들링
