@@ -61,3 +61,17 @@ Temporary Items
 .apdisk
 
 .wrangler
+
+# Python venv & caches
+.venv/
+venv/
+ENV/
+env/
+python/.venv/
+python/venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
