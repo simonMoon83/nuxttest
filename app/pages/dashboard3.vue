@@ -298,41 +298,5 @@ onMounted(async () => {
 <style scoped>
 .ag-grid-container { height: 420px; width: 100%; }
 
-:deep(.formkit-actions) { display: none !important; }
-:deep(.formkit-outer[data-type='submit']) { display: none !important; }
-:deep(button[type='submit']) { display: none !important; }
-
-/* Compact form style */
-.compact-form :deep(.formkit-outer) { margin-bottom: 0.25rem; }
-.compact-form :deep(.formkit-label) { font-size: 0.75rem; margin-bottom: 0.15rem; }
-.compact-form :deep(.p-inputtext),
-.compact-form :deep(input[type='text']),
-.compact-form :deep(input[type='number']) { padding: 0.25rem 0.5rem; font-size: 0.875rem; height: 2rem; }
-.compact-form :deep(select) { padding: 0.25rem 0.5rem; font-size: 0.875rem; height: 2rem; }
-.compact-form :deep(.p-button) { padding: 0.25rem 0.5rem; font-size: 0.875rem; }
-
-/* 4-cols per row layout */
-.compact-form :deep(.formkit-form.grid-4) {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  column-gap: 0.75rem;
-  row-gap: 0.25rem;
-}
-.compact-form :deep(.formkit-form.grid-4 > .formkit-outer) {
-  width: 100% !important;
-  max-width: 100% !important;
-}
-.compact-form :deep(.formkit-form.grid-4 > .col-12) {
-  grid-column: 1 / -1;
-}
-
-/* Headings span full row in grid-4 */
-.compact-form :deep(.formkit-form.grid-4 > h1),
-.compact-form :deep(.formkit-form.grid-4 > h2),
-.compact-form :deep(.formkit-form.grid-4 > h3),
-.compact-form :deep(.formkit-form.grid-4 > h4),
-.compact-form :deep(.formkit-form.grid-4 > h5),
-.compact-form :deep(.formkit-form.grid-4 > h6) {
-  grid-column: 1 / -1;
-}
+/* grid-4 레이아웃은 전역(app/assets/sass/form.scss)에서 관리 */
 </style>
