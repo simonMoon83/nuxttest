@@ -40,9 +40,9 @@ const formData = ref({
   specYMax: '',
 })
 
-// FormKit 스키마
-const schema = ref<any>([
-  addElement('h4', ['TEST 조건']),
+// FormKit 스키마 (분리)
+const schemaTest = ref<any>([
+  addElement('h5', ['TEST 조건']),
   { $formkit: 'primeInputText', name: 'testTagsInput', label: 'Tags (쉼표/공백 구분)', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'testBucket', label: 'Bucket', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'testWindow', label: 'Window (예: 1d,12h)', outerClass: 'col-3' },
@@ -51,8 +51,19 @@ const schema = ref<any>([
   { $formkit: 'primeInputText', name: 'testEnd', label: 'End(YYYY-MM-DD)', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'testYMin', label: 'Y Min', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'testYMax', label: 'Y Max', outerClass: 'col-3' },
+  {
+    $el: 'div',
+    attrs: { class: 'col-12 w-full flex justify-end items-center gap-x-2 mt-2' },
+    children: [
+      { $cmp: 'Button', props: { label: 'TEST 조회', severity: 'primary', onClick: () => fetchTest() } },
+      { $cmp: 'Button', props: { label: 'TEST 범위 적용', severity: 'secondary', onClick: () => updateTestChart() } },
+      { $cmp: 'Button', props: { label: 'TEST 초기화', outlined: true, severity: 'secondary', onClick: () => resetTest() } },
+    ],
+  },
+])
 
-  addElement('h4', ['SPEC 조건']),
+const schemaSpec = ref<any>([
+  addElement('h5', ['SPEC 조건']),
   { $formkit: 'primeInputText', name: 'specTag', label: 'Tag', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'specBucket', label: 'Bucket', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'specWindow', label: 'Window (예: 4h,1d)', outerClass: 'col-3' },
@@ -61,26 +72,37 @@ const schema = ref<any>([
   { $formkit: 'primeInputText', name: 'specEnd', label: 'End(YYYY-MM-DD)', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'specYMin', label: 'Y Min', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'specYMax', label: 'Y Max', outerClass: 'col-3' },
-
-  // 버튼 그룹
   {
     $el: 'div',
-    attrs: { class: 'col-12 w-full flex justify-end items-center gap-x-2 mt-4' },
+    attrs: { class: 'col-12 w-full flex justify-end items-center gap-x-2 mt-2' },
     children: [
-      { $cmp: 'Button', props: { label: 'TEST 조회', severity: 'primary', onClick: () => fetchTest() } },
       { $cmp: 'Button', props: { label: 'SPEC 조회', severity: 'primary', onClick: () => fetchSpec() } },
-      { $cmp: 'Button', props: { label: 'TEST 범위 적용', severity: 'secondary', onClick: () => updateTestChart() } },
       { $cmp: 'Button', props: { label: 'SPEC 범위 적용', severity: 'secondary', onClick: () => updateSpecChart() } },
-      { $cmp: 'Button', props: { label: '초기화', outlined: true, severity: 'secondary', onClick: () => resetForm() } },
+      { $cmp: 'Button', props: { label: 'SPEC 초기화', outlined: true, severity: 'secondary', onClick: () => resetSpec() } },
     ],
   },
 ])
 
-function resetForm() {
-  formData.value = {
-    testTagsInput: 'A', testBucket: 'testspc', testWindow: '1d', testMeasurement: 'TESTSPC', testStart: '', testEnd: '', testYMin: '', testYMax: '',
-    specTag: 'A', specBucket: 'testspecspc', specWindow: '4h', specMeasurement: 'TESTSPECSPC', specStart: '', specEnd: '', specYMin: '', specYMax: '',
-  }
+function resetTest() {
+  formData.value.testTagsInput = 'A'
+  formData.value.testBucket = 'testspc'
+  formData.value.testWindow = '1d'
+  formData.value.testMeasurement = 'TESTSPC'
+  formData.value.testStart = ''
+  formData.value.testEnd = ''
+  formData.value.testYMin = ''
+  formData.value.testYMax = ''
+}
+
+function resetSpec() {
+  formData.value.specTag = 'A'
+  formData.value.specBucket = 'testspecspc'
+  formData.value.specWindow = '4h'
+  formData.value.specMeasurement = 'TESTSPECSPC'
+  formData.value.specStart = ''
+  formData.value.specEnd = ''
+  formData.value.specYMin = ''
+  formData.value.specYMax = ''
 }
 
 // 데이터 저장
@@ -241,25 +263,27 @@ onMounted(async () => {
       <p v-if="errorMessage" class="text-sm text-red-600 mt-2">{{ errorMessage }}</p>
     </div>
 
+    <!-- TEST: 조건 + 차트/표 -->
     <div class="card p-4">
-      <FormKitDataEdit v-model="formData" :schema="schema" submit-label="" />
-    </div>
-
-    <div class="card p-4">
-      <h3 class="font-semibold mb-3">TEST 차트 / 표</h3>
-      <ClientOnly>
-        <component :is="VChart" v-if="echartsReady && VChart" :option="testOptions" autoresize style="height: 360px; width: 100%" />
-      </ClientOnly>
+      <FormKitDataEdit v-model="formData" :schema="schemaTest" submit-label="" />
+      <div class="mt-4">
+        <ClientOnly>
+          <component :is="VChart" v-if="echartsReady && VChart" :option="testOptions" autoresize style="height: 360px; width: 100%" />
+        </ClientOnly>
+      </div>
       <div class="mt-4">
         <div id="testGrid3" :class="agGridThemeClass" class="ag-grid-container"></div>
       </div>
     </div>
 
+    <!-- SPEC: 조건 + 차트/표 -->
     <div class="card p-4">
-      <h3 class="font-semibold mb-3">SPEC 차트 / 표</h3>
-      <ClientOnly>
-        <component :is="VChart" v-if="echartsReady && VChart" :option="specOptions" autoresize style="height: 360px; width: 100%" />
-      </ClientOnly>
+      <FormKitDataEdit v-model="formData" :schema="schemaSpec" submit-label="" />
+      <div class="mt-4">
+        <ClientOnly>
+          <component :is="VChart" v-if="echartsReady && VChart" :option="specOptions" autoresize style="height: 360px; width: 100%" />
+        </ClientOnly>
+      </div>
       <div class="mt-4">
         <div id="specGrid3" :class="agGridThemeClass" class="ag-grid-container"></div>
       </div>
@@ -269,4 +293,7 @@ onMounted(async () => {
 
 <style scoped>
 .ag-grid-container { height: 420px; width: 100%; }
+:deep(.formkit-actions) { display: none !important; }
+:deep(.formkit-outer[data-type='submit']) { display: none !important; }
+:deep(button[type='submit']) { display: none !important; }
 </style>
