@@ -43,17 +43,17 @@ const formData = ref({
 // FormKit 스키마 (분리)
 const schemaTest = ref<any>([
   addElement('h5', ['TEST 조건']),
-  { $formkit: 'primeInputText', name: 'testTagsInput', label: 'Tags (쉼표/공백 구분)', outerClass: 'col-3' },
+  { $formkit: 'primeInputText', name: 'testTagsInput', label: 'Tags', help: '쉼표/공백 구분', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'testBucket', label: 'Bucket', outerClass: 'col-3' },
-  { $formkit: 'primeInputText', name: 'testWindow', label: 'Window (예: 1d,12h)', outerClass: 'col-3' },
+  { $formkit: 'primeInputText', name: 'testWindow', label: 'Window', help: '예: 1d,12h', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'testMeasurement', label: 'Measurement', outerClass: 'col-3' },
-  { $formkit: 'primeInputText', name: 'testStart', label: 'Start(YYYY-MM-DD)', outerClass: 'col-3' },
-  { $formkit: 'primeInputText', name: 'testEnd', label: 'End(YYYY-MM-DD)', outerClass: 'col-3' },
+  { $formkit: 'primeInputText', name: 'testStart', label: 'Start', help: 'YYYY-MM-DD', outerClass: 'col-3' },
+  { $formkit: 'primeInputText', name: 'testEnd', label: 'End', help: 'YYYY-MM-DD', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'testYMin', label: 'Y Min', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'testYMax', label: 'Y Max', outerClass: 'col-3' },
   {
     $el: 'div',
-    attrs: { class: 'col-12 w-full flex justify-end items-center gap-x-2 mt-2' },
+    attrs: { class: 'col-12 w-full flex justify-end items-center gap-x-2 mt-1' },
     children: [
       { $cmp: 'Button', props: { label: 'TEST 조회', severity: 'primary', onClick: () => fetchTest() } },
       { $cmp: 'Button', props: { label: 'TEST 범위 적용', severity: 'secondary', onClick: () => updateTestChart() } },
@@ -66,15 +66,15 @@ const schemaSpec = ref<any>([
   addElement('h5', ['SPEC 조건']),
   { $formkit: 'primeInputText', name: 'specTag', label: 'Tag', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'specBucket', label: 'Bucket', outerClass: 'col-3' },
-  { $formkit: 'primeInputText', name: 'specWindow', label: 'Window (예: 4h,1d)', outerClass: 'col-3' },
+  { $formkit: 'primeInputText', name: 'specWindow', label: 'Window', help: '예: 4h,1d', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'specMeasurement', label: 'Measurement', outerClass: 'col-3' },
-  { $formkit: 'primeInputText', name: 'specStart', label: 'Start(YYYY-MM-DD)', outerClass: 'col-3' },
-  { $formkit: 'primeInputText', name: 'specEnd', label: 'End(YYYY-MM-DD)', outerClass: 'col-3' },
+  { $formkit: 'primeInputText', name: 'specStart', label: 'Start', help: 'YYYY-MM-DD', outerClass: 'col-3' },
+  { $formkit: 'primeInputText', name: 'specEnd', label: 'End', help: 'YYYY-MM-DD', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'specYMin', label: 'Y Min', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'specYMax', label: 'Y Max', outerClass: 'col-3' },
   {
     $el: 'div',
-    attrs: { class: 'col-12 w-full flex justify-end items-center gap-x-2 mt-2' },
+    attrs: { class: 'col-12 w-full flex justify-end items-center gap-x-2 mt-1' },
     children: [
       { $cmp: 'Button', props: { label: 'SPEC 조회', severity: 'primary', onClick: () => fetchSpec() } },
       { $cmp: 'Button', props: { label: 'SPEC 범위 적용', severity: 'secondary', onClick: () => updateSpecChart() } },
@@ -265,7 +265,9 @@ onMounted(async () => {
 
     <!-- TEST: 조건 + 차트/표 -->
     <div class="card p-4">
-      <FormKitDataEdit v-model="formData" :schema="schemaTest" submit-label="" />
+      <div class="compact-form">
+        <FormKitDataEdit v-model="formData" :schema="schemaTest" form-class="form-horizontal grid-4" submit-label="" />
+      </div>
       <div class="mt-4">
         <ClientOnly>
           <component :is="VChart" v-if="echartsReady && VChart" :option="testOptions" autoresize style="height: 360px; width: 100%" />
@@ -278,7 +280,9 @@ onMounted(async () => {
 
     <!-- SPEC: 조건 + 차트/표 -->
     <div class="card p-4">
-      <FormKitDataEdit v-model="formData" :schema="schemaSpec" submit-label="" />
+      <div class="compact-form">
+        <FormKitDataEdit v-model="formData" :schema="schemaSpec" form-class="form-horizontal grid-4" submit-label="" />
+      </div>
       <div class="mt-4">
         <ClientOnly>
           <component :is="VChart" v-if="echartsReady && VChart" :option="specOptions" autoresize style="height: 360px; width: 100%" />
@@ -293,7 +297,42 @@ onMounted(async () => {
 
 <style scoped>
 .ag-grid-container { height: 420px; width: 100%; }
+
 :deep(.formkit-actions) { display: none !important; }
 :deep(.formkit-outer[data-type='submit']) { display: none !important; }
 :deep(button[type='submit']) { display: none !important; }
+
+/* Compact form style */
+.compact-form :deep(.formkit-outer) { margin-bottom: 0.25rem; }
+.compact-form :deep(.formkit-label) { font-size: 0.75rem; margin-bottom: 0.15rem; }
+.compact-form :deep(.p-inputtext),
+.compact-form :deep(input[type='text']),
+.compact-form :deep(input[type='number']) { padding: 0.25rem 0.5rem; font-size: 0.875rem; height: 2rem; }
+.compact-form :deep(select) { padding: 0.25rem 0.5rem; font-size: 0.875rem; height: 2rem; }
+.compact-form :deep(.p-button) { padding: 0.25rem 0.5rem; font-size: 0.875rem; }
+
+/* 4-cols per row layout */
+.compact-form :deep(.formkit-form.grid-4) {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: 0.75rem;
+  row-gap: 0.25rem;
+}
+.compact-form :deep(.formkit-form.grid-4 > .formkit-outer) {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+.compact-form :deep(.formkit-form.grid-4 > .col-12) {
+  grid-column: 1 / -1;
+}
+
+/* Headings span full row in grid-4 */
+.compact-form :deep(.formkit-form.grid-4 > h1),
+.compact-form :deep(.formkit-form.grid-4 > h2),
+.compact-form :deep(.formkit-form.grid-4 > h3),
+.compact-form :deep(.formkit-form.grid-4 > h4),
+.compact-form :deep(.formkit-form.grid-4 > h5),
+.compact-form :deep(.formkit-form.grid-4 > h6) {
+  grid-column: 1 / -1;
+}
 </style>
