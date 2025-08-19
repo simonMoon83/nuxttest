@@ -2,6 +2,8 @@
 const authStore = useAuthStore()
 const showProfileCard = ref(false)
 const headerCollapsed = useState<boolean>('headerCollapsed', () => false)
+const collapseBtnRef = ref<any>(null)
+const expandBtnPos = ref<{ top: number; left: number } | null>(null)
 
 function redirectToGithub() {
   window.open('https://github.com/sfxcode/nuxt3-primevue-starter', '_blank')
@@ -16,6 +18,23 @@ function toggleProfileCard() {
 }
 
 function collapseHeader() {
+  try {
+    const btnEl = collapseBtnRef.value?.$el
+    if (btnEl) {
+      const rect = btnEl.getBoundingClientRect()
+      // 버튼의 뷰포트 기준 위치를 정확히 저장
+      expandBtnPos.value = { 
+        top: Math.round(rect.top), 
+        left: Math.round(rect.left) 
+      }
+    } else {
+      // 요소를 찾을 수 없는 경우 기본 위치
+      expandBtnPos.value = { top: 8, left: 8 }
+    }
+  } catch (error) {
+    console.error('Error calculating button position:', error)
+    expandBtnPos.value = { top: 8, left: 8 }
+  }
   headerCollapsed.value = true
 }
 
@@ -25,12 +44,13 @@ function expandHeader() {
 </script>
 
 <template>
-  <nav class="relative">
-    <div v-if="!headerCollapsed">
+  <nav v-if="!headerCollapsed" class="relative">
+    <div>
       <Toolbar class="border-b border-gray-200 dark:border-gray-700 py-1">
         <template #start>
           <div class="flex items-center gap-2 w-full">
             <Button
+              ref="collapseBtnRef"
               icon="pi pi-angle-up"
               text
               rounded
@@ -46,73 +66,53 @@ function expandHeader() {
 
         <template #end>
           <ClientOnly>
-            <div 
-              v-show="authStore.user" 
-              class="flex items-center mr-4 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 group"
+            <button
+              v-show="authStore.user"
+              class="mr-2 w-8 h-8 rounded-full flex items-center justify-center border border-gray-300 dark:border-gray-600 bg-white/70 dark:bg-gray-800/60 backdrop-blur-sm hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm"
               @click="toggleProfileCard"
               v-tooltip.bottom="'프로필 보기'"
             >
-              <div class="relative">
-                <div class="w-8 h-8 bg-blue-500 dark:bg-white dark:bg-opacity-20 rounded-full flex items-center justify-center mr-3 backdrop-blur-sm shadow-sm flex-shrink-0">
-                  <i class="pi pi-user text-white dark:text-white text-sm" aria-hidden="true"></i>
-                </div>
-                <div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full shadow-md ring-1 ring-green-200 dark:ring-green-900/30"></div>
-              </div>
-              <div class="flex flex-col min-w-0 flex-1">
-                <span class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
-                  {{ authStore.user?.full_name || authStore.user?.username }}
-                </span>
-                <span class="text-xs text-gray-500 dark:text-gray-400 truncate">
-                  {{ authStore.user?.email || 'user@example.com' }}
-                </span>
-              </div>
-              <i 
-                class="pi pi-chevron-down ml-2 text-gray-400 text-xs transition-transform duration-200 group-hover:text-gray-600 dark:group-hover:text-gray-300"
-                :class="{ 'rotate-180': showProfileCard }"
-              ></i>
-            </div>
+              <i class="pi pi-user text-gray-700 dark:text-gray-200 text-base"></i>
+            </button>
           </ClientOnly>
-          <AppColorMode class="ml-2 mr-2" />
-          <Button 
-            icon="pi pi-github" 
-            class="mr-2" 
-            outlined
-            @click="redirectToGithub"
-            v-tooltip.bottom="'GitHub 저장소'"
-          />
-          <Button 
-            icon="pi pi-sign-out" 
-            severity="danger" 
-            @click="handleLogout"
-            v-tooltip.bottom="'로그아웃'"
-          />
+          <AppColorMode class="ml-1 mr-1" />
+          <Button icon="pi pi-github" class="mr-1" text @click="redirectToGithub" v-tooltip.bottom="'GitHub 저장소'" />
+          <Button icon="pi pi-sign-out" text severity="danger" @click="handleLogout" v-tooltip.bottom="'로그아웃'" />
         </template>
       </Toolbar>
     </div>
+  </nav>
 
-    <div v-else>
-      <!-- 오버랩 형태의 펼치기 버튼 (공간 차지 최소화) -->
+  <!-- 접힌 상태에서만 표시되는 고정 버튼 (레이아웃 공간 차지 X) -->
+  <ClientOnly>
+    <Teleport to="body">
       <Button
+        v-if="headerCollapsed"
         icon="pi pi-angle-down"
-        rounded
         text
-        class="fixed top-2 right-3 z-30 shadow-sm bg-white/70 hover:bg-white dark:bg-gray-800/70 dark:hover:bg-gray-800 backdrop-blur-sm"
+        rounded
+        class="mr-2 p-1 expand-btn-fixed"
+        :style="{ top: `${(expandBtnPos?.top ?? 8)}px`, left: `${(expandBtnPos?.left ?? 8)}px`, zIndex: 2147483647 }"
         v-tooltip.bottom="'헤더 펼치기'"
         @click="expandHeader"
       />
-    </div>
+    </Teleport>
+  </ClientOnly>
 
-    <!-- 사용자 프로필 카드 -->
-    <AppUserProfileCard2
-      v-model:visible="showProfileCard"
-      :user="authStore.user"
-      @logout="handleLogout"
-    />
-  </nav>
+  <!-- 사용자 프로필 카드 -->
+  <AppUserProfileCard2
+    v-model:visible="showProfileCard"
+    :user="authStore.user"
+    @logout="handleLogout"
+  />
 </template>
 
 <style scoped lang="scss">
 .rotate-180 {
   transform: rotate(180deg);
+}
+
+.expand-btn-fixed {
+  position: fixed !important;
 }
 </style>

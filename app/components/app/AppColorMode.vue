@@ -18,14 +18,11 @@ watchEffect(() => mode.value = state.value)
 <template>
   <div>
     <client-only>
-      <Button @click="next()">
-        <i v-if="mode === 'dark'" i-carbon-moon align-middle inline-block class="align-middle" />
-        <i v-if="mode === 'light'" i-carbon-sun align-middle inline-block class="align-middle" />
-        <i v-if="mode === 'cafe'" i-carbon-cafe align-middle inline-block class="align-middle" />
-        <i v-if="mode === 'contrast'" i-carbon-contrast align-middle inline-block class="align-middle" />
-        <i v-if="mode === 'auto'" i-carbon-laptop align-middle inline-block class="align-middle" />
-        <span class="ml-2 capitalize">{{ mode }}</span>
-      </Button>
+      <button class="w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 bg-white/70 dark:bg-gray-800/60 backdrop-blur-sm shadow-sm" @click="next()">
+        <i v-if="mode === 'dark'" class="pi pi-moon text-gray-700 dark:text-gray-200"></i>
+        <i v-else-if="mode === 'light'" class="pi pi-sun text-gray-700 dark:text-gray-200"></i>
+        <i v-else class="pi pi-desktop text-gray-700 dark:text-gray-200"></i>
+      </button>
     </client-only>
   </div>
 </template>
