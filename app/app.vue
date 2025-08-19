@@ -115,13 +115,22 @@ const breadcrumbTitle = computed(() => {
   } catch {}
   return pageTitle.value
 })
+
+// 특정 페이지에서 전역 타이틀 숨김 처리 (route.meta.hideTitle === true)
+const hideGlobalTitle = computed(() => {
+  try {
+    return Boolean(route.meta?.hideTitle)
+  } catch {
+    return false
+  }
+})
 </script>
 
 <template>
   <NuxtLayout>
     <!-- DynamicTabs는 AppTopbar 내부로 이동 -->
     <!-- 탭 바로 아래 전역 타이틀: 탭이 없어도 항상 표시 -->
-    <div class="mt-1 mb-2 border-b-1 border-gray-400 dark:border-gray-700">
+    <div v-if="!hideGlobalTitle" class="mt-1 mb-2 border-b-1 border-gray-400 dark:border-gray-700">
       <div class="flex items-center gap-1">
         <i :class="pageIcon" class="text-primary"></i>
         <h2 class="text-xl font-semibold text-gray-600 dark:text-gray-100">{{ breadcrumbTitle }}</h2>

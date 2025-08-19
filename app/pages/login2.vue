@@ -128,6 +128,7 @@ async function submitHandler(_formData: any) {
 definePageMeta({
   layout: false,
   title: '로그인',
+  hideTitle: true,
 })
 
 useHead({
