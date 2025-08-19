@@ -155,6 +155,11 @@ const defaultColDef = ref({
   minWidth: 100,
 })
 
+const gridOptions = ref({
+  rowHeight: 28,
+  headerHeight: 32,
+})
+
 // 새로운 rowSelection 설정 - 올바른 타입으로 수정
 const rowSelection = ref({
   mode: 'multiRow' as const,
@@ -193,18 +198,19 @@ function onCellClicked(event: any) {
 </script>
 
 <template>
-  <div class="card flex flex-wrap gap-10">
+  <div class="card flex flex-wrap gap-6">
     <div class="w-full">
-      <div class="mb-4 flex items-center justify-between">
+      <div class="mb-2 flex items-center justify-between">
         <h2>Basic Demo</h2>
       </div>
 
-      <div v-if="data" class="min-w-25rem">
+      <div v-if="data" class="min-w-25rem compact-form">
         <FormKitDataEdit
           v-model="data"
           :schema="schema"
           :debug-schema="false"
           :debug-data="false"
+          form-class="form-horizontal grid-4"
           submit-label=""
           @data-saved="submitHandler"
         />
@@ -212,16 +218,17 @@ function onCellClicked(event: any) {
     </div>
 
     <div class="w-full">
-      <div class="mb-4 flex items-center justify-between">
+      <div class="mb-2 flex items-center justify-between">
         <h1>Nuxt 3 Ag-Grid Example</h1>
       </div>
 
       <ClientOnly>
-        <div :class="agGridThemeClass" class="ag-grid-demo" style="height: 500px; width: 100%;">
+        <div :class="agGridThemeClass" class="ag-grid-demo" style="height: 420px; width: 100%;">
           <AgGridVue
             :row-data="rowData"
             :column-defs="columnDefs"
             :default-col-def="defaultColDef"
+            :grid-options="gridOptions"
             :animate-rows="true"
             :row-selection="rowSelection"
             theme="legacy"
@@ -236,9 +243,9 @@ function onCellClicked(event: any) {
     </div>
 
     <!-- 데이터 조건 출력 부분을 맨 밑으로 이동 -->
-    <div class="mt-8 w-full">
+    <div class="mt-6 w-full">
       <h3>현재 데이터 조건</h3>
-      <div v-if="data" class="p-4 border border-gray-200 rounded-lg bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
+      <div v-if="data" class="p-3 border border-gray-200 rounded-lg bg-gray-50 dark:border-gray-700 dark:bg-gray-800">
         <pre class="text-sm text-gray-800 dark:text-gray-200">{{ JSON.stringify(data, null, 2) }}</pre>
       </div>
     </div>

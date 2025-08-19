@@ -235,11 +235,13 @@ onMounted(async () => {
     const { createGrid } = await import('ag-grid-community')
     const testOptionsGrid: any = {
       theme: 'legacy', columnDefs: testColumnDefs.value, rowData: [], defaultColDef: defaultColDef.value, animateRows: true,
+      rowHeight: 28, headerHeight: 32,
       rowSelection: { mode: 'multiRow' }, pagination: true, paginationPageSize: 20, paginationPageSizeSelector: [20, 50, 100],
       onGridReady: (params: any) => { testGridApi = params.api; updateGridTheme() },
     }
     const specOptionsGrid: any = {
       theme: 'legacy', columnDefs: specColumnDefs.value, rowData: [], defaultColDef: defaultColDef.value, animateRows: true,
+      rowHeight: 28, headerHeight: 32,
       rowSelection: { mode: 'multiRow' }, pagination: true, paginationPageSize: 20, paginationPageSizeSelector: [20, 50, 100],
       onGridReady: (params: any) => { specGridApi = params.api; updateGridTheme() },
     }
@@ -250,8 +252,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div class="card p-4">
+  <div class="space-y-3">
+    <div class="card p-3">
       <div class="flex items-center gap-2 flex-wrap">
         <input v-model="apiBase" class="p-inputtext p-component w-80" placeholder="API Base (http://127.0.0.1:8000)" />
         <span class="text-xs text-gray-500">대시보드에서 저장한 값이 자동 사용됩니다.</span>
@@ -260,31 +262,31 @@ onMounted(async () => {
     </div>
 
     <!-- TEST: 조건 + 차트/표 -->
-    <div class="card p-4">
+    <div class="card p-3">
       <div class="compact-form">
         <FormKitDataEdit v-model="formData" :schema="schemaTest" form-class="form-horizontal grid-4" submit-label="" />
       </div>
-      <div class="mt-4">
+      <div class="mt-3">
         <ClientOnly>
-          <component :is="VChart" v-if="echartsReady && VChart" :option="testOptions" autoresize style="height: 360px; width: 100%" />
+          <component :is="VChart" v-if="echartsReady && VChart" :option="testOptions" autoresize style="height: 320px; width: 100%" />
         </ClientOnly>
       </div>
-      <div class="mt-4">
+      <div class="mt-3">
         <div id="testGrid3" :class="agGridThemeClass" class="ag-grid-container"></div>
       </div>
     </div>
 
     <!-- SPEC: 조건 + 차트/표 -->
-    <div class="card p-4">
+    <div class="card p-3">
       <div class="compact-form">
         <FormKitDataEdit v-model="formData" :schema="schemaSpec" form-class="form-horizontal grid-4" submit-label="" />
       </div>
-      <div class="mt-4">
+      <div class="mt-3">
         <ClientOnly>
-          <component :is="VChart" v-if="echartsReady && VChart" :option="specOptions" autoresize style="height: 360px; width: 100%" />
+          <component :is="VChart" v-if="echartsReady && VChart" :option="specOptions" autoresize style="height: 320px; width: 100%" />
         </ClientOnly>
       </div>
-      <div class="mt-4">
+      <div class="mt-3">
         <div id="specGrid3" :class="agGridThemeClass" class="ag-grid-container"></div>
       </div>
     </div>

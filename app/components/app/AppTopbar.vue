@@ -27,14 +27,14 @@ function expandHeader() {
 <template>
   <nav class="relative">
     <div v-if="!headerCollapsed">
-      <Toolbar class="border-b border-gray-200 dark:border-gray-700">
+      <Toolbar class="border-b border-gray-200 dark:border-gray-700 py-1">
         <template #start>
           <div class="flex items-center gap-2 w-full">
             <Button
               icon="pi pi-angle-up"
               text
               rounded
-              class="mr-2"
+              class="mr-2 p-1"
               v-tooltip.bottom="'헤더 접기'"
               @click="collapseHeader"
             />

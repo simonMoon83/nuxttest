@@ -48,8 +48,8 @@ watch(() => tabsStore.activeKey, (key) => {
 </script>
 
 <template>
-  <div v-if="tabsStore.tabs.length && authStore.isLoggedIn" class="mb-2" data-testid="tabs">
-    <div class="flex items-center gap-1">
+  <div v-if="tabsStore.tabs.length && authStore.isLoggedIn" class="mb-1" data-testid="tabs">
+    <div class="flex items-center gap-1 text-sm">
       <button v-if="totalTabs > maxVisible" class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50" :disabled="startIndex === 0" @click="moveLeft" v-tooltip.bottom="'왼쪽으로'">
         <i class="pi pi-angle-left" />
       </button>
@@ -58,14 +58,14 @@ watch(() => tabsStore.activeKey, (key) => {
           <div
             v-for="tab in visibleTabs"
             :key="tab.key"
-            class="inline-flex items-center border rounded px-2 py-1 cursor-pointer"
+            class="inline-flex items-center border rounded px-2 py-0.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
             :data-tab-key="tab.key"
             :data-tab-title="tab.title"
             :class="{ 'bg-primary text-primary-contrast': tab.key === tabsStore.activeKey }"
             @click="activeKey = tab.key"
           >
-            <span class="mr-2 truncate max-w-48">{{ tab.title }}</span>
-            <button class="i-carbon-close hover:text-red-500" @click.stop="onClose(tab.key)" />
+            <span class="mr-1 truncate max-w-40 leading-6">{{ tab.title }}</span>
+            <button class="i-carbon-close hover:text-red-500 text-xs" @click.stop="onClose(tab.key)" />
           </div>
         </div>
       </div>
