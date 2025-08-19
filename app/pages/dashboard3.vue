@@ -47,8 +47,8 @@ const schemaTest = ref<any>([
   { $formkit: 'primeInputText', name: 'testBucket', label: 'Bucket', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'testWindow', label: 'Window', help: '예: 1d,12h', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'testMeasurement', label: 'Measurement', outerClass: 'col-3' },
-  { $formkit: 'primeInputText', name: 'testStart', label: 'Start', help: 'YYYY-MM-DD', outerClass: 'col-3' },
-  { $formkit: 'primeInputText', name: 'testEnd', label: 'End', help: 'YYYY-MM-DD', outerClass: 'col-3' },
+  { $formkit: 'primeDatePicker', name: 'testStart', label: 'Start', help: 'YYYY-MM-DD', dateFormat: 'yy-mm-dd', showIcon: true, outerClass: 'col-3' },
+  { $formkit: 'primeDatePicker', name: 'testEnd', label: 'End', help: 'YYYY-MM-DD', dateFormat: 'yy-mm-dd', showIcon: true, outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'testYMin', label: 'Y Min', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'testYMax', label: 'Y Max', outerClass: 'col-3' },
   {
@@ -252,10 +252,6 @@ onMounted(async () => {
 <template>
   <div class="space-y-4">
     <div class="card p-4">
-      <div class="flex items-center gap-2 mb-2">
-        <i class="pi pi-chart-line text-primary" />
-        <h2 class="text-xl font-semibold">Dashboard3 (FormKit + ECharts)</h2>
-      </div>
       <div class="flex items-center gap-2 flex-wrap">
         <input v-model="apiBase" class="p-inputtext p-component w-80" placeholder="API Base (http://127.0.0.1:8000)" />
         <span class="text-xs text-gray-500">대시보드에서 저장한 값이 자동 사용됩니다.</span>

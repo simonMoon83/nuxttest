@@ -29,14 +29,19 @@ function expandHeader() {
     <div v-if="!headerCollapsed">
       <Toolbar class="border-b border-gray-200 dark:border-gray-700">
         <template #start>
-          <Button
-            icon="pi pi-angle-up"
-            text
-            rounded
-            class="mr-2"
-            v-tooltip.bottom="'헤더 접기'"
-            @click="collapseHeader"
-          />
+          <div class="flex items-center gap-2 w-full">
+            <Button
+              icon="pi pi-angle-up"
+              text
+              rounded
+              class="mr-2"
+              v-tooltip.bottom="'헤더 접기'"
+              @click="collapseHeader"
+            />
+            <div class="flex-1 min-w-0">
+              <DynamicTabs />
+            </div>
+          </div>
         </template>
 
         <template #end>
