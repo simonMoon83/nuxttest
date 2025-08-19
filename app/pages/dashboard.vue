@@ -320,10 +320,6 @@ onMounted(() => {
 <template>
 	<div class="space-y-4">
 		<div class="card p-4">
-			<div class="flex items-center gap-2 mb-2">
-				<i class="pi pi-chart-line text-primary" />
-				<h2 class="text-xl font-semibold">Dashboard (Influx 통신 테스트)</h2>
-			</div>
 			<div class="flex items-center gap-2 flex-wrap">
 				<input v-model="apiBase" class="p-inputtext p-component w-80" placeholder="API Base (http://127.0.0.1:8000)" />
 				<button class="p-button p-component" @click="saveApiBase">
