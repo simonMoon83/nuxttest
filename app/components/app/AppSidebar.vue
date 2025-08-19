@@ -176,7 +176,7 @@ onUnmounted(() => {
     >
       <template #header>
         <!-- 확장된 상태 (로고 + 앱 이름) -->
-        <div v-if="!collapsed" class="logo-section-expanded">
+        <div v-if="!collapsed" class="logo-section-expanded compact">
           <div class="logo-container">
             <img
               class="logo-image"
@@ -192,7 +192,7 @@ onUnmounted(() => {
         </div>
         
         <!-- 축소된 상태 (로고만) -->
-        <div v-else class="logo-section-collapsed">
+        <div v-else class="logo-section-collapsed compact">
           <img
             class="logo-image-small"
             :src="logoSettings"
@@ -203,9 +203,9 @@ onUnmounted(() => {
       </template>
       
       <template #footer>
-        <div class="footer-section">
+        <div class="footer-section compact">
           <div v-if="!collapsed" class="footer-expanded">
-            <div class="text-xs text-color-secondary text-center">
+            <div class="text-xs text-color-secondary text-center truncate">
               {{ appSettings.description }}
             </div>
           </div>
@@ -228,13 +228,13 @@ onUnmounted(() => {
 
 <style lang="scss" scoped>
 .logo-section-expanded {
-  padding: 1rem;
+  padding: 0.75rem;
   border-bottom: 1px solid var(--p-surface-border);
   background: var(--p-surface-ground);
 }
 
 .logo-section-collapsed {
-  padding: 1rem 0.5rem;
+  padding: 0.5rem 0.5rem;
   display: flex;
   justify-content: center;
   border-bottom: 1px solid var(--p-surface-border);
@@ -285,7 +285,7 @@ onUnmounted(() => {
 }
 
 .footer-section {
-  padding: 0.5rem;
+  padding: 0.25rem 0.5rem;
   border-top: 1px solid var(--p-surface-border);
   background: var(--p-surface-ground);
 }

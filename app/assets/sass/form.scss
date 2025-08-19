@@ -361,12 +361,14 @@ $grid-breakpoints: (
 /* Compact form global styles */
 .compact-form {
   .formkit-outer { margin-bottom: 0.25rem; }
-  .formkit-label { font-size: 0.75rem; margin-bottom: 0.15rem; }
+  .formkit-label { font-size: 0.72rem !important; line-height: 1.15; margin-bottom: 0.15rem; }
   .p-inputtext,
   input[type='text'],
-  input[type='number'] { padding: 0.25rem 0.5rem; font-size: 0.875rem; height: 2rem; }
-  select { padding: 0.25rem 0.5rem; font-size: 0.875rem; height: 2rem; }
-  .p-button { padding: 0.25rem 0.5rem; font-size: 0.875rem; }
+  input[type='number'] { padding: 0.25rem 0.5rem; font-size: 0.8125rem; line-height: 1.2; height: 1.875rem; }
+  select { padding: 0.25rem 0.5rem; font-size: 0.8125rem; line-height: 1.2; height: 1.875rem; }
+  .p-button { padding: 0.25rem 0.5rem; font-size: 0.8125rem; }
+  .formkit-help { font-size: 0.7rem; }
+  .formkit-messages, .formkit-message { font-size: 0.7rem; }
 }
 
 /* Hide default FormKit submit/actions inside compact forms */

@@ -9,7 +9,7 @@ html {
 }
 
 body {
-  margin: 1rem;
+  margin: 0.75rem;
 }
 
 // Header
@@ -75,9 +75,9 @@ h6 {
 }
 
 .card {
-  padding: 1rem;
+  padding: 0.75rem;
   color: var(--p-text-color);
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
   border-radius: $borderRadius;
   box-shadow:
     0 3px 5px rgba(0, 0, 0, 0.02),
