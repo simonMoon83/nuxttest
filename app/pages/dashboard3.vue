@@ -47,8 +47,8 @@ const schemaTest = ref<any>([
   { $formkit: 'primeInputText', name: 'testBucket', label: 'Bucket', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'testWindow', label: 'Window', help: '예: 1d,12h', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'testMeasurement', label: 'Measurement', outerClass: 'col-3' },
-  { $formkit: 'primeDatePicker', name: 'testStart', label: 'Start', help: 'YYYY-MM-DD', dateFormat: 'yy-mm-dd', showIcon: true, outerClass: 'col-3' },
-  { $formkit: 'primeDatePicker', name: 'testEnd', label: 'End', help: 'YYYY-MM-DD', dateFormat: 'yy-mm-dd', showIcon: true, outerClass: 'col-3' },
+  { $formkit: 'primeDatePicker', name: 'testStart', label: 'Start', help: 'YYYY-MM-DD', dateFormat: 'yy-mm-dd', showIcon: true, outerClass: 'col-3', class: 'w-full' },
+  { $formkit: 'primeDatePicker', name: 'testEnd', label: 'End', help: 'YYYY-MM-DD', dateFormat: 'yy-mm-dd', showIcon: true, outerClass: 'col-3', class: 'w-full' },
   { $formkit: 'primeInputText', name: 'testYMin', label: 'Y Min', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'testYMax', label: 'Y Max', outerClass: 'col-3' },
   {
@@ -68,8 +68,8 @@ const schemaSpec = ref<any>([
   { $formkit: 'primeInputText', name: 'specBucket', label: 'Bucket', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'specWindow', label: 'Window', help: '예: 4h,1d', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'specMeasurement', label: 'Measurement', outerClass: 'col-3' },
-  { $formkit: 'primeInputText', name: 'specStart', label: 'Start', help: 'YYYY-MM-DD', outerClass: 'col-3' },
-  { $formkit: 'primeInputText', name: 'specEnd', label: 'End', help: 'YYYY-MM-DD', outerClass: 'col-3' },
+  { $formkit: 'primeDatePicker', name: 'specStart', label: 'Start', help: 'YYYY-MM-DD', dateFormat: 'yy-mm-dd', showIcon: true, outerClass: 'col-3', class: 'w-full' },
+  { $formkit: 'primeDatePicker', name: 'specEnd', label: 'End', help: 'YYYY-MM-DD', dateFormat: 'yy-mm-dd', showIcon: true, outerClass: 'col-3', class: 'w-full' },
   { $formkit: 'primeInputText', name: 'specYMin', label: 'Y Min', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'specYMax', label: 'Y Max', outerClass: 'col-3' },
   {
@@ -169,11 +169,47 @@ function buildUrl(base: string, path: string, params: Record<string, string | st
 
 function parseTagsInput(input: string): string[] { return input.split(/[\s,]+/).map(s => s.trim()).filter(Boolean) }
 
-function applyDateFilter(rows: any[], start: string, end: string) {
-  if (!start && !end) return rows
-  const s = start ? new Date(start + 'T00:00:00').getTime() : -Infinity
-  const e = end ? new Date(end + 'T23:59:59.999').getTime() : Infinity
-  return rows.filter(r => { const t = new Date(r._time).getTime(); return t >= s && t <= e })
+function toDayBoundaryMs(input: string | Date, boundary: 'start' | 'end'): number {
+  const dateObj = typeof input === 'string' ? new Date(input) : input
+  if (Number.isNaN(dateObj?.getTime?.())) {
+    return boundary === 'start' ? -Infinity : Infinity
+  }
+  const year = dateObj.getFullYear()
+  const month = dateObj.getMonth()
+  const day = dateObj.getDate()
+  const at = boundary === 'start' ? new Date(year, month, day, 0, 0, 0, 0) : new Date(year, month, day, 23, 59, 59, 999)
+  return at.getTime()
+}
+
+function applyDateFilter(rows: any[], start: string | Date, end: string | Date) {
+  const hasStart = Boolean(start)
+  const hasEnd = Boolean(end)
+  if (!hasStart && !hasEnd) {
+    return rows
+  }
+  const startMs = hasStart ? toDayBoundaryMs(start, 'start') : -Infinity
+  const endMs = hasEnd ? toDayBoundaryMs(end, 'end') : Infinity
+  return rows.filter((row: any) => {
+    const timeMs = new Date(row._time).getTime()
+    return timeMs >= startMs && timeMs <= endMs
+  })
+}
+
+function applyValueFilter(rows: any[], minStr: string, maxStr: string, field: string = '_value') {
+  const hasMin = minStr !== ''
+  const hasMax = maxStr !== ''
+  if (!hasMin && !hasMax) {
+    return rows
+  }
+  const min = hasMin ? Number(minStr) : null
+  const max = hasMax ? Number(maxStr) : null
+  return rows.filter((row: any) => {
+    const v = row[field]
+    if (v == null || Number.isNaN(Number(v))) return false
+    if (min !== null && Number(v) < min) return false
+    if (max !== null && Number(v) > max) return false
+    return true
+  })
 }
 
 function updateTestChart() {
@@ -184,6 +220,10 @@ function updateTestChart() {
   const yMin = formData.value.testYMin !== '' ? Number(formData.value.testYMin) : null
   const yMax = formData.value.testYMax !== '' ? Number(formData.value.testYMax) : null
   testOptions.value = { ...testOptions.value, series, yAxis: { ...testOptions.value.yAxis, min: yMin, max: yMax } }
+  const gridRows = applyValueFilter(rows, formData.value.testYMin, formData.value.testYMax, '_value')
+  if (testGridApi) {
+    testGridApi.setGridOption('rowData', gridRows)
+  }
 }
 
 function updateSpecChart() {
@@ -193,6 +233,10 @@ function updateSpecChart() {
   const yMin = formData.value.specYMin !== '' ? Number(formData.value.specYMin) : null
   const yMax = formData.value.specYMax !== '' ? Number(formData.value.specYMax) : null
   specOptions.value = { ...specOptions.value, series, yAxis: { ...specOptions.value.yAxis, min: yMin, max: yMax } }
+  const gridRows = applyValueFilter(rows, formData.value.specYMin, formData.value.specYMax, '_value')
+  if (specGridApi) {
+    specGridApi.setGridOption('rowData', gridRows)
+  }
 }
 
 async function fetchTest() {
@@ -248,6 +292,11 @@ onMounted(async () => {
     const testDiv = document.querySelector('#testGrid3'); if (testDiv) createGrid(testDiv as any, testOptionsGrid)
     const specDiv = document.querySelector('#specGrid3'); if (specDiv) createGrid(specDiv as any, specOptionsGrid)
   } catch (e) { console.error('초기화 실패:', e) }
+  try {
+    document.querySelectorAll('.fk-date input').forEach((el) => {
+      try { (el as HTMLInputElement).readOnly = false } catch {}
+    })
+  } catch {}
 })
 </script>
 

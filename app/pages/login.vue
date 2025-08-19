@@ -3,6 +3,7 @@ definePageMeta({
   layout: false,
   name: 'Login',
   noTab: true,
+  hideTitle: true,
 })
 
 const authStore = useAuthStore()
