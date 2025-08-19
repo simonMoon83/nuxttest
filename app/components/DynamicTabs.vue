@@ -4,7 +4,7 @@ import { useAuthStore } from '../stores/auth'
 const router = useRouter()
 const tabsStore = useTabsStore()
 const authStore = useAuthStore()
-const maxVisible = 8
+const maxVisible = 12
 const startIndex = ref(0)
 
 const activeKey = computed({
@@ -58,14 +58,14 @@ watch(() => tabsStore.activeKey, (key) => {
           <div
             v-for="tab in visibleTabs"
             :key="tab.key"
-            class="inline-flex items-center border rounded px-2 py-0.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+            class="inline-flex items-center border rounded px-2 py-0.5 cursor-pointer"
             :data-tab-key="tab.key"
             :data-tab-title="tab.title"
             :class="{ 'bg-primary text-primary-contrast': tab.key === tabsStore.activeKey }"
             @click="activeKey = tab.key"
           >
             <span class="mr-1 truncate max-w-40 leading-6">{{ tab.title }}</span>
-            <button class="i-carbon-close hover:text-red-500 text-xs" @click.stop="onClose(tab.key)" />
+            <button class="i-carbon-close text-xs" @click.stop="onClose(tab.key)" />
           </div>
         </div>
       </div>
