@@ -43,14 +43,14 @@ const formData = ref({
 // FormKit 스키마 (분리)
 const schemaTest = ref<any>([
   addElement('h5', ['TEST 조건']),
-  { $formkit: 'primeInputText', name: 'testTagsInput', label: 'Tags', help: '쉼표/공백 구분', outerClass: 'col-3' },
-  { $formkit: 'primeInputText', name: 'testBucket', label: 'Bucket', outerClass: 'col-3' },
-  { $formkit: 'primeInputText', name: 'testWindow', label: 'Window', help: '예: 1d,12h', outerClass: 'col-3' },
-  { $formkit: 'primeInputText', name: 'testMeasurement', label: 'Measurement', outerClass: 'col-3' },
-  { $formkit: 'primeDatePicker', name: 'testStart', label: 'Start', help: 'YYYY-MM-DD', dateFormat: 'yy-mm-dd', showIcon: true, outerClass: 'col-3', class: 'w-full' },
-  { $formkit: 'primeDatePicker', name: 'testEnd', label: 'End', help: 'YYYY-MM-DD', dateFormat: 'yy-mm-dd', showIcon: true, outerClass: 'col-3', class: 'w-full' },
-  { $formkit: 'primeInputText', name: 'testYMin', label: 'Y Min', outerClass: 'col-3' },
-  { $formkit: 'primeInputText', name: 'testYMax', label: 'Y Max', outerClass: 'col-3' },
+  { $formkit: 'primeInputText', name: 'testTagsInput', label: 'Tags', help: '쉼표/공백 구분', outerClass: 'col-2' },
+  { $formkit: 'primeInputText', name: 'testBucket', label: 'Bucket', outerClass: 'col-2' },
+  { $formkit: 'primeInputText', name: 'testWindow', label: 'Window', help: '예: 1d,12h', outerClass: 'col-2' },
+  { $formkit: 'primeInputText', name: 'testMeasurement', label: 'Measurement', outerClass: 'col-2' },
+  { $formkit: 'primeDatePicker', name: 'testStart', label: 'Start', help: 'YYYY-MM-DD', dateFormat: 'yy-mm-dd', showIcon: true, outerClass: 'col-2', class: 'w-full' },
+  { $formkit: 'primeDatePicker', name: 'testEnd', label: 'End', help: 'YYYY-MM-DD', dateFormat: 'yy-mm-dd', showIcon: true, outerClass: 'col-2', class: 'w-full' },
+  { $formkit: 'primeInputText', name: 'testYMin', label: 'Y Min', outerClass: 'col-4' },
+  { $formkit: 'primeInputText', name: 'testYMax', label: 'Y Max', outerClass: 'col-8' },
   {
     $el: 'div',
     attrs: { class: 'col-12 w-full flex justify-end items-center gap-x-2 mt-1' },
@@ -313,7 +313,7 @@ onMounted(async () => {
     <!-- TEST: 조건 + 차트/표 -->
     <div class="card p-3">
       <div class="compact-form">
-        <FormKitDataEdit v-model="formData" :schema="schemaTest" form-class="form-horizontal grid-4" submit-label="" />
+        <FormKitDataEdit v-model="formData" :schema="schemaTest" form-class="form-horizontal grid-12" submit-label="" />
       </div>
       <div class="mt-3">
         <ClientOnly>
