@@ -321,6 +321,31 @@ $grid-breakpoints: (
   }
 }
 
+// In 12-col grid, keep labels compact and let inputs grow across the remaining space
+@include media-breakpoint-up(md) {
+  .formkit-form.form-horizontal.grid-12 {
+    .formkit-outer {
+      .formkit-wrapper {
+        display: flex;
+      }
+      label {
+        width: auto !important;
+        flex: 0 0 auto;
+        white-space: nowrap;
+        padding-right: 0.5rem;
+      }
+      .formkit-inner {
+        width: auto !important;
+        flex: 1 1 0%;
+      }
+      .formkit-help, .formkit-messages {
+        width: auto;
+        margin-left: 0;
+      }
+    }
+  }
+}
+
 /* Global 4-cols grid layout for FormKit forms */
 .formkit-form.grid-4 {
   display: grid;
@@ -355,6 +380,83 @@ $grid-breakpoints: (
 .formkit-form.grid-4 > h4,
 .formkit-form.grid-4 > h5,
 .formkit-form.grid-4 > h6 {
+  grid-column: 1 / -1;
+}
+
+/* Global 6-cols grid layout for FormKit forms */
+.formkit-form.grid-6 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr); // default: 1 column on small screens
+  column-gap: 0.75rem;
+  row-gap: 0.25rem;
+}
+
+// md and up: 3 columns
+@include media-breakpoint-up(md) {
+  .formkit-form.grid-6 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+// lg and up: 6 columns
+@include media-breakpoint-up(lg) {
+  .formkit-form.grid-6 {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+.formkit-form.grid-6 > .formkit-outer {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+.formkit-form.grid-6 > .col-12 {
+  grid-column: 1 / -1;
+}
+
+/* Global 12-cols grid layout for FormKit forms (supports .col-# spans) */
+.formkit-form.grid-12 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr); // default: 1 column on small screens
+  column-gap: 0.75rem;
+  row-gap: 0.25rem;
+}
+
+// md and up: 6 columns
+@include media-breakpoint-up(md) {
+  .formkit-form.grid-12 {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+// lg and up: 12 columns
+@include media-breakpoint-up(lg) {
+  .formkit-form.grid-12 {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+}
+
+// Allow headings and full-width blocks to span all columns
+.formkit-form.grid-12 > .col-12,
+.formkit-form.grid-12 > h1,
+.formkit-form.grid-12 > h2,
+.formkit-form.grid-12 > h3,
+.formkit-form.grid-12 > h4,
+.formkit-form.grid-12 > h5,
+.formkit-form.grid-12 > h6 {
+  grid-column: 1 / -1;
+}
+
+// Map .col-# to grid spans (1..12)
+@for $i from 1 through 12 {
+  .formkit-form.grid-12 > .col-#{$i} {
+    grid-column: span $i;
+  }
+}
+.formkit-form.grid-6 > h1,
+.formkit-form.grid-6 > h2,
+.formkit-form.grid-6 > h3,
+.formkit-form.grid-6 > h4,
+.formkit-form.grid-6 > h5,
+.formkit-form.grid-6 > h6 {
   grid-column: 1 / -1;
 }
 

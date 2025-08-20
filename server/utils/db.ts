@@ -2,7 +2,7 @@ import sql from 'mssql'
 import bcrypt from 'bcryptjs'
 
 const config: sql.config = {
-  server: 'localhost',
+  server: '192.168.10.151',
   port: 1433,
   user: 'frame',
   password: 'frame',
