@@ -13,11 +13,15 @@ const headerCollapsed = useState<boolean>('headerCollapsed', () => false)
     <!-- 항상 동일한 구조를 유지하여 hydration mismatch 방지 -->
     <div>
       <!-- 사이드바: 서버에서는 숨김, 클라이언트에서만 조건부 표시 -->
-      <AppSidebar v-show="authStore.isLoggedIn" />
+      <div v-show="authStore.isLoggedIn">
+        <AppSidebar />
+      </div>
 
       <div id="workspace" :class="[{ collapsed }, { mobile: isOnMobile }, headerCollapsed ? 'workspace-compact' : 'workspace-default']">
         <!-- 탑바: 서버에서는 숨김, 클라이언트에서만 조건부 표시 -->
-        <AppTopbar v-show="authStore.isLoggedIn" />
+        <div v-if="authStore.isLoggedIn">
+          <AppTopbar />
+        </div>
 
         <div :class="headerCollapsed ? 'm-0 mt-0' : 'm-1 mt-2'">
           <slot />
