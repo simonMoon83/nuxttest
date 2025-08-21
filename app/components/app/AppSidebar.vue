@@ -169,8 +169,9 @@ onUnmounted(() => {
       link-component-name="nuxt-sidebar-link"
       :menu="menu"
       :show-one-child="true"
+      :hide-toggle="true"
       width="200px"
-      width-collapsed="60px"
+      width-collapsed="48px"
       @update:collapsed="onToggleCollapse"
       @item-click="onItemClick"
     >
@@ -213,6 +214,15 @@ onUnmounted(() => {
             <div class="text-xs text-color-secondary text-center">
               {{ config.public.APP_VERSION }}
             </div>
+          </div>
+          <!-- 커스텀 토글 버튼 -->
+          <div class="toggle-button-container">
+            <button 
+              class="custom-toggle-btn"
+              @click="collapsed = !collapsed"
+            >
+              <i :class="collapsed ? 'pi pi-angle-right' : 'pi pi-angle-left'" />
+            </button>
           </div>
         </div>
       </template>
@@ -307,5 +317,37 @@ onUnmounted(() => {
   background-color: #000;
   opacity: 0.5;
   z-index: 900;
+}
+
+.toggle-button-container {
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--p-surface-border);
+  margin-top: 0.25rem;
+}
+
+.custom-toggle-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--p-surface-border);
+  border-radius: 50%;
+  background: var(--p-surface-ground);
+  color: var(--p-text-color-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: var(--p-surface-hover);
+    color: var(--p-text-color);
+    border-color: var(--p-primary-color);
+  }
+  
+  i {
+    font-size: 0.875rem;
+  }
 }
 </style>
