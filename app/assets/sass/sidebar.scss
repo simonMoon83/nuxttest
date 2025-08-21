@@ -55,17 +55,43 @@
 
 // 하위메뉴 크기 조정
 .v-sidebar-menu {
+  // 사이드바와 메인 콘텐츠 구분을 위한 오른쪽 경계선
+  border-right: 1px solid var(--p-surface-border);
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+
   // 2단계 하위메뉴 (Menu Management, 시스템 설정 등)
   .vsm--link_level-2 {
     line-height: 26px;
     padding: 3px 12px 3px 10px;
     font-size: 12.5px;
   }
+
+  // 하위메뉴 유무와 관계없이 동일한 높이/정렬 적용 (원래 28px 기준)
+  .vsm--link,
+  .vsm--link_open,
+  .vsm--link_active {
+    line-height: 28px !important;
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+  }
+  .vsm--icon,
+  .vsm--arrow,
+  .vsm--toggle-btn {
+    height: 28px !important;
+    width: 28px !important;
+    line-height: 28px !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
 }
 
 // 다크모드: 축소 플라이아웃(오버레이) 드롭다운도 확장 상태와 동일 스타일 강제
 [data-theme="dark"] .v-sidebar-menu,
 .dark .v-sidebar-menu {
+  // 다크 테마에서의 경계선 색상 조정
+  border-right-color: #3f3f46;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.15);
   // 플라이아웃(드롭다운) 컨테이너 배경/테두리
   .vsm--dropdown,
   .vsm--flyout,
