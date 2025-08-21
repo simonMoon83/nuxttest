@@ -94,3 +94,28 @@ h6 {
     color: var(--p-primary-color);
   }
 }
+
+/* Global: TreeTable compact spacing helper */
+.treetable-tight.p-treetable .p-treetable-tbody > tr > td,
+.treetable-tight.p-treetable .p-treetable-thead > tr > th,
+.treetable-tight .p-treetable .p-treetable-tbody > tr > td,
+.treetable-tight .p-treetable .p-treetable-thead > tr > th {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* Global: ToggleSwitch neutral tone */
+.neutral-switch.p-toggleswitch .p-toggleswitch-slider {
+  background: rgb(95, 95, 95);
+}
+.neutral-switch.p-toggleswitch.p-toggleswitch-checked .p-toggleswitch-slider {
+  background: rgb(105, 152, 218);
+}
+@media (prefers-color-scheme: dark) {
+  .neutral-switch.p-toggleswitch .p-toggleswitch-slider {
+    background: rgb(31, 41, 55);
+  }
+  .neutral-switch.p-toggleswitch.p-toggleswitch-checked .p-toggleswitch-slider {
+    background: rgb(119, 119, 119);
+  }
+}

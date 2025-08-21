@@ -8,13 +8,16 @@
             icon="pi pi-plus" 
             label="새 메뉴 추가" 
             @click="showAddDialog = true"
-            class="p-button-success"
+            severity="secondary"
+            text
             size="small"
           />
           <Button 
             icon="pi pi-refresh" 
             label="새로고침" 
             @click="refreshMenuData"
+            severity="secondary"
+            text
             size="small"
           />
           <Button 
@@ -22,6 +25,7 @@
             label="전체 펼치기" 
             @click="expandAll"
             severity="secondary"
+            text
             size="small"
           />
           <Button 
@@ -29,6 +33,7 @@
             label="전체 접기" 
             @click="collapseAll"
             severity="secondary"
+            text
             size="small"
           />
         </div>
@@ -36,28 +41,30 @@
       </div>
   
       <!-- 메뉴 트리 테이블 -->
+    <div class="-mx-6 mt-8">
       <Card>
         <template #header>
-          <div class="datatable-header">
-            <div class="flex items-center justify-end">
-              <IconField icon-position="left" class="ml-auto w-full lg:w-80">
+          <div class="datatable-header pt-5 pr-4">
+            <div class="flex justify-between">
+              <span class="text-xl pl-4">Menu List</span>
+              <IconField icon-position="left">
                 <InputIcon class="pi pi-search" />
                 <InputText v-model="searchQuery" placeholder="메뉴 검색 (제목/링크)" />
               </IconField>
             </div>
           </div>
-        </template>
+        </template>        
         <template #content>
           <TreeTable 
             :value="filteredMenuTreeData" 
             :loading="loading"
             v-model:expandedKeys="expandedKeys"
-            class="p-treetable-sm"
-            :pt="{ headerCell: { class: 'py-2 px-2' }, bodyCell: { class: 'py-2 px-2' }, table: { class: 'text-sm' } }"
+            class="p-treetable-sm treetable-tight"
+            :pt="{ headerCell: { class: 'py-0.5 px-1 text-xs' }, bodyCell: { class: 'py-0.5 px-1 text-xs' }, table: { class: 'text-xs leading-tight' } }"
           >
             <Column field="title" header="제목" expander style="width: 30%">
               <template #body="slotProps">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1">
                   <i v-if="slotProps.node.data.icon" :class="slotProps.node.data.icon"></i>
                   <span v-if="!slotProps.node.data.is_separator">{{ slotProps.node.data.title }}</span>
                   <Tag v-else label="구분선" severity="info" />
@@ -75,7 +82,9 @@
             
             <Column field="sort_order" header="순서" style="width: 10%">
               <template #body="slotProps">
-                <Badge :value="slotProps.node.data.sort_order" />
+                <span class="text-sm bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 px-2 py-1 rounded">
+                  {{ slotProps.node.data.sort_order }}
+                </span>
               </template>
             </Column>
             
@@ -84,6 +93,7 @@
                 <template v-if="!slotProps.node.data.is_separator">
                   <div class="flex items-center gap-2">
                     <ToggleSwitch 
+                      class="neutral-switch"
                       :model-value="slotProps.node.data.is_active"
                       @update:modelValue="onToggleActive(slotProps.node.data, $event)"
                     />
@@ -105,7 +115,8 @@
                   <Button 
                     icon="pi pi-pencil" 
                     size="small"
-                    severity="info"
+                    severity="secondary"
+                    text
                     @click="editMenu(slotProps.node.data)"
                     v-tooltip.top="'수정'"
                   />
@@ -113,6 +124,7 @@
                     icon="pi pi-arrow-up" 
                     size="small"
                     severity="secondary"
+                    text
                     @click="moveUp(slotProps.node.data)"
                     :disabled="!canMoveUp(slotProps.node.data)"
                     v-tooltip.top="'위로 이동'"
@@ -121,6 +133,7 @@
                     icon="pi pi-arrow-down" 
                     size="small"
                     severity="secondary"
+                    text
                     @click="moveDown(slotProps.node.data)"
                     :disabled="!canMoveDown(slotProps.node.data)"
                     v-tooltip.top="'아래로 이동'"
@@ -128,7 +141,8 @@
                   <Button 
                     icon="pi pi-plus" 
                     size="small"
-                    severity="success"
+                    severity="secondary"
+                    text
                     @click="addChildMenu(slotProps.node.data)"
                     v-tooltip.top="'하위 메뉴 추가'"
                   />
@@ -136,6 +150,7 @@
                     icon="pi pi-trash" 
                     size="small"
                     severity="danger"
+                    text
                     @click="deleteMenu(slotProps.node.data)"
                     v-tooltip.top="'삭제'"
                   />
@@ -152,6 +167,7 @@
           </TreeTable>
         </template>
       </Card>
+    </div>
   
       <!-- 메뉴 추가/수정 다이얼로그 -->
       <Dialog 
@@ -630,4 +646,5 @@
   .field {
     margin-bottom: 1rem;
   }
+  /* moved to global styles (app/assets/sass/main.scss) */
   </style> 
