@@ -49,15 +49,16 @@ function expandHeader() {
       <Toolbar class="border-b border-gray-200 dark:border-gray-700 py-1">
         <template #start>
           <div class="flex items-center gap-2 w-full">
-            <Button
-              ref="collapseBtnRef"
-              icon="pi pi-angle-up"
-              text
-              rounded
-              class="mr-2 p-1"
-              v-tooltip.bottom="'헤더 접기'"
-              @click="collapseHeader"
-            />
+            <span v-tooltip.bottom="'헤더 접기'">
+              <Button
+                ref="collapseBtnRef"
+                icon="pi pi-angle-up"
+                text
+                rounded
+                class="mr-2 p-1"
+                @click="collapseHeader"
+              />
+            </span>
             <div class="flex-1 min-w-0">
               <DynamicTabs />
             </div>
@@ -76,8 +77,12 @@ function expandHeader() {
             </button>
           </ClientOnly>
           <AppColorMode class="ml-1 mr-1" />
-          <Button icon="pi pi-github" class="mr-1" text @click="redirectToGithub" v-tooltip.bottom="'GitHub 저장소'" />
-          <Button icon="pi pi-sign-out" text severity="danger" @click="handleLogout" v-tooltip.bottom="'로그아웃'" />
+          <span v-tooltip.bottom="'GitHub 저장소'">
+            <Button icon="pi pi-github" class="mr-1" text @click="redirectToGithub" />
+          </span>
+          <span v-tooltip.bottom="'로그아웃'">
+            <Button icon="pi pi-sign-out" text severity="danger" @click="handleLogout" />
+          </span>
         </template>
       </Toolbar>
     </div>
@@ -86,16 +91,16 @@ function expandHeader() {
   <!-- 접힌 상태에서만 표시되는 고정 버튼 (레이아웃 공간 차지 X) -->
   <ClientOnly>
     <Teleport to="body">
-      <Button
-        v-if="headerCollapsed"
-        icon="pi pi-angle-down"
-        text
-        rounded
-        class="mr-2 p-1 expand-btn-fixed"
-        :style="{ top: `${(expandBtnPos?.top ?? 8)}px`, left: `${(expandBtnPos?.left ?? 8)}px`, zIndex: 2147483647 }"
-        v-tooltip.bottom="'헤더 펼치기'"
-        @click="expandHeader"
-      />
+      <span v-if="headerCollapsed" v-tooltip.bottom="'헤더 펼치기'">
+        <Button
+          icon="pi pi-angle-down"
+          text
+          rounded
+          class="mr-2 p-1 expand-btn-fixed"
+          :style="{ top: `${(expandBtnPos?.top ?? 8)}px`, left: `${(expandBtnPos?.left ?? 8)}px`, zIndex: 2147483647 }"
+          @click="expandHeader"
+        />
+      </span>
     </Teleport>
   </ClientOnly>
 

@@ -32,7 +32,51 @@ export function useNavigationMenu() {
       const response = await $fetch<ApiResponse>('/api/menu')
       
       if (response && response.success) {
-        menuData.value = response.data
+        const rawMenu = response.data
+
+        const buildPrunedMenu = (items: MenuItem[]): MenuItem[] => {
+          const result: MenuItem[] = []
+          for (const item of items) {
+            const prunedChildren = Array.isArray(item.child) ? buildPrunedMenu(item.child) : undefined
+            result.push({ ...item, child: prunedChildren })
+          }
+          return result
+        }
+
+        let finalMenu: MenuItem[] = rawMenu
+
+        // 클라이언트에서 존재하지 않는 라우트 제거 (Router 경고 방지)
+        if (import.meta.client) {
+          try {
+            const router = useRouter()
+            const routeExists = (path?: string) => {
+              if (!path) return false
+              if (/^https?:\/\//i.test(path)) return true
+              const resolved = router.resolve(path)
+              return resolved.matched && resolved.matched.length > 0
+            }
+
+            const prune = (items: MenuItem[]): MenuItem[] => {
+              const acc: MenuItem[] = []
+              for (const current of items) {
+                const children = Array.isArray(current.child) ? prune(current.child) : undefined
+                const selfValid = routeExists(current.href)
+                if ((current as any).component || selfValid || (children && children.length > 0)) {
+                  acc.push({ ...current, child: children })
+                }
+              }
+              return acc
+            }
+
+            finalMenu = prune(rawMenu)
+          } catch (e) {
+            console.warn('메뉴 라우트 필터링 중 경고:', e)
+          }
+        } else {
+          finalMenu = buildPrunedMenu(rawMenu)
+        }
+
+        menuData.value = finalMenu
       } else {
         throw new Error('메뉴 데이터 로드 실패')
       }
