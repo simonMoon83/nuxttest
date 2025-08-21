@@ -1,6 +1,6 @@
 @use 'sass:color';
 @use 'vue-sidebar-menu/src/scss/vue-sidebar-menu.scss' with (
-  $primary-color: #2a2a2e,
+  $primary-color: #6c757d,
   $base-bg: #fff,
   $item-color: #2a2a2e,
   $item-active-color: #2a2a2e,
@@ -10,7 +10,7 @@
   $icon-bg: transparent,
   $dropdown-bg: #fff,
   $header-item-color: #6c757d,
-  $toggle-btn-color: #2a2a2e,
+  $toggle-btn-color: #6c757d,
   $toggle-btn-bg: #fff,
   $item-font-size: 13px,
   $item-line-height: 28px,
@@ -32,16 +32,17 @@
   --vsm-primary-color: #fff;
   --vsm-base-bg: #2a2a2e;
   --vsm-item-color: #fff;
-  --vsm-item-active-color: #000;
-  --vsm-item-active-bg: #fff;
-  --vsm-item-open-color: #000;
-  --vsm-item-open-bg: #fff;
+  /* 활성/오픈/아이콘 상태를 다크 톤으로 일관되게 */
+  --vsm-item-active-color: #fff;
+  --vsm-item-active-bg: #3a3a3e;
+  --vsm-item-open-color: #fff;
+  --vsm-item-open-bg: #3a3a3e;
   --vsm-item-hover-bg: #3a3a3e;
   --vsm-icon-color: #fff;
   --vsm-icon-bg: transparent;
-  --vsm-icon-active-color: #000;
-  --vsm-icon-open-color: #000;
-  --vsm-icon-open-bg: #fff;
+  --vsm-icon-active-color: #fff;
+  --vsm-icon-open-color: #fff;
+  --vsm-icon-open-bg: transparent;
   --vsm-dropdown-bg: #2a2a2e;
   --vsm-header-item-color: #adb5bd;
   --vsm-toggle-btn-color: #fff;
@@ -59,5 +60,56 @@
     line-height: 26px;
     padding: 3px 12px 3px 10px;
     font-size: 12.5px;
+  }
+}
+
+// 다크모드: 축소 플라이아웃(오버레이) 드롭다운도 확장 상태와 동일 스타일 강제
+[data-theme="dark"] .v-sidebar-menu,
+.dark .v-sidebar-menu {
+  // 플라이아웃(드롭다운) 컨테이너 배경/테두리
+  .vsm--dropdown,
+  .vsm--flyout,
+  .vsm--list,
+  .vsm--mobile-bg,
+  .vsm--scrollbar {
+    background: var(--vsm-dropdown-bg) !important;
+    color: var(--vsm-item-color) !important;
+  }
+  // 축소 상태에서의 드롭다운도 동일하게
+  &.vsm_collapsed .vsm--dropdown {
+    background: var(--vsm-dropdown-bg) !important;
+    color: var(--vsm-item-color) !important;
+  }
+  // 링크/라벨/아이콘 색상
+  .vsm--link {
+    color: var(--vsm-item-color) !important;
+    background: transparent;
+  }
+  .vsm--link_active,
+  .vsm--link_open {
+    color: var(--vsm-item-open-color) !important;
+    background: var(--vsm-item-open-bg) !important;
+  }
+  .vsm--link:hover {
+    background: var(--vsm-item-hover-bg) !important;
+  }
+  // 아이콘/라벨은 항상 현재 텍스트 색을 따르도록
+  .vsm--icon,
+  .vsm--title,
+  .vsm--label {
+    color: inherit !important;
+  }
+
+  // 축소 상태 전반
+  &.vsm_collapsed {
+    background: var(--vsm-base-bg) !important;
+    .vsm--item,
+    .vsm--link {
+      background: transparent !important;
+      color: var(--vsm-item-color) !important;
+    }
+    .vsm--link:hover {
+      background: var(--vsm-item-hover-bg) !important;
+    }
   }
 }
