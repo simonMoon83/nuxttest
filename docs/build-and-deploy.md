@@ -47,13 +47,83 @@ docker inspect nuxttest:prod
 ```
 
 4. DB 연결 주의사항
-- 현재 `server/utils/db.ts`는 `localhost`로 고정. 컨테이너에서 호스트 DB에 연결하려면:
-  - Windows: `host.docker.internal` 사용 권장
-  - 또는 DB도 Docker로 띄우고 동일 네트워크 사용
-- 필요 시 DB 설정을 환경변수로 빼도록 리팩터 필요
+- 현재 DB 설정은 환경변수 기반입니다. 컨테이너 실행 시 아래 값을 넘기면 됩니다:
+  - `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
+  - 선택: `DB_TRUST_SERVER_CERT=true`, `DB_ENCRYPT=true|false`
+  - 선택(초기화 스킵): `SKIP_DB_INIT=true`
+- 호스트(로컬)에서 동작 중인 DB에 접속: `DB_HOST=host.docker.internal`
+- DB도 컨테이너라면 동일 네트워크에 두고 컨테이너 이름으로 접속: 예) `DB_HOST=mssql-server-instance`
 
 5. WebSocket/프록시
 - 별도 포트(예: 4000)를 사용한다면 포트 매핑/프록시 규칙 추가 필요
+
+---
+
+### 2-1) Docker 네트워크로 DB 연결 구성
+컨테이너 간 이름으로 통신하려면 사용자 네트워크를 생성해 두세요.
+```bash
+docker network create nuxtnet   # 최초 1회
+
+# 이미 떠 있는 MSSQL 컨테이너를 네트워크에 연결 (예시 이름: mssql-server-instance)
+docker network connect nuxtnet mssql-server-instance
+
+# Nuxt 컨테이너 실행 (동일 네트워크, 컨테이너 이름으로 DB 접속)
+docker run --rm --name nuxtapp --network nuxtnet \
+  -p 3000:3000 \
+  -e DB_HOST=mssql-server-instance \
+  -e DB_PORT=1433 \
+  -e DB_USER=frame \
+  -e DB_PASSWORD=frame \
+  -e DB_NAME=theframework \
+  -e DB_TRUST_SERVER_CERT=true \
+  nuxttest:latest
+```
+
+호스트 DB로 붙고 싶다면 네트워크 없이도 아래처럼 가능합니다.
+```bash
+docker run --rm --name nuxtapp -p 3000:3000 \
+  -e DB_HOST=host.docker.internal -e DB_PORT=1433 \
+  -e DB_USER=frame -e DB_PASSWORD=frame -e DB_NAME=theframework \
+  -e DB_TRUST_SERVER_CERT=true \
+  nuxttest:latest
+```
+
+---
+
+### 2-2) docker-compose로 실행 (Docker Desktop 포함)
+프로젝트 루트에 `docker-compose.yml`이 포함되어 있습니다. 외부 네트워크(`nuxtnet`)를 먼저 만들어 주세요.
+```bash
+docker network create nuxtnet   # 최초 1회만
+docker compose up -d            # 또는 Docker Desktop에서 Compose 파일로 실행
+```
+
+`docker-compose.yml` 주요 내용(요약):
+```yaml
+services:
+  nuxtapp:
+    image: nuxttest:latest
+    container_name: nuxtapp
+    ports:
+      - "3000:3000"
+    environment:
+      DB_HOST: mssql-server-instance
+      DB_PORT: "1433"
+      DB_USER: frame
+      DB_PASSWORD: frame
+      DB_NAME: theframework
+      DB_TRUST_SERVER_CERT: "true"
+    networks:
+      - nuxtnet
+
+networks:
+  nuxtnet:
+    external: true
+```
+
+Docker Desktop에서 실행하려면 Images → `nuxttest:latest` → Run에서 다음을 설정:
+- Network: `nuxtnet`
+- Ports: `3000:3000`
+- Environment: 위와 동일한 DB 환경변수 입력
 
 ---
 
