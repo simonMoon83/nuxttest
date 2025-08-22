@@ -31,37 +31,37 @@ const schema = ref<any>([
     $formkit: 'primeInputText',
     name: 'search_condition1',
     label: '상세검색 조건',
-    outerClass: 'col-3',
+    outerClass: 'col-2',
   },
   {
     $formkit: 'primeInputText',
     name: 'search_condition2',
     label: '상세검색 조건',
-    outerClass: 'col-3',
+    outerClass: 'col-2',
   },
   {
     $formkit: 'primeInputText',
     name: 'search_condition3',
     label: '상세검색 조건',
-    outerClass: 'col-3',
+    outerClass: 'col-2',
   },
   {
     $formkit: 'primeInputText',
     name: 'search_condition4',
     label: '상세검색 조건',
-    outerClass: 'col-3',
+    outerClass: 'col-2',
   },
   {
     $formkit: 'primeInputText',
     name: 'search_condition5',
     label: '상세검색 조건',
-    outerClass: 'col-3',
+    outerClass: 'col-2',
   },
   {
     $formkit: 'primeInputText',
     name: 'search_condition6',
     label: '상세검색 조건',
-    outerClass: 'col-3',
+    outerClass: 'col-2',
   },
   {
     $formkit: 'primeInputText',
@@ -73,7 +73,7 @@ const schema = ref<any>([
     $formkit: 'primeInputText',
     name: 'search_condition8',
     label: '상세검색 조건',
-    outerClass: 'col-3',
+    outerClass: 'col-9',
   },
   // --- 모든 버튼을 포함하는 그룹 ---
   {
@@ -204,13 +204,13 @@ function onCellClicked(event: any) {
         <h2>Basic Demo</h2>
       </div>
 
-      <div v-if="data" class="min-w-25rem compact-form">
+      <div v-if="data" class="compact-form">
         <FormKitDataEdit
           v-model="data"
           :schema="schema"
           :debug-schema="false"
           :debug-data="false"
-          form-class="form-horizontal grid-4"
+          form-class="form-horizontal grid-12"
           submit-label=""
           @data-saved="submitHandler"
         />
