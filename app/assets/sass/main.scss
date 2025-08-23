@@ -95,14 +95,7 @@ h6 {
   }
 }
 
-/* Global: TreeTable compact spacing helper */
-.treetable-tight.p-treetable .p-treetable-tbody > tr > td,
-.treetable-tight.p-treetable .p-treetable-thead > tr > th,
-.treetable-tight .p-treetable .p-treetable-tbody > tr > td,
-.treetable-tight .p-treetable .p-treetable-thead > tr > th {
-  padding-top: 0;
-  padding-bottom: 0;
-}
+/* TreeTable compact spacing moved to assets/sass/utilities/_tables.scss */
 
 /* Global: ToggleSwitch neutral tone */
 .neutral-switch.p-toggleswitch .p-toggleswitch-slider {

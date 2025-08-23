@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs'
 import { join } from 'path'
+import { ensureUploadsDir } from '../../utils/uploads'
 
 export default defineEventHandler(async (event) => {
   try {
@@ -39,13 +40,8 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    // uploads 폴더 확인/생성
-    const uploadsDir = join(process.cwd(), 'public', 'uploads')
-    try {
-      await fs.access(uploadsDir)
-    } catch {
-      await fs.mkdir(uploadsDir, { recursive: true })
-    }
+    // 업로드 디렉토리 결정 (.output/public/uploads 우선, 환경변수로 재정의 가능)
+    const uploadsDir = await ensureUploadsDir()
 
     // 파일명 생성 (타임스탬프 포함)
     const timestamp = Date.now()

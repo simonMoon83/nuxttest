@@ -13,7 +13,7 @@
 
 ## 🎯 프로젝트 개요
 
-이 프로젝트는 **Nuxt 3.17.4**를 기반으로 하며, **PrimeVue**, **FormKit**, **Pinia** 등을 통합한 풀스택 웹 애플리케이션입니다.
+이 프로젝트는 **Nuxt 3.17.5**를 기반으로 하며, **PrimeVue**, **FormKit**, **Pinia** 등을 통합한 풀스택 웹 애플리케이션입니다.
 
 ### 🔧 주요 기술 스택
 
@@ -21,7 +21,7 @@
 - **State Management**: Pinia
 - **Styling**: UnoCSS, SCSS
 - **Authentication**: Custom Auth Store
-- **Database**: SQLite (Turso)
+- **Database**: MSSQL
 
 ## 🗺️ 라우팅 구조
 
@@ -151,6 +151,8 @@ app/pages/
 | `/exam/agGrid`     | `exam/agGrid.vue`     | AG Grid 데모         | ✅        |
 | `/exam/demo`       | `exam/demo.vue`       | FormKit 데모         | ✅        |
 | `/exam/demodetail` | `exam/demodetail.vue` | 데모 상세 페이지     | ✅        |
+
+| `/uploads/*`       | `server/routes/uploads/[...file].get.ts` | 업로드 파일 서빙 | ❌ |
 
 ## 🎨 레이아웃 시스템
 
@@ -487,6 +489,12 @@ export default defineNuxtConfig({
 
   // SSR 설정
   ssr: true,
+
+  // Nitro 정적 자산 서빙 (업로드 포함)
+  nitro: {
+    serveStatic: true,
+    publicAssets: [{ dir: 'public', baseURL: '/' }],
+  },
 
   // 호환성 버전
   future: {

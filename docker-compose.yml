@@ -6,6 +6,11 @@ services:
     container_name: nuxtapp
     ports:
       - "3000:3000"
+    volumes:
+      - /Users/darkhorse/DevTool/Project/nuxttest/public/uploads:/Users/darkhorse/DevTool/Project/nuxttest/public/uploads
+      # --- Windows (Docker Desktop) 예시 ---
+      # - "D:/public/uploads:/uploads"   # 호스트 D:\public\uploads → 컨테이너 /uploads
+      # 환경변수에서도 /uploads를 가리키도록 설정하세요 (아래 참조)
     environment:
       DB_HOST: mssql-server-instance
       DB_PORT: "1433"
@@ -14,7 +19,10 @@ services:
       DB_NAME: theframework
       DB_TRUST_SERVER_CERT: "true"
       # 필요 시 주석 해제하여 DB 초기화 스킵
-      # SKIP_DB_INIT: "true"
+      SKIP_DB_INIT: "true"
+      UPLOADS_DIR: /Users/darkhorse/DevTool/Project/nuxttest/public/uploads
+      # --- Windows (Docker Desktop) 예시 ---
+      # UPLOADS_DIR: /uploads
     networks:
       - nuxtnet
     restart: "no"
