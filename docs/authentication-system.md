@@ -375,17 +375,22 @@ CREATE TABLE app_users (
 ### 1. 데이터베이스 연결 (`server/utils/db.ts`)
 
 ```typescript
-// MSSQL 연결 설정
+// MSSQL 연결 설정 (환경변수 기반)
 const config: sql.config = {
-  server: 'localhost',
-  port: 1433,
-  user: 'demo',
-  password: 'demo',
-  database: 'bbbb',
+  server: process.env.DB_HOST || 'localhost',
+  port: process.env.DB_PORT ? Number.parseInt(process.env.DB_PORT, 10) : 1433,
+  user: process.env.DB_USER || 'frame',
+  password: process.env.DB_PASSWORD || 'frame',
+  database: process.env.DB_NAME || 'theframework',
   options: {
-    encrypt: false,
-    trustServerCertificate: true
-  }
+    encrypt: process.env.DB_ENCRYPT === 'true',
+    trustServerCertificate: process.env.DB_TRUST_SERVER_CERT !== 'false',
+  },
+  pool: {
+    max: process.env.DB_POOL_MAX ? Number.parseInt(process.env.DB_POOL_MAX, 10) : 10,
+    min: process.env.DB_POOL_MIN ? Number.parseInt(process.env.DB_POOL_MIN, 10) : 0,
+    idleTimeoutMillis: process.env.DB_POOL_IDLE_MS ? Number.parseInt(process.env.DB_POOL_IDLE_MS, 10) : 30000,
+  },
 }
 ```
 
@@ -393,6 +398,8 @@ const config: sql.config = {
 - 연결 풀링으로 성능 최적화
 - 자동 테이블 생성 및 초기 데이터 생성
 - bcrypt를 사용한 비밀번호 해싱
+- 재시도/지연 설정: `DB_MAX_RETRIES`, `DB_RETRY_DELAY_MS`
+- 초기화 스킵: `SKIP_DB_INIT=true`
 
 ### 2. JWT 토큰 관리 (`server/utils/jwt.ts`)
 
@@ -546,7 +553,7 @@ export default defineNuxtRouteMiddleware((to, from) => {
 ## 🧪 테스트
 
 ### 로그인 테스트
-1. 브라우저에서 `http://localhost:3002` 접속
+1. 브라우저에서 `http://localhost:3000` 접속
 2. 테스트 계정으로 로그인: `admin` / `admin123`
 3. 개발자 도구에서 쿠키 확인
 4. 로그아웃 후 쿠키 삭제 확인
@@ -555,16 +562,16 @@ export default defineNuxtRouteMiddleware((to, from) => {
 
 ```bash
 # 로그인
-curl -X POST http://localhost:3002/api/auth/login \
+curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "admin123"}'
 
 # 사용자 정보 조회 (쿠키 포함)
-curl -X GET http://localhost:3002/api/auth/me \
+curl -X GET http://localhost:3000/api/auth/me \
   -H "Cookie: auth-token=YOUR_TOKEN"
 
 # 로그아웃
-curl -X POST http://localhost:3002/api/auth/logout
+curl -X POST http://localhost:3000/api/auth/logout
 ```
 
 ## 🐛 트러블슈팅

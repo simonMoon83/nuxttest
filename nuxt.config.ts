@@ -4,6 +4,7 @@ import pkg from './package.json'
 export const wrappedPrimeInputs: string[] = ['AutoComplete', 'CascadeSelect', 'Checkbox', 'Chip', 'ColorPicker', 'DatePicker', 'Editor', 'InputMask', 'InputNumber', 'InputOtp', 'InputText', 'Knob', 'Listbox', 'MultiSelect', 'Password', 'RadioButton', 'Rating', 'Select', 'SelectButton', 'Slider', 'Textarea', 'ToggleButton', 'ToggleSwitch', 'TreeSelect', 'Button']
 
 export default defineNuxtConfig({
+  css: ['~/App.scss'],
 
   modules: [
     '@pinia/nuxt',
@@ -42,6 +43,13 @@ export default defineNuxtConfig({
   },
   experimental: {
     appManifest: false,
+  },
+
+  nitro: {
+    serveStatic: true,
+    publicAssets: [
+      { dir: 'public', baseURL: '/' },
+    ],
   },
 
   compatibilityDate: '2024-07-04',

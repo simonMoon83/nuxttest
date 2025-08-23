@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs'
 import { join } from 'path'
+import { ensureUploadsDir } from '../../utils/uploads'
 import { randomUUID } from 'crypto'
 
 export default defineEventHandler(async (event) => {
@@ -45,22 +46,15 @@ export default defineEventHandler(async (event) => {
     // 고유한 파일명 생성
     const uniqueFilename = `logo-${randomUUID()}${fileExtension}`
     
-    // public 디렉토리의 uploads 폴더에 저장
-    const uploadDir = join(process.cwd(), 'public', 'uploads')
-    
-    // uploads 디렉토리가 없으면 생성
-    try {
-      await fs.access(uploadDir)
-    } catch {
-      await fs.mkdir(uploadDir, { recursive: true })
-    }
+    // 업로드 디렉토리 결정 (.output/public/uploads 우선, 환경변수로 재정의 가능)
+    const uploadDir = await ensureUploadsDir()
     
     const filePath = join(uploadDir, uniqueFilename)
     
     // 파일 저장
     await fs.writeFile(filePath, file.data)
     
-    // 웹 경로 반환
+    // 웹 경로 반환 (정적 서빙 기준 /uploads)
     const webPath = `/uploads/${uniqueFilename}`
     
     return {

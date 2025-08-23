@@ -127,6 +127,93 @@ Docker Desktop에서 실행하려면 Images → `nuxttest:latest` → Run에서 
 
 ---
 
+### 2-3) 파일 업로드(컨테이너)
+업로드 API는 서버에서 파일을 저장하고 `/uploads/<파일명>` 경로로 접근합니다. 컨테이너에서도 영속적으로 동작하도록 볼륨과 환경변수를 설정하세요.
+
+- 기본 원리
+  - 저장 경로는 `UPLOADS_DIR` 환경변수로 제어됩니다. 미설정 시 `.output/public/uploads`(개발 폴백: `public/uploads`).
+  - 이 저장소에서 파일을 직접 서빙하는 라우트가 포함되어 있습니다: `server/routes/uploads/[...file].get.ts` → 브라우저에서 `/uploads/<파일명>`로 접근합니다.
+
+- 예시 1) 프로젝트 경로 바인드(맥/리눅스)
+```yaml
+services:
+  nuxtapp:
+    volumes:
+      - ./public/uploads:/app/public/uploads
+      - ./public/uploads:/app/.output/public/uploads
+    environment:
+      UPLOADS_DIR: /app/.output/public/uploads
+```
+
+- 예시 2) 단일 타깃 경로 사용(맥/리눅스)
+```yaml
+services:
+  nuxtapp:
+    volumes:
+      - /absolute/host/uploads:/uploads
+    environment:
+      UPLOADS_DIR: /uploads
+```
+
+- 예시 3) Windows (Docker Desktop)
+```yaml
+services:
+  nuxtapp:
+    volumes:
+      - "D:/public/uploads:/uploads"   # 호스트 D:\\public\\uploads → 컨테이너 /uploads
+    environment:
+      UPLOADS_DIR: /uploads
+```
+주의: Docker Desktop Settings → Resources → File Sharing에서 해당 드라이브/폴더 공유를 허용해야 합니다.
+
+- 업로드/확인
+```bash
+curl -F "file=@public/nuxt.png" http://localhost:3000/api/upload/logo
+# 응답: { success: true, path: "/uploads/xxx.png", ... }
+curl -I "http://localhost:3000/uploads/xxx.png"
+```
+
+---
+
+### 2-4) k6로 스모크/램핑 테스트(선택)
+```bash
+# 스모크(10 VUs, 10s)
+docker run --rm --network nuxtnet -i grafana/k6:0.51.0 run - <<'K6'
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+export const options = { vus: 10, duration: '10s' };
+export default function () {
+  const r = http.get('http://nuxtapp:3000/api/products');
+  check(r, { '200': (res) => res.status === 200 });
+  sleep(0.2);
+}
+K6
+```
+
+```bash
+# 램핑 예시
+docker run --rm --network nuxtnet -i grafana/k6:0.51.0 run - <<'K6'
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+export const options = {
+  scenarios: {
+    ramp: {
+      executor: 'ramping-vus', startVUs: 0,
+      stages: [ { duration: '30s', target: 50 }, { duration: '1m', target: 50 }, { duration: '30s', target: 0 } ]
+    }
+  },
+  thresholds: { http_req_failed: ['rate<0.01'], http_req_duration: ['p(95)<800'] }
+};
+export default function () {
+  const r = http.get('http://nuxtapp:3000/api/products');
+  check(r, { '200': (res) => res.status === 200 });
+  sleep(0.2);
+}
+K6
+```
+
+---
+
 ### 3) 정적 HTML(선택)
 두 가지 방식이 있습니다.
 
@@ -182,6 +269,11 @@ server {
   - `--env-file .env` 사용 시 파일이 존재해야 함. 필요한 값만 넣고 실행하거나 옵션을 제거하세요.
 - 이미지 위치는 어디?
   - Docker 데몬 로컬 저장소(Windows는 Docker Desktop/WSL2 내부). `docker images`로 확인
+- `/uploads/*`가 404가 나요
+  - `nuxt.config.ts`에 `nitro.serveStatic=true`, `nitro.publicAssets=[{ dir: 'public', baseURL: '/' }]`가 포함되어 있어야 합니다(이미 반영됨).
+  - `server/routes/uploads/[...file].get.ts` 라우트가 업로드 디렉터리에서 직접 파일을 서빙합니다.
+  - `UPLOADS_DIR`과 볼륨 마운트가 일치하는지 확인하세요. (예: `UPLOADS_DIR=/uploads`, `-v D:/public/uploads:/uploads`)
+  - Docker Desktop에서 호스트 폴더 공유가 허용되어 있는지 확인하세요.
 
 ---
 
