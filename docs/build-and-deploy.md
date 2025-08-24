@@ -127,40 +127,42 @@ Docker Desktop에서 실행하려면 Images → `nuxttest:latest` → Run에서 
 
 ---
 
-### 2-3) 파일 업로드(컨테이너)
+### 2-3) 파일 업로드(컨테이너) + 볼륨 전략(dev/prod)
 업로드 API는 서버에서 파일을 저장하고 `/uploads/<파일명>` 경로로 접근합니다. 컨테이너에서도 영속적으로 동작하도록 볼륨과 환경변수를 설정하세요.
 
 - 기본 원리
   - 저장 경로는 `UPLOADS_DIR` 환경변수로 제어됩니다. 미설정 시 `.output/public/uploads`(개발 폴백: `public/uploads`).
   - 이 저장소에서 파일을 직접 서빙하는 라우트가 포함되어 있습니다: `server/routes/uploads/[...file].get.ts` → 브라우저에서 `/uploads/<파일명>`로 접근합니다.
 
-- 예시 1) 프로젝트 경로 바인드(맥/리눅스)
-```yaml
-services:
-  nuxtapp:
-    volumes:
-      - ./public/uploads:/app/public/uploads
-      - ./public/uploads:/app/.output/public/uploads
-    environment:
-      UPLOADS_DIR: /app/.output/public/uploads
+- dev/prod 프로필 기반 실행(docker-compose)
+  - dev: 호스트(메인 컴퓨터) 디렉터리를 그대로 사용(바인드 마운트)
+  - prod: Docker 네임드 볼륨 사용(컨테이너 수명과 무관한 데이터 보존)
+
+1) 사전 준비(최초 1회)
+```bash
+docker network create nuxtnet
+docker build -t nuxttest:latest .
 ```
 
-- 예시 2) 단일 타깃 경로 사용(맥/리눅스)
-```yaml
-services:
-  nuxtapp:
-    volumes:
-      - /absolute/host/uploads:/uploads
-    environment:
-      UPLOADS_DIR: /uploads
+2) 개발용(dev 프로필) — 호스트 폴더 사용
+```bash
+docker compose --profile dev up -d
+# 업로드 경로: 컨테이너 /uploads (호스트 ./public/uploads와 동기화)
 ```
 
-- 예시 3) Windows (Docker Desktop)
+3) 운영용(prod 프로필) — 네임드 볼륨 사용
+```bash
+docker volume create nuxt_uploads   # 선택(없으면 compose가 자동 생성)
+docker compose --profile prod up -d
+# 업로드 경로: 컨테이너 /uploads (네임드 볼륨 nuxt_uploads에 영속)
+```
+
+4) Windows (Docker Desktop)에서 dev 프로필로 바인드 마운트 시
 ```yaml
 services:
-  nuxtapp:
+  nuxtapp-dev:
     volumes:
-      - "D:/public/uploads:/uploads"   # 호스트 D:\\public\\uploads → 컨테이너 /uploads
+      - "D:/public/uploads:/uploads"
     environment:
       UPLOADS_DIR: /uploads
 ```
@@ -213,6 +215,84 @@ K6
 ```
 
 ---
+
+### 2-5) Docker 볼륨 백업/복구
+- 네임드 볼륨(`nuxt_uploads`) 백업(macOS/Linux)
+```bash
+# 백업(현재 디렉터리에 tgz 생성)
+docker run --rm \
+  -v nuxt_uploads:/data \
+  -v "$(pwd)":/backup \
+  alpine sh -c 'tar czf /backup/nuxt_uploads_$(date +%F).tgz -C /data .'
+
+# 복구(tgz 파일을 /data로 전개)
+docker run --rm \
+  -v nuxt_uploads:/data \
+  -v "$(pwd)":/backup \
+  alpine sh -c 'cd /data && tar xzf /backup/nuxt_uploads_YYYY-MM-DD.tgz'
+```
+
+- 바인드 마운트(호스트 경로) 백업은 호스트에서 직접 압축即可
+```bash
+tar czf uploads_backup_$(date +%F).tgz -C public uploads
+```
+
+- 마이그레이션: 바인드 → 네임드 볼륨
+```bash
+docker run --rm \
+  -v "$(pwd)/public/uploads":/from \
+  -v nuxt_uploads:/to \
+  alpine sh -c 'cp -a /from/. /to/'
+```
+
+- 마이그레이션: 네임드 볼륨 → 바인드
+```bash
+docker run --rm \
+  -v nuxt_uploads:/from \
+  -v "$(pwd)/public/uploads":/to \
+  alpine sh -c 'cp -a /from/. /to/'
+```
+
+- 볼륨 관리 기본 명령
+```bash
+docker volume ls
+docker volume inspect nuxt_uploads
+docker volume rm nuxt_uploads          # 사용 중이면 실패
+docker volume prune                    # 미사용 볼륨 일괄 삭제(주의)
+```
+
+참고: `COMPOSE_PROJECT_NAME`를 설정하면 볼륨 이름이 `<프로젝트>_nuxt_uploads` 형태로 생성됩니다.
+
+---
+
+### 2-6) 업로드 경로 커스터마이징
+애플리케이션은 `UPLOADS_DIR`을 기준으로 파일을 저장/서빙합니다. 컨테이너에서는 `/uploads`를 권장하며, 아래 중 하나를 선택하세요.
+
+- 옵션 A: 네임드 볼륨(기본, 권장)
+  - `docker-compose.yml` 그대로 사용: `nuxt_uploads:/uploads`
+  - 호스트의 실제 저장 위치는 Docker 내부에 관리됩니다(Desktop/WSL에서는 내부 VM).
+
+- 옵션 B: 운영에서도 호스트 경로를 명시하고 싶을 때(바인드 마운트)
+```yaml
+services:
+  nuxtapp:
+    volumes:
+      - /absolute/host/uploads:/uploads
+    environment:
+      UPLOADS_DIR: /uploads
+```
+
+- 옵션 C: Linux에서 네임드 볼륨을 특정 경로에 바인딩(local driver)
+```yaml
+volumes:
+  nuxt_uploads:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /srv/nuxt/uploads   # 실제 호스트 경로
+```
+주의: Windows에서는 `driver_opts` 방식이 제한적일 수 있습니다. 이 경우 옵션 B(바인드 마운트)를 사용하세요. Docker Desktop에서는 해당 경로가 공유 허용되어 있어야 합니다.
 
 ### 3) 정적 HTML(선택)
 두 가지 방식이 있습니다.

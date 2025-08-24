@@ -1,16 +1,18 @@
 version: "3.9"
 
 services:
-  nuxtapp:
+  # 개발용: 호스트 디렉터리 바인드 마운트 사용
+  nuxtapp-dev:
     image: nuxttest:latest
-    container_name: nuxtapp
+    container_name: nuxtapp-dev
+    profiles: ["dev"]
     ports:
       - "3000:3000"
     volumes:
-      - /Users/darkhorse/DevTool/Project/nuxttest/public/uploads:/Users/darkhorse/DevTool/Project/nuxttest/public/uploads
-      # --- Windows (Docker Desktop) 예시 ---
-      # - "D:/public/uploads:/uploads"   # 호스트 D:\public\uploads → 컨테이너 /uploads
-      # 환경변수에서도 /uploads를 가리키도록 설정하세요 (아래 참조)
+      # 호스트 프로젝트의 업로드 폴더를 컨테이너 /uploads로 마운트
+      - ./public/uploads:/uploads
+      # Nitro 정적 경로에도 동일 폴더를 연결 (SSR 빌드 산출물 경로)
+      - ./public/uploads:/app/.output/public/uploads
     environment:
       DB_HOST: mssql-server-instance
       DB_PORT: "1433"
@@ -20,14 +22,48 @@ services:
       DB_TRUST_SERVER_CERT: "true"
       # 필요 시 주석 해제하여 DB 초기화 스킵
       SKIP_DB_INIT: "true"
-      UPLOADS_DIR: /Users/darkhorse/DevTool/Project/nuxttest/public/uploads
-      # --- Windows (Docker Desktop) 예시 ---
-      # UPLOADS_DIR: /uploads
+      # 애플리케이션이 참조하는 업로드 경로
+      UPLOADS_DIR: /uploads
     networks:
       - nuxtnet
-    restart: "no"
+    restart: unless-stopped
+
+  # 운영용: Docker 네임드 볼륨 사용
+  nuxtapp:
+    image: nuxttest:latest
+    container_name: nuxtapp
+    profiles: ["prod"]
+    ports:
+      - "3000:3000"
+    volumes:
+      - nuxt_uploads:/uploads  # 운영: 네임드 볼륨을 /uploads로 마운트
+      # (대안1) 운영에서도 호스트 경로 고정 필요 시 바인드 사용:
+      # - /absolute/host/uploads:/uploads
+    environment:
+      DB_HOST: mssql-server-instance
+      DB_PORT: "1433"
+      DB_USER: frame
+      DB_PASSWORD: frame
+      DB_NAME: theframework
+      DB_TRUST_SERVER_CERT: "true"
+      # 필요 시 주석 해제하여 DB 초기화 스킵
+      SKIP_DB_INIT: "true"
+      # 애플리케이션이 참조하는 업로드 경로
+      UPLOADS_DIR: /uploads
+    networks:
+      - nuxtnet
+    restart: unless-stopped
 
 networks:
   nuxtnet:
     external: true
+
+volumes:
+  nuxt_uploads:  # 기본 네임드 볼륨
+    # (대안2, Linux) 네임드 볼륨을 특정 경로에 바인딩하고 싶다면 주석 해제:
+    # driver: local
+    # driver_opts:
+    #   type: none
+    #   o: bind
+    #   device: /srv/nuxt/uploads  # 호스트의 실제 저장 위치
 
