@@ -21,7 +21,7 @@ onMounted(() => { filters.value = { q: '', dept: '', departmentId: null } })
 const departmentOptions = ref<{ id: number; name: string }[]>([])
 
 const schema = ref<any>([
-  addElement('h5', ['상세검색 조건'], { class: 'col-12 mb-1' }),
+  addElement('h5', ['상세검색 조건']),
   { $formkit: 'primeInputText', name: 'q', label: '이름/아이디/이메일', outerClass: 'col-4' },
   { $formkit: 'primeInputText', name: 'dept', label: '부서명(직접입력)', outerClass: 'col-4' },
   { $formkit: 'primeSelect', name: 'departmentId', label: '부서(선택)', outerClass: 'col-4', options: departmentOptions, optionLabel: 'name', optionValue: 'id', placeholder: '부서 선택', showClear: true, filter: true },
@@ -177,5 +177,8 @@ async function loadDepartmentsOptions() {
     </Dialog>
   </div>
 </template>
+
+<style lang='scss' scoped>
+</style>
 
 
