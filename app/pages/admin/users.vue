@@ -1,7 +1,8 @@
 <script setup lang='ts'>
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
 import { AgGridVue } from 'ag-grid-vue3'
-import { onMounted, ref, computed, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { makeHierarchicalSelectOptions } from '@/composables/departments'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
 
@@ -9,16 +10,29 @@ definePageMeta({ layout: 'default', middleware: 'auth' })
 
 const { addElement } = useFormKitSchema()
 const colorMode = useColorMode()
+const toast = useToast()
 const agGridThemeClass = computed(() => colorMode.value === 'dark' ? 'ag-theme-quartz-dark' : 'ag-theme-quartz')
 
 ModuleRegistry.registerModules([AllCommunityModule])
 
-type AppUser = { id: number; username: string; email: string; full_name?: string | null; is_active: boolean; created_at?: string; updated_at?: string; department_id?: number | null; department_name?: string | null }
+interface AppUser {
+  id: number
+  username: string
+  email: string
+  full_name?: string | null
+  is_active: boolean
+  created_at?: string
+  updated_at?: string
+  department_id?: number | null
+  department_name?: string | null
+}
 
 const filters = ref<any>()
-onMounted(() => { filters.value = { q: '', dept: '', departmentId: null } })
+onMounted(() => {
+  filters.value = { q: '', dept: '', departmentId: null }
+})
 
-const departmentOptions = ref<{ id: number; name: string }[]>([])
+const departmentOptions = ref<{ id: number, name: string }[]>([])
 
 const schema = ref<any>([
   addElement('h5', ['상세검색 조건']),
@@ -36,7 +50,10 @@ const schema = ref<any>([
   },
 ])
 
-function resetForm() { filters.value = { q: '', dept: '', departmentId: null }; loadUsers() }
+function resetForm() {
+  filters.value = { q: '', dept: '', departmentId: null }
+  loadUsers()
+}
 
 const rowData = ref<AppUser[]>([])
 const columnDefs = ref([
@@ -58,25 +75,64 @@ const updateGridTheme = () => {
     gridDiv?.classList.add(agGridThemeClass.value)
   }
 }
-watch(() => colorMode.value, () => { updateGridTheme() })
-onMounted(() => { updateGridTheme(); loadDepartmentsOptions(); loadUsers() })
+watch(
+  () => colorMode.value,
+  () => {
+    updateGridTheme()
+  }
+)
+onMounted(() => {
+  updateGridTheme()
+  loadDepartmentsOptions()
+  loadUsers()
+})
 
 async function loadUsers() {
   const q = filters.value?.q || ''
   const dept = filters.value?.dept || ''
   const departmentId = filters.value?.departmentId || null
   const res = await $fetch<any>('/api/users', { params: { search: q, dept, departmentId } })
-  if (res?.success) rowData.value = res.data
+  if (res?.success) {
+    rowData.value = res.data
+  }
 }
-function search() { loadUsers() }
+function search() {
+  loadUsers()
+}
 
 // 등록/수정
 const dialogVisible = ref(false)
 const deleting = ref(false)
 const editTarget = ref<Partial<AppUser> | null>(null)
-function openCreate() { editTarget.value = { username: '', email: '', full_name: '', is_active: true, department_id: null }; dialogVisible.value = true }
-function openEdit(row: AppUser) { editTarget.value = { ...row }; dialogVisible.value = true }
+function openCreate() {
+  editTarget.value = { username: '', email: '', full_name: '', is_active: true, department_id: null, password: '', password_confirm: '' } as any
+  dialogVisible.value = true
+}
+function openEdit(row: AppUser) {
+  editTarget.value = { ...row, password: '', password_confirm: '' } as any
+  dialogVisible.value = true
+}
 async function saveUser() {
+  const username = (editTarget.value as any)?.username?.trim?.() || ''
+  const email = (editTarget.value as any)?.email?.trim?.() || ''
+  const password = (editTarget.value as any)?.password || ''
+  const passwordConfirm = (editTarget.value as any)?.password_confirm || ''
+  if (!username) {
+    return toast.add({ severity: 'warn', summary: '유효성 오류', detail: '아이디는 필수입니다.', life: 2500 })
+  }
+  if (!email) {
+    return toast.add({ severity: 'warn', summary: '유효성 오류', detail: '이메일은 필수입니다.', life: 2500 })
+  }
+  if (!editTarget.value?.id) {
+    if (!password) return toast.add({ severity: 'warn', summary: '유효성 오류', detail: '비밀번호는 필수입니다.', life: 2500 })
+    if (password.length < 6) return toast.add({ severity: 'warn', summary: '유효성 오류', detail: '비밀번호는 6자 이상이어야 합니다.', life: 2500 })
+    if (password !== passwordConfirm) return toast.add({ severity: 'warn', summary: '유효성 오류', detail: '비밀번호가 일치하지 않습니다.', life: 2500 })
+  } else {
+    if (password || passwordConfirm) {
+      if (password.length < 6) return toast.add({ severity: 'warn', summary: '유효성 오류', detail: '비밀번호는 6자 이상이어야 합니다.', life: 2500 })
+      if (password !== passwordConfirm) return toast.add({ severity: 'warn', summary: '유효성 오류', detail: '비밀번호가 일치하지 않습니다.', life: 2500 })
+    }
+  }
   if (!editTarget.value?.id) await $fetch('/api/users/create', { method: 'POST', body: editTarget.value })
   else await $fetch(`/api/users/${editTarget.value.id}`, { method: 'PUT', body: editTarget.value })
   dialogVisible.value = false
@@ -84,15 +140,24 @@ async function saveUser() {
 }
 async function deleteInDialog() {
   if (!editTarget.value?.id) return
-  try { deleting.value = true; await $fetch(`/api/users/${editTarget.value.id}`, { method: 'DELETE' }); dialogVisible.value = false; await loadUsers() } finally { deleting.value = false }
+  try {
+    deleting.value = true
+    await $fetch(`/api/users/${editTarget.value.id}`, { method: 'DELETE' })
+    dialogVisible.value = false
+    await loadUsers()
+  } finally {
+    deleting.value = false
+  }
 }
 
-function onCellDoubleClicked(event: any) { openEdit(event.data) }
+function onCellDoubleClicked(event: any) {
+  openEdit(event.data)
+}
 
 async function loadDepartmentsOptions() {
   const res = await $fetch<any>('/api/departments', { params: { search: '' } })
   if (res?.success) {
-    departmentOptions.value = (res.data || []).map((d: any) => ({ id: d.id, name: d.name }))
+    departmentOptions.value = makeHierarchicalSelectOptions((res.data || []), { labelKey: 'name', includeCode: true })
   }
 }
 </script>
@@ -146,7 +211,7 @@ async function loadDepartmentsOptions() {
     <Dialog v-model:visible="dialogVisible" header="사용자 등록/수정" :modal="true" :style="{ width: '540px' }">
       <div class="grid grid-cols-12 gap-3">
         <div class="col-span-12 md:col-span-6">
-          <label class="block mb-1">아이디</label>
+          <label class="block mb-1">아이디 <span class="text-red-500">*</span></label>
           <InputText v-model="(editTarget as any).username" class="w-full" />
         </div>
         <div class="col-span-12 md:col-span-6">
@@ -154,8 +219,16 @@ async function loadDepartmentsOptions() {
           <InputText v-model="(editTarget as any).full_name" class="w-full" />
         </div>
         <div class="col-span-12">
-          <label class="block mb-1">이메일</label>
+          <label class="block mb-1">이메일 <span class="text-red-500">*</span></label>
           <InputText v-model="(editTarget as any).email" class="w-full" />
+        </div>
+        <div class="col-span-12 md:col-span-6">
+          <label class="block mb-1">비밀번호<span v-if="!(editTarget as any)?.id" class="text-red-500"> *</span></label>
+          <Password v-model="(editTarget as any).password" class="w-full" toggle-mask :feedback="false" :input-props="{ placeholder: '6자 이상' }" />
+        </div>
+        <div class="col-span-12 md:col-span-6">
+          <label class="block mb-1">비밀번호 확인<span v-if="!(editTarget as any)?.id" class="text-red-500"> *</span></label>
+          <Password v-model="(editTarget as any).password_confirm" class="w-full" toggle-mask :feedback="false" :input-props="{ placeholder: '비밀번호 확인' }" />
         </div>
         <div class="col-span-12 md:col-span-6">
           <label class="block mb-1">부서</label>
@@ -171,7 +244,7 @@ async function loadDepartmentsOptions() {
       </div>
       <template #footer>
         <Button v-if="(editTarget as any)?.id" label="삭제" severity="danger" :loading="deleting" @click="deleteInDialog" />
-        <Button label="취소" severity="secondary" @click="dialogVisible=false" />
+        <Button label="취소" severity="secondary" @click="dialogVisible = false" />
         <Button label="저장" @click="saveUser" />
       </template>
     </Dialog>
@@ -180,5 +253,3 @@ async function loadDepartmentsOptions() {
 
 <style lang='scss' scoped>
 </style>
-
-

@@ -6,6 +6,7 @@ interface UserUpdateBody {
   full_name?: string | null
   is_active?: boolean
   department_id?: number | null
+  password?: string
 }
 
 export default defineEventHandler(async (event) => {
@@ -15,6 +16,9 @@ export default defineEventHandler(async (event) => {
 
     const body = await readBody(event) as UserUpdateBody
     const connection = await getDbConnection()
+    const bcryptMod = await import('bcryptjs')
+    const bcryptHash = (bcryptMod as any)?.default?.hash ?? (bcryptMod as any).hash
+    const hashed = body.password && body.password.length >= 6 ? await bcryptHash(body.password, 10) : null
     await connection.request()
       .input('id', id)
       .input('username', body.username ?? null)
@@ -22,6 +26,7 @@ export default defineEventHandler(async (event) => {
       .input('full_name', body.full_name ?? null)
       .input('is_active', body.is_active ?? true)
       .input('department_id', body.department_id ?? null)
+      .input('password', hashed)
       .query(`
         UPDATE app_users
         SET 
@@ -30,6 +35,7 @@ export default defineEventHandler(async (event) => {
           full_name = @full_name,
           is_active = @is_active,
           department_id = @department_id,
+          password = COALESCE(@password, password),
           updated_at = GETDATE()
         WHERE id = @id
       `)

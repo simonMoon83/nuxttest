@@ -6,6 +6,7 @@ interface UserCreateBody {
   full_name?: string
   is_active?: boolean
   department_id?: number | null
+  password?: string
 }
 
 export default defineEventHandler(async (event) => {
@@ -16,16 +17,20 @@ export default defineEventHandler(async (event) => {
     }
 
     const connection = await getDbConnection()
+    const bcryptMod = await import('bcryptjs')
+    const bcryptHash = (bcryptMod as any)?.default?.hash ?? (bcryptMod as any).hash
+    const password = body.password && body.password.length >= 6 ? await bcryptHash(body.password, 10) : '!'
     const result = await connection.request()
       .input('username', body.username)
       .input('email', body.email)
       .input('full_name', body.full_name || null)
+      .input('password', password)
       .input('is_active', body.is_active ?? true)
       .input('department_id', body.department_id ?? null)
       .query(`
         INSERT INTO app_users (username, email, full_name, password, is_active, department_id)
         OUTPUT INSERTED.id
-        VALUES (@username, @email, @full_name, '!', @is_active, @department_id)
+        VALUES (@username, @email, @full_name, @password, @is_active, @department_id)
       `)
 
     return { success: true, data: { id: result.recordset[0].id } }
