@@ -1,7 +1,8 @@
 <script setup lang='ts'>
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
 import { AgGridVue } from 'ag-grid-vue3'
-import { onMounted, ref, computed, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { buildDepartmentTypeMap, makeHierarchicalSelectOptions, orderDepartmentsForView } from '@/composables/departments'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
 
@@ -11,8 +12,9 @@ definePageMeta({
 })
 
 const { addElement } = useFormKitSchema()
-const { t } = useI18n()
+// i18n 미사용 제거
 const colorMode = useColorMode()
+const toast = useToast()
 
 const agGridThemeClass = computed(() => {
   return colorMode.value === 'dark' ? 'ag-theme-quartz-dark' : 'ag-theme-quartz'
@@ -25,7 +27,7 @@ onMounted(() => {
   filters.value = { name: '', code: '', description: '', parentFilterId: null }
 })
 
-const parentOptions = ref<{ id: number; label: string }[]>([])
+const parentOptions = ref<{ id: number, label: string }[]>([])
 
 const schema = ref<any>([
   addElement('h5', ['상세검색 조건'], { class: 'col-12 mb-1' }),
@@ -55,7 +57,7 @@ function resetForm() {
 // Ag-Grid
 ModuleRegistry.registerModules([AllCommunityModule])
 
-type Department = {
+interface Department {
   id: number
   name: string
   code: string
@@ -71,16 +73,35 @@ const rowData = ref<Department[]>([])
 const allDepartments = ref<Department[]>([])
 
 const columnDefs = ref([
+  {
+    headerName: '부서',
+    field: 'name',
+    minWidth: 160,
+    filter: true,
+    cellRenderer: (params: any) => {
+      const level = params.data?.orgLevel ?? 0
+      const padding = level * 16
+      const name = params.data?.name ?? ''
+      const parent = params.data?.parent_name ?? ''
+      const type = params.data?.dept_type as ('standalone' | 'parent' | 'child' | undefined)
+      const badge = type === 'parent'
+        ? '<span style="background:#eef2ff;color:#3730a3;border-radius:8px;padding:0 6px;margin-left:6px;font-size:11px;">상위</span>'
+        : type === 'child'
+          ? '<span style="background:#ecfeff;color:#155e75;border-radius:8px;padding:0 6px;margin-left:6px;font-size:11px;">하위</span>'
+          : '<span style="background:#f0fdf4;color:#166534;border-radius:8px;padding:0 6px;margin-left:6px;font-size:11px;">단독</span>'
+      const parentLine = parent ? `<div style="color:#6b7280;font-size:12px;">상위: ${parent}</div>` : ''
+      return `<div style="padding-left:${padding}px"><div>${name}${badge}</div>${parentLine}</div>`
+    },
+  },
   { field: 'code', headerName: '코드', filter: true, minWidth: 140 },
-  { field: 'description', headerName: '설명', minWidth: 200 },
-  { field: 'sort_order', headerName: '순서', width: 100 },
-  { field: 'is_active', headerName: '사용', width: 100 },
+  { field: 'parent_name', headerName: '상위부서', minWidth: 140, filter: true },
+  { field: 'description', headerName: '설명', minWidth: 200, filter: true },
+  { field: 'sort_order', headerName: '순서', width: 100, filter: true },
+  { field: 'is_active', headerName: '사용', width: 100, filter: true },
 ])
 
-const defaultColDef = ref({ flex: 1, minWidth: 100 })
-const getDataPath = (data: any) => data.orgHierarchy as string[]
-const autoGroupColumnDef = ref({ headerName: '부서', cellRendererParams: { suppressCount: true } })
-const gridOptions = ref({ rowHeight: 28, headerHeight: 32, treeData: true, groupDefaultExpanded: -1, getDataPath })
+const defaultColDef = ref({ flex: 1, minWidth: 100, filter: true })
+const gridOptions = ref({ rowHeight: 28, headerHeight: 32 })
 
 const rowSelection = ref({ mode: 'multiRow' as const, checkboxes: true, headerCheckbox: true })
 
@@ -94,8 +115,18 @@ const updateGridTheme = () => {
   }
 }
 
-watch(() => colorMode.value, () => { updateGridTheme() })
-onMounted(() => { updateGridTheme(); loadParentOptions(); loadDepartments() })
+watch(
+  () => colorMode.value,
+  () => {
+    updateGridTheme()
+  }
+)
+
+onMounted(() => {
+  updateGridTheme()
+  loadParentOptions()
+  loadDepartments()
+})
 
 async function loadDepartments() {
   const q = filters.value
@@ -103,12 +134,17 @@ async function loadDepartments() {
   const res = await $fetch<any>('/api/departments', { params: { search } })
   if (res?.success) {
     allDepartments.value = res.data
-    const visible = filterByParent(allDepartments.value, q?.parentFilterId)
-    rowData.value = addHierarchy(visible, allDepartments.value)
+    const typedMap = buildDepartmentTypeMap(allDepartments.value as any)
+    const ordered = q?.parentFilterId
+      ? (orderDepartmentsForView(allDepartments.value as any, q.parentFilterId) as any)
+      : (orderDepartmentsForView(allDepartments.value as any) as any)
+    rowData.value = addHierarchy(ordered, allDepartments.value).map((d: any) => ({ ...d, dept_type: typedMap.get(d.id) }))
   }
 }
 
-function search() { loadDepartments() }
+function search() {
+  loadDepartments()
+}
 
 // 등록/수정 다이얼로그
 const dialogVisible = ref(false)
@@ -125,6 +161,15 @@ function openEdit(row: Department) {
 }
 
 async function saveDepartment() {
+  // validation
+  const name = (editTarget.value as any)?.name?.trim?.() || ''
+  const code = (editTarget.value as any)?.code?.trim?.() || ''
+  if (!name) {
+    return toast.add({ severity: 'warn', summary: '유효성 오류', detail: '부서명은 필수입니다.', life: 2500 })
+  }
+  if (!code) {
+    return toast.add({ severity: 'warn', summary: '유효성 오류', detail: '코드는 필수입니다.', life: 2500 })
+  }
   if (!editTarget.value?.id) {
     await $fetch('/api/departments/create', { method: 'POST', body: editTarget.value })
   } else {
@@ -149,7 +194,9 @@ async function deleteInDialog() {
 }
 
 const agGrid = ref()
-function onCellDoubleClicked(event: any) { openEdit(event.data) }
+function onCellDoubleClicked(event: any) {
+  openEdit(event.data)
+}
 
 function buildParentMap(items: Department[]): Map<number, Department> {
   const map = new Map<number, Department>()
@@ -172,42 +219,22 @@ function computePath(item: Department, parentMap: Map<number, Department>): stri
 
 function addHierarchy(visible: Department[], all: Department[]) {
   const parentMap = buildParentMap(all)
-  return visible.map(v => ({ ...v, orgHierarchy: computePath(v, parentMap) }))
-}
-
-function collectDescendants(all: Department[], rootId: number): Set<number> {
-  const byParent = new Map<number | null, Department[]>()
-  all.forEach(d => {
-    const key = d.parent_id ?? null
-    const arr = byParent.get(key) || []
-    arr.push(d)
-    byParent.set(key, arr)
+  return visible.map(v => {
+    const path = computePath(v, parentMap)
+    const level = Math.max(0, path.length - 1)
+    const parentName = v.parent_id ? parentMap.get(v.parent_id)?.name ?? '' : ''
+    return { ...v, orgHierarchy: path, orgLevel: level, pathText: path.join(' / '), parent_name: parentName }
   })
-  const result = new Set<number>([rootId])
-  const stack: number[] = [rootId]
-  while (stack.length) {
-    const pid = stack.pop()!
-    const children = byParent.get(pid) || []
-    for (const child of children) {
-      if (!result.has(child.id)) {
-        result.add(child.id)
-        stack.push(child.id)
-      }
-    }
-  }
-  return result
 }
 
-function filterByParent(all: Department[], parentId?: number | null) {
-  if (!parentId) return all
-  const ids = collectDescendants(all, parentId)
-  return all.filter(d => ids.has(d.id))
-}
+// legacy util removed (replaced by orderDepartmentsForView)
+
+// legacy util removed (replaced by orderDepartmentsForView)
 
 async function loadParentOptions() {
   const res = await $fetch<any>('/api/departments', { params: { search: '' } })
   if (res?.success) {
-    parentOptions.value = (res.data || []).map((d: any) => ({ id: d.id, label: `${d.code ? d.code + ' - ' : ''}${d.name}` }))
+    parentOptions.value = makeHierarchicalSelectOptions((res.data || []), { includeCode: true })
   }
 }
 </script>
@@ -244,7 +271,6 @@ async function loadParentOptions() {
             :row-data="rowData"
             :column-defs="columnDefs"
             :default-col-def="defaultColDef"
-            :auto-group-column-def="autoGroupColumnDef"
             :grid-options="gridOptions"
             :animate-rows="true"
             :row-selection="rowSelection"
@@ -262,11 +288,11 @@ async function loadParentOptions() {
     <Dialog v-model:visible="dialogVisible" header="부서 등록/수정" :modal="true" :style="{ width: '540px' }">
       <div v-if="editTarget" class="grid grid-cols-12 gap-3">
         <div class="col-span-12 md:col-span-6">
-          <label class="block mb-1">부서명</label>
+          <label class="block mb-1">부서명 <span class="text-red-500">*</span></label>
           <InputText v-model="(editTarget as any).name" class="w-full" />
         </div>
         <div class="col-span-12 md:col-span-6">
-          <label class="block mb-1">코드</label>
+          <label class="block mb-1">코드 <span class="text-red-500">*</span></label>
           <InputText v-model="(editTarget as any).code" class="w-full" />
         </div>
         <div class="col-span-12 md:col-span-12">
@@ -291,11 +317,9 @@ async function loadParentOptions() {
       </div>
       <template #footer>
         <Button v-if="(editTarget as any)?.id" label="삭제" severity="danger" :loading="deleting" @click="deleteInDialog" />
-        <Button label="취소" severity="secondary" @click="dialogVisible=false" />
+        <Button label="취소" severity="secondary" @click="dialogVisible = false" />
         <Button label="저장" @click="saveDepartment" />
       </template>
     </Dialog>
   </div>
-  
 </template>
-
