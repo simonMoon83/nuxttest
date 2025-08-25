@@ -80,7 +80,7 @@
     "ag-grid-community": "^33.3.2",
     "ag-grid-enterprise": "^33.3.2",
     "ag-grid-vue3": "^33.3.2",
-    "bcryptjs": "^2.4.3",
+    "bcryptjs": "^3.0.2",
     "cookie": "^0.6.0",
     "echarts": "^5.5.1",
     "jsonwebtoken": "^9.0.2",
