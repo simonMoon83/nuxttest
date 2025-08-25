@@ -119,10 +119,84 @@ export async function initializeDatabase() {
       console.warn('기본 관리자 계정이 이미 존재합니다.')
     }
 
+    // app_users 테이블에 department_id 컬럼 존재 보장
+    const userColumns = await connection.request().query(`
+      SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'app_users'
+    `)
+    const userColSet = new Set(userColumns.recordset.map((r: any) => r.COLUMN_NAME.toLowerCase()))
+    if (!userColSet.has('department_id')) {
+      await connection.request().query(`ALTER TABLE app_users ADD department_id INT NULL`)
+      console.warn('app_users.department_id 컬럼을 추가했습니다.')
+    }
+
+    // departments 테이블 생성/보강
+    await ensureDepartmentsTable(connection)
+
     console.warn('데이터베이스 및 테이블 초기화 완료')
   }
   catch (error) {
     console.error('데이터베이스 초기화 오류:', error)
     throw error
   }
+}
+
+// departments 테이블 초기화를 위한 함수 호출을 기존 initializeDatabase 내에 통합
+async function ensureDepartmentsTable(connection: sql.ConnectionPool) {
+  // departments 테이블 존재 여부 확인
+  const checkDepartments = await connection.request().query(`
+      SELECT COUNT(*) as count 
+      FROM information_schema.tables 
+      WHERE table_name = 'departments'
+    `)
+
+  if (checkDepartments.recordset[0].count === 0) {
+    await connection.request().query(`
+        CREATE TABLE departments (
+          id INT IDENTITY(1,1) PRIMARY KEY,
+          name NVARCHAR(100) NOT NULL,
+          code NVARCHAR(50) UNIQUE NOT NULL,
+          description NVARCHAR(400) NULL,
+          parent_id INT NULL,
+          sort_order INT DEFAULT 0,
+          is_active BIT DEFAULT 1,
+          created_at DATETIME2 DEFAULT GETDATE(),
+          updated_at DATETIME2 DEFAULT GETDATE()
+        )
+      `)
+
+    // 기본 데이터 예시 삽입
+    await connection.request().query(`
+        INSERT INTO departments (name, code, description, parent_id, sort_order, is_active)
+        VALUES 
+          (N'경영기획팀', 'HQ-PLN', N'본사 기획 조직', NULL, 1, 1),
+          (N'인사총무팀', 'HR-ADM', N'인사 및 총무', NULL, 2, 1),
+          (N'개발1팀', 'DEV-01', N'웹/백엔드 개발', NULL, 3, 1),
+          (N'개발2팀', 'DEV-02', N'프론트엔드/모바일', NULL, 4, 1)
+      `)
+    console.warn('departments 테이블이 생성되었습니다.')
+  } else {
+    console.warn('departments 테이블이 이미 존재합니다.')
+  }
+
+  // 필요한 컬럼 존재 여부 확인 후 보강 (idempotent)
+  const columns = await connection.request().query(`
+    SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'departments'
+  `)
+  const colSet = new Set(columns.recordset.map((r: any) => r.COLUMN_NAME.toLowerCase()))
+
+  async function addColumnIfMissing(name: string, ddl: string) {
+    if (!colSet.has(name.toLowerCase())) {
+      await connection.request().query(`ALTER TABLE departments ADD ${ddl}`)
+      console.warn(`departments.${name} 컬럼을 추가했습니다.`)
+    }
+  }
+
+  await addColumnIfMissing('name', 'name NVARCHAR(100) NOT NULL DEFAULT N""')
+  await addColumnIfMissing('code', 'code NVARCHAR(50) NULL')
+  await addColumnIfMissing('description', 'description NVARCHAR(400) NULL')
+  await addColumnIfMissing('parent_id', 'parent_id INT NULL')
+  await addColumnIfMissing('sort_order', 'sort_order INT NOT NULL DEFAULT 0')
+  await addColumnIfMissing('is_active', 'is_active BIT NOT NULL DEFAULT 1')
+  await addColumnIfMissing('created_at', 'created_at DATETIME2 NULL DEFAULT GETDATE()')
+  await addColumnIfMissing('updated_at', 'updated_at DATETIME2 NULL DEFAULT GETDATE()')
 }

@@ -468,6 +468,11 @@ $grid-breakpoints: (
   input[type='text'],
   input[type='number'] { padding: 0.25rem 0.5rem; font-size: 0.8125rem; line-height: 1.2; height: 1.875rem; }
   select { padding: 0.25rem 0.5rem; font-size: 0.8125rem; line-height: 1.2; height: 1.875rem; }
+  // PrimeVue Dropdown (FormKit primeSelect)
+  .p-dropdown, .p-select { height: 1.875rem !important; box-sizing: border-box; }
+  .p-dropdown .p-dropdown-label, .p-select .p-select-label { padding: 0 0.5rem !important; font-size: 0.8125rem !important; height: 100% !important; line-height: 1.875rem !important; display: flex !important; align-items: center !important; }
+  .p-dropdown .p-dropdown-trigger, .p-select .p-select-trigger { width: 1.875rem !important; height: 100% !important; display: flex !important; align-items: center !important; justify-content: center !important; }
+  .p-dropdown .p-dropdown-trigger .p-dropdown-trigger-icon, .p-select .p-select-trigger .p-select-trigger-icon { font-size: 0.875rem !important; }
   .p-button { padding: 0.25rem 0.5rem; font-size: 0.8125rem; }
   .formkit-help { font-size: 0.7rem; }
   .formkit-messages, .formkit-message { font-size: 0.7rem; }

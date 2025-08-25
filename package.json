@@ -78,6 +78,7 @@
     "ag-charts-community": "^12.1.1",
     "ag-charts-vue3": "^12.1.1",
     "ag-grid-community": "^33.3.2",
+    "ag-grid-enterprise": "^33.3.2",
     "ag-grid-vue3": "^33.3.2",
     "bcryptjs": "^2.4.3",
     "cookie": "^0.6.0",
