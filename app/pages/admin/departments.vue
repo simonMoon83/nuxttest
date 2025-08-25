@@ -71,26 +71,16 @@ const rowData = ref<Department[]>([])
 const allDepartments = ref<Department[]>([])
 
 const columnDefs = ref([
-  {
-    headerName: '부서',
-    field: 'name',
-    minWidth: 160,
-    cellRenderer: (params: any) => {
-      const level = params.data?.orgLevel ?? 0
-      const padding = level * 16
-      const name = params.data?.name ?? ''
-      return `<span style="display:inline-block;padding-left:${padding}px">${name}</span>`
-    },
-  },
   { field: 'code', headerName: '코드', filter: true, minWidth: 140 },
-  { field: 'parent_name', headerName: '상위부서', minWidth: 140 },
   { field: 'description', headerName: '설명', minWidth: 200 },
   { field: 'sort_order', headerName: '순서', width: 100 },
   { field: 'is_active', headerName: '사용', width: 100 },
 ])
 
 const defaultColDef = ref({ flex: 1, minWidth: 100 })
-const gridOptions = ref({ rowHeight: 28, headerHeight: 32 })
+const getDataPath = (data: any) => data.orgHierarchy as string[]
+const autoGroupColumnDef = ref({ headerName: '부서', cellRendererParams: { suppressCount: true } })
+const gridOptions = ref({ rowHeight: 28, headerHeight: 32, treeData: true, groupDefaultExpanded: -1, getDataPath })
 
 const rowSelection = ref({ mode: 'multiRow' as const, checkboxes: true, headerCheckbox: true })
 
@@ -182,12 +172,7 @@ function computePath(item: Department, parentMap: Map<number, Department>): stri
 
 function addHierarchy(visible: Department[], all: Department[]) {
   const parentMap = buildParentMap(all)
-  return visible.map(v => {
-    const path = computePath(v, parentMap)
-    const level = Math.max(0, path.length - 1)
-    const parentName = v.parent_id ? parentMap.get(v.parent_id)?.name ?? '' : ''
-    return { ...v, orgHierarchy: path, orgLevel: level, pathText: path.join(' / '), parent_name: parentName }
-  })
+  return visible.map(v => ({ ...v, orgHierarchy: computePath(v, parentMap) }))
 }
 
 function collectDescendants(all: Department[], rootId: number): Set<number> {
@@ -259,6 +244,7 @@ async function loadParentOptions() {
             :row-data="rowData"
             :column-defs="columnDefs"
             :default-col-def="defaultColDef"
+            :auto-group-column-def="autoGroupColumnDef"
             :grid-options="gridOptions"
             :animate-rows="true"
             :row-selection="rowSelection"
