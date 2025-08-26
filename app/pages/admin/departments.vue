@@ -207,7 +207,7 @@ function onCellDoubleClicked(event: any) {
 
 function exportExcel() {
   const api = gridApi.value
-  if (api) api.exportDataAsExcel({ sheetName: 'Departments' })
+  if (api) api.exportDataAsExcel({ fileName: 'DepartmentList', sheetName: 'Departments' })
 }
 
 function onGridReady(params: any) {
