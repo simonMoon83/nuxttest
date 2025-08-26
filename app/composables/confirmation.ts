@@ -28,15 +28,33 @@ export function useConfirmation() {
     })
   }
 
-  function confirmAction(acceptCallback: () => void, acceptMessage: string = 'Action confirmed', acceptMessageDetail: string = acceptMessage, header: string = 'Attention', message: string = 'Should proceed with this action ?') {
+  function confirmAction(
+    acceptCallback: () => void,
+    acceptMessage: string = 'Action confirmed',
+    acceptMessageDetail: string = acceptMessage,
+    header: string = 'Attention',
+    message: string = 'Should proceed with this action ?',
+    options?: {
+      compact?: boolean
+      acceptLabel?: string
+      rejectLabel?: string
+      acceptClass?: string
+      rejectClass?: string
+      icon?: string
+    },
+  ) {
+    const sizeClass = options?.compact ? 'p-button-sm' : ''
+    const acceptClass = (options?.acceptClass ?? `p-button-success ${sizeClass}`).trim()
+    const rejectClass = (options?.rejectClass ?? `p-button-secondary p-button-outlined ${sizeClass}`).trim()
+
     confirm.require({
       message,
       header,
-      icon: 'pi pi-info-circle',
-      rejectLabel: 'Cancel',
-      acceptLabel: 'Accept',
-      rejectClass: 'p-button-secondary p-button-outlined',
-      acceptClass: 'p-button-success',
+      icon: options?.icon ?? 'pi pi-info-circle',
+      rejectLabel: options?.rejectLabel ?? 'Cancel',
+      acceptLabel: options?.acceptLabel ?? 'Accept',
+      rejectClass,
+      acceptClass,
       accept: () => {
         acceptCallback()
         showInfoMessage(acceptMessage, acceptMessageDetail)

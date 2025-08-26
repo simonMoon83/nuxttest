@@ -1,6 +1,7 @@
 <script setup lang='ts'>
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
-import { TreeDataModule } from "ag-grid-enterprise";
+import { TreeDataModule } from 'ag-grid-enterprise'
+import { useConfirmation } from '@/composables/confirmation'
 import { AgGridVue } from 'ag-grid-vue3'
 import { computed, onMounted, ref, watch } from 'vue'
 import { buildDepartmentTypeMap, makeHierarchicalSelectOptions, orderDepartmentsForView } from '@/composables/departments'
@@ -16,6 +17,7 @@ const { addElement } = useFormKitSchema()
 // i18n 미사용 제거
 const colorMode = useColorMode()
 const toast = useToast()
+const { confirmAction } = useConfirmation()
 
 const agGridThemeClass = computed(() => {
   return colorMode.value === 'dark' ? 'ag-theme-quartz-dark' : 'ag-theme-quartz'
@@ -140,6 +142,16 @@ const dialogVisible = ref(false)
 const editTarget = ref<Partial<Department> | null>(null)
 const deleting = ref(false)
 
+// FormKit PrimeVue 다이얼로그 스키마
+const editSchema = ref<any>([
+  { $formkit: 'primeInputText', name: 'name', label: '부서명', outerClass: 'col-6 md:col-6', validation: 'required' },
+  { $formkit: 'primeInputText', name: 'code', label: '코드', outerClass: 'col-6 md:col-6', validation: 'required' },
+  { $formkit: 'primeSelect', name: 'parent_id', label: '상위부서', outerClass: 'col-12 md:col-6', options: parentOptions, optionLabel: 'label', optionValue: 'id', placeholder: '상위부서 선택(없으면 루트)', showClear: true, filter: true },
+  { $formkit: 'primeTextarea', name: 'description', label: '설명', outerClass: 'col-12', rows: 3 },
+  { $formkit: 'primeInputNumber', name: 'sort_order', label: '순서', outerClass: 'col-6 md:col-6', min: 0 },
+  { $formkit: 'primeCheckbox', name: 'is_active', label: '사용', outerClass: 'col-6 md:col-6' },
+])
+
 function openCreate() {
   editTarget.value = { name: '', code: '', description: '', is_active: true, sort_order: 0 }
   dialogVisible.value = true
@@ -170,16 +182,19 @@ async function saveDepartment() {
 
 // 선택삭제 제거 (팝업의 개별 삭제로 대체)
 
-async function deleteInDialog() {
-  if (!editTarget.value?.id) return
-  try {
-    deleting.value = true
-    await $fetch(`/api/departments/${editTarget.value.id}`, { method: 'DELETE' })
-    dialogVisible.value = false
-    await loadDepartments()
-  } finally {
-    deleting.value = false
-  }
+function deleteInDialog() {
+  const currentId = editTarget.value?.id
+  if (!currentId) return
+  confirmAction(async () => {
+    try {
+      deleting.value = true
+      await $fetch(`/api/departments/${currentId}`, { method: 'DELETE' })
+      dialogVisible.value = false
+      await loadDepartments()
+    } finally {
+      deleting.value = false
+    }
+  }, '삭제 완료', '부서를 삭제했습니다.', '삭제 확인', '해당 부서를 삭제하시겠습니까?', { compact: true, acceptLabel: '삭제', rejectLabel: '취소', icon: 'pi pi-exclamation-triangle' })
 }
 
 const agGrid = ref()
@@ -278,40 +293,23 @@ async function loadParentOptions() {
       </ClientOnly>
     </div>
 
-    <Dialog v-model:visible="dialogVisible" header="부서 등록/수정" :modal="true" :style="{ width: '540px' }">
-      <div v-if="editTarget" class="grid grid-cols-12 gap-3">
-        <div class="col-span-12 md:col-span-6">
-          <label class="block mb-1">부서명 <span class="text-red-500">*</span></label>
-          <InputText v-model="(editTarget as any).name" class="w-full" />
-        </div>
-        <div class="col-span-12 md:col-span-6">
-          <label class="block mb-1">코드 <span class="text-red-500">*</span></label>
-          <InputText v-model="(editTarget as any).code" class="w-full" />
-        </div>
-        <div class="col-span-12 md:col-span-12">
-          <label class="block mb-1">상위부서</label>
-          <Dropdown class="w-full" v-model="(editTarget as any).parent_id" :options="parentOptions" optionValue="id" optionLabel="label" placeholder="상위부서 선택(없으면 루트)" showClear />
-        </div>
-        <div class="col-span-12">
-          <label class="block mb-1">설명</label>
-          <Textarea v-model="(editTarget as any).description" class="w-full" rows="3" />
-        </div>
-        <div class="col-span-6">
-          <label class="block mb-1">순서</label>
-          <InputNumber v-model="(editTarget as any).sort_order" input-class="w-full" :min="0" />
-        </div>
-        <div class="col-span-6">
-          <label class="block mb-1">사용/미사용</label>
-          <div class="flex items-center gap-3">
-            <InputSwitch v-model="(editTarget as any).is_active" inputId="isActive" />
-            <span class="text-sm">{{ (editTarget as any).is_active ? '사용' : '미사용' }}</span>
-          </div>
-        </div>
+    <Dialog v-model:visible="dialogVisible" header="부서 등록/수정" :modal="true" :style="{ width: '640px' }">
+      <div v-if="editTarget" class="w-full compact-form">
+        <FormKitDataEdit
+          v-model="editTarget"
+          :schema="editSchema"
+          :debug-schema="false"
+          :debug-data="false"
+          form-class="form-horizontal grid-12"
+          submit-label=""
+        />
       </div>
       <template #footer>
-        <Button v-if="(editTarget as any)?.id" label="삭제" severity="danger" :loading="deleting" @click="deleteInDialog" />
-        <Button label="취소" severity="secondary" @click="dialogVisible = false" />
-        <Button label="저장" @click="saveDepartment" />
+        <div class="compact-form flex items-center gap-2">
+          <Button v-if="(editTarget as any)?.id" label="삭제" severity="danger" :loading="deleting" @click="deleteInDialog" />
+          <Button label="취소" severity="secondary" @click="dialogVisible = false" />
+          <Button label="저장" @click="saveDepartment" />
+        </div>
       </template>
     </Dialog>
   </div>
