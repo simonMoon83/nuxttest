@@ -83,6 +83,7 @@
     "bcryptjs": "^2.4.3",
     "cookie": "^0.6.0",
     "echarts": "^5.5.1",
+    "chart.js": "^4.4.7",
     "jsonwebtoken": "^9.0.2",
     "mssql": "^10.0.1",
     "nuxt3-primevue-starter": "file:",
