@@ -5,6 +5,45 @@ const headerCollapsed = useState<boolean>('headerCollapsed', () => false)
 const collapseBtnRef = ref<any>(null)
 const expandBtnPos = ref<{ top: number; left: number } | null>(null)
 
+const router = useRouter()
+
+// Global menu search
+const menuSearchText = ref('')
+const menuSuggestions = ref<any[]>([])
+const allMenus = shallowRef<any[] | null>(null)
+
+async function ensureMenus() {
+  if (allMenus.value) return
+  try {
+    const res: any = await $fetch('/api/menu/admin')
+    allMenus.value = (res?.data || []).filter((m: any) => !m?.is_separator && (m?.is_active ?? true))
+  } catch (e) {
+    allMenus.value = []
+  }
+}
+
+async function completeMenuSearch(event: any) {
+  await ensureMenus()
+  const q = (event?.query || '').toString().toLowerCase().trim()
+  if (!q) { menuSuggestions.value = []; return }
+  const items = (allMenus.value || []).filter((m: any) => {
+    const title = (m?.title || '').toString().toLowerCase()
+    const href = (m?.href || '').toString().toLowerCase()
+    return title.includes(q) || href.includes(q)
+  }).slice(0, 20)
+  menuSuggestions.value = items.map((m: any) => ({ label: m.title || m.href || '메뉴', href: m.href || '/', icon: m.icon || '' }))
+}
+
+function onMenuPick(e: any) {
+  const item = e?.value
+  if (item?.href) {
+    navigateTo(item.href)
+    // clear input after navigate
+    menuSearchText.value = ''
+    menuSuggestions.value = []
+  }
+}
+
 function redirectToGithub() {
   window.open('https://github.com/sfxcode/nuxt3-primevue-starter', '_blank')
 }
@@ -66,6 +105,19 @@ function expandHeader() {
         </template>
 
         <template #end>
+          <!-- Global menu search -->
+          <div class="hidden md:flex items-center gap-2 mr-2">
+            <AutoComplete
+              v-model="menuSearchText"
+              :suggestions="menuSuggestions"
+              optionLabel="label"
+              :minLength="1"
+              placeholder="메뉴 검색 (이름/링크)"
+              inputClass="w-56"
+              @complete="completeMenuSearch"
+              @item-select="onMenuPick"
+            />
+          </div>
           <ClientOnly>
             <button
               v-show="authStore.user"

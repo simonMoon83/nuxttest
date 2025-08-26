@@ -50,7 +50,7 @@ const schema = ref<any>([
     { $cmp: 'Button', props: { label: '검색', severity: 'primary', onClick: () => onSearch() } },
     { $cmp: 'Button', props: { label: '초기화', outlined: true, severity: 'secondary', type: 'reset', onClick: () => onReset() } },
     { $cmp: 'Button', props: { label: '엑셀', outlined: true, severity: 'secondary', onClick: () => exportExcel() } },
-    { $cmp: 'Button', props: { label: '추가', severity: 'secondary', onClick: () => openCreateRoot() } },
+    { $cmp: 'Button', props: { label: '등록', severity: 'secondary', onClick: () => openCreateRoot() } },
   ] },
 ])
 
