@@ -4,7 +4,7 @@ import { useAuthStore } from '../stores/auth'
 const router = useRouter()
 const tabsStore = useTabsStore()
 const authStore = useAuthStore()
-const maxVisible = 12
+const maxVisible = 8
 const startIndex = ref(0)
 
 const activeKey = computed({
@@ -53,6 +53,9 @@ watch(() => tabsStore.activeKey, (key) => {
       <button v-if="totalTabs > maxVisible" class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50" :disabled="startIndex === 0" @click="moveLeft" v-tooltip.bottom="'왼쪽으로'">
         <i class="pi pi-angle-left" />
       </button>
+      <button v-if="totalTabs > maxVisible" class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50" :disabled="endIndex >= totalTabs" @click="moveRight" v-tooltip.bottom="'오른쪽으로'">
+        <i class="pi pi-angle-right" />
+      </button>      
       <div class="flex-1 overflow-hidden whitespace-nowrap">
         <div class="inline-flex gap-1">
           <div
@@ -69,9 +72,6 @@ watch(() => tabsStore.activeKey, (key) => {
           </div>
         </div>
       </div>
-      <button v-if="totalTabs > maxVisible" class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50" :disabled="endIndex >= totalTabs" @click="moveRight" v-tooltip.bottom="'오른쪽으로'">
-        <i class="pi pi-angle-right" />
-      </button>
     </div>
   </div>
   <div v-else class="mb-2" />
