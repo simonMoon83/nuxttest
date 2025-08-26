@@ -1,5 +1,6 @@
 <script setup lang='ts'>
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
+import { TreeDataModule } from "ag-grid-enterprise";
 import { AgGridVue } from 'ag-grid-vue3'
 import { computed, onMounted, ref, watch } from 'vue'
 import { buildDepartmentTypeMap, makeHierarchicalSelectOptions, orderDepartmentsForView } from '@/composables/departments'
@@ -55,7 +56,7 @@ function resetForm() {
 }
 
 // Ag-Grid
-ModuleRegistry.registerModules([AllCommunityModule])
+ModuleRegistry.registerModules([AllCommunityModule, TreeDataModule])
 
 interface Department {
   id: number
@@ -73,26 +74,6 @@ const rowData = ref<Department[]>([])
 const allDepartments = ref<Department[]>([])
 
 const columnDefs = ref([
-  {
-    headerName: '부서',
-    field: 'name',
-    minWidth: 160,
-    filter: true,
-    cellRenderer: (params: any) => {
-      const level = params.data?.orgLevel ?? 0
-      const padding = level * 16
-      const name = params.data?.name ?? ''
-      const parent = params.data?.parent_name ?? ''
-      const type = params.data?.dept_type as ('standalone' | 'parent' | 'child' | undefined)
-      const badge = type === 'parent'
-        ? '<span style="background:#eef2ff;color:#3730a3;border-radius:8px;padding:0 6px;margin-left:6px;font-size:11px;">상위</span>'
-        : type === 'child'
-          ? '<span style="background:#ecfeff;color:#155e75;border-radius:8px;padding:0 6px;margin-left:6px;font-size:11px;">하위</span>'
-          : '<span style="background:#f0fdf4;color:#166534;border-radius:8px;padding:0 6px;margin-left:6px;font-size:11px;">단독</span>'
-      const parentLine = parent ? `<div style="color:#6b7280;font-size:12px;">상위: ${parent}</div>` : ''
-      return `<div style="padding-left:${padding}px"><div>${name}${badge}</div>${parentLine}</div>`
-    },
-  },
   { field: 'code', headerName: '코드', filter: true, minWidth: 140 },
   { field: 'parent_name', headerName: '상위부서', minWidth: 140, filter: true },
   { field: 'description', headerName: '설명', minWidth: 200, filter: true },
@@ -102,6 +83,14 @@ const columnDefs = ref([
 
 const defaultColDef = ref({ flex: 1, minWidth: 100, filter: true })
 const gridOptions = ref({ rowHeight: 28, headerHeight: 32 })
+
+// Tree Data 설정
+const autoGroupColumnDef = ref({
+  headerName: '부서',
+  minWidth: 200,
+  cellRendererParams: { suppressCount: true },
+})
+const getDataPath = (data: any) => data.orgHierarchy || []
 
 const rowSelection = ref({ mode: 'multiRow' as const, checkboxes: true, headerCheckbox: true })
 
@@ -271,6 +260,10 @@ async function loadParentOptions() {
             :row-data="rowData"
             :column-defs="columnDefs"
             :default-col-def="defaultColDef"
+            :tree-data="true"
+            :get-data-path="getDataPath"
+            :auto-group-column-def="autoGroupColumnDef"
+            :group-default-expanded="1"
             :grid-options="gridOptions"
             :animate-rows="true"
             :row-selection="rowSelection"
