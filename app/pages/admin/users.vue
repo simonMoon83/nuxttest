@@ -222,11 +222,11 @@ async function loadDepartmentsOptions() {
           <label class="block mb-1">이메일 <span class="text-red-500">*</span></label>
           <InputText v-model="(editTarget as any).email" class="w-full" />
         </div>
-        <div class="col-span-12 md:col-span-6">
+        <div class="col-span-6 md:col-span-6">
           <label class="block mb-1">비밀번호<span v-if="!(editTarget as any)?.id" class="text-red-500"> *</span></label>
           <Password v-model="(editTarget as any).password" class="w-full" toggle-mask :feedback="false" :input-props="{ placeholder: '6자 이상' }" />
         </div>
-        <div class="col-span-12 md:col-span-6">
+        <div class="col-span-6 md:col-span-6">
           <label class="block mb-1">비밀번호 확인<span v-if="!(editTarget as any)?.id" class="text-red-500"> *</span></label>
           <Password v-model="(editTarget as any).password_confirm" class="w-full" toggle-mask :feedback="false" :input-props="{ placeholder: '비밀번호 확인' }" />
         </div>
