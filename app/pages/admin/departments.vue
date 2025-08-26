@@ -1,9 +1,9 @@
 <script setup lang='ts'>
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
-import { TreeDataModule } from 'ag-grid-enterprise'
+import { TreeDataModule, ExcelExportModule, CellSelectionModule, ClipboardModule, } from 'ag-grid-enterprise'
 import { useConfirmation } from '@/composables/confirmation'
 import { AgGridVue } from 'ag-grid-vue3'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch, shallowRef } from 'vue'
 import { buildDepartmentTypeMap, makeHierarchicalSelectOptions, orderDepartmentsForView } from '@/composables/departments'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
@@ -33,7 +33,7 @@ onMounted(() => {
 const parentOptions = ref<{ id: number, label: string }[]>([])
 
 const schema = ref<any>([
-  addElement('h5', ['상세검색 조건'], { class: 'col-12 mb-1' }),
+  // addElement('h5', ['상세검색 조건'], { class: 'col-12 mb-1' }),
   { $formkit: 'primeInputText', name: 'name', label: '부서명', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'code', label: '부서코드', outerClass: 'col-3' },
   { $formkit: 'primeInputText', name: 'description', label: '설명', outerClass: 'col-3' },
@@ -45,6 +45,7 @@ const schema = ref<any>([
       { $cmp: 'Button', props: { label: '검색', severity: 'primary', onClick: () => search() } },
       { $cmp: 'Button', props: { label: '초기화', outlined: true, severity: 'secondary', type: 'reset', onClick: () => resetForm() } },
       { $cmp: 'Button', props: { label: '등록', severity: 'secondary', onClick: () => openCreate() } },
+      { $cmp: 'Button', props: { label: '엑셀', outlined: true, severity: 'secondary', onClick: () => exportExcel() } },
     ],
   },
 ])
@@ -58,7 +59,7 @@ function resetForm() {
 }
 
 // Ag-Grid
-ModuleRegistry.registerModules([AllCommunityModule, TreeDataModule])
+ModuleRegistry.registerModules([AllCommunityModule, TreeDataModule, ExcelExportModule, CellSelectionModule, ClipboardModule])
 
 interface Department {
   id: number
@@ -84,7 +85,8 @@ const columnDefs = ref([
 ])
 
 const defaultColDef = ref({ flex: 1, minWidth: 100, filter: true })
-const gridOptions = ref({ rowHeight: 28, headerHeight: 32 })
+const gridOptions = ref({ rowHeight: 28, headerHeight: 32, enableRangeSelection: true, enableRangeHandle: true })
+const cellSelection = ref<boolean | any>(true)
 
 // Tree Data 설정
 const autoGroupColumnDef = ref({
@@ -198,8 +200,18 @@ function deleteInDialog() {
 }
 
 const agGrid = ref()
+const gridApi = shallowRef<any | null>(null)
 function onCellDoubleClicked(event: any) {
   openEdit(event.data)
+}
+
+function exportExcel() {
+  const api = gridApi.value
+  if (api) api.exportDataAsExcel({ sheetName: 'Departments' })
+}
+
+function onGridReady(params: any) {
+  gridApi.value = params.api
 }
 
 function buildParentMap(items: Department[]): Map<number, Department> {
@@ -245,11 +257,7 @@ async function loadParentOptions() {
 
 <template>
   <div class="card flex flex-wrap gap-6">
-    <div class="w-full">
-      <div class="mb-2 flex items-center justify-between">
-        <h2>부서관리</h2>
-      </div>
-
+    <div class="w-full pb-2 mb-2 border-b border-gray-200 dark:border-gray-700">
       <div v-if="filters" class="compact-form">
         <FormKitDataEdit
           v-model="filters"
@@ -264,17 +272,16 @@ async function loadParentOptions() {
     </div>
 
     <div class="w-full">
-      <div class="mb-2 flex items-center justify-between">
-        <h3>부서 목록</h3>
-      </div>
+      <h5 class="mb-2">부서 목록</h5>
 
       <ClientOnly>
-        <div :class="agGridThemeClass" class="ag-grid-dept" style="height: 420px; width: 100%;">
+        <div :class="agGridThemeClass" class="ag-grid-dept" style="height: 550px; width: 100%;">
           <AgGridVue
             ref="agGrid"
             :row-data="rowData"
             :column-defs="columnDefs"
             :default-col-def="defaultColDef"
+            :cell-selection="cellSelection"
             :tree-data="true"
             :get-data-path="getDataPath"
             :auto-group-column-def="autoGroupColumnDef"
@@ -284,6 +291,7 @@ async function loadParentOptions() {
             :row-selection="rowSelection"
             theme="legacy"
             style="width: 100%; height: 100%;"
+            @grid-ready="onGridReady"
             @cell-double-clicked="onCellDoubleClicked"
           />
         </div>
