@@ -181,7 +181,7 @@ function onCellDoubleClicked(event: any) {
 
 function exportExcel() {
   const api = gridApi.value
-  if (api) api.exportDataAsExcel({ sheetName: 'Users' })
+  if (api) api.exportDataAsExcel({ fileName: 'UserList', sheetName: 'Users' })
 }
 
 function onGridReady(params: any) {

@@ -49,8 +49,8 @@ const schema = ref<any>([
   { $el: 'div', attrs: { class: 'col-12 w-full flex justify-end items-center gap-x-2 mt-1' }, children: [
     { $cmp: 'Button', props: { label: '검색', severity: 'primary', onClick: () => onSearch() } },
     { $cmp: 'Button', props: { label: '초기화', outlined: true, severity: 'secondary', type: 'reset', onClick: () => onReset() } },
-    { $cmp: 'Button', props: { label: '엑셀', outlined: true, severity: 'secondary', onClick: () => exportExcel() } },
     { $cmp: 'Button', props: { label: '등록', severity: 'secondary', onClick: () => openCreateRoot() } },
+    { $cmp: 'Button', props: { label: '엑셀', outlined: true, severity: 'secondary', onClick: () => exportExcel() } },
   ] },
 ])
 
@@ -89,7 +89,7 @@ function updateGridTheme() { if (import.meta.client) { const div = document.quer
 watch(() => colorMode.value, () => updateGridTheme())
 function applyGridFilter() { if (!gridApi.value) return; const q = searchQuery.value.toLowerCase().trim(); gridApi.value.setGridOption('quickFilterText', q) }
 watch(searchQuery, () => applyGridFilter())
-function exportExcel() { const api = gridApi.value; if (api) api.exportDataAsExcel({ sheetName: 'Menus' }) }
+function exportExcel() { const api = gridApi.value; if (api) api.exportDataAsExcel({fileName: 'MenuList', sheetName: 'Menus' }) }
 
 // 메뉴 데이터
 const menuData = ref<MenuItem[]>([])
