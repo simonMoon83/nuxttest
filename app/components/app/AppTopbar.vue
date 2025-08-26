@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const authStore = useAuthStore()
+const tabsStore = useTabsStore()
 const showProfileCard = ref(false)
 const headerCollapsed = useState<boolean>('headerCollapsed', () => false)
 const collapseBtnRef = ref<any>(null)
@@ -37,6 +38,8 @@ async function completeMenuSearch(event: any) {
 function onMenuPick(e: any) {
   const item = e?.value
   if (item?.href) {
+    // 탭 생성 시 메뉴명이 제목으로 반영되도록 대기 제목 설정
+    try { tabsStore.setPendingTitle(item.href, item.label || item.href) } catch {}
     navigateTo(item.href)
     // clear input after navigate
     menuSearchText.value = ''
