@@ -3,6 +3,7 @@ import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
 import { AgGridVue } from 'ag-grid-vue3'
 import { computed, onMounted, ref, watch } from 'vue'
 import { makeHierarchicalSelectOptions } from '@/composables/departments'
+import { useConfirmation } from '@/composables/confirmation'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
 
@@ -104,6 +105,18 @@ function search() {
 const dialogVisible = ref(false)
 const deleting = ref(false)
 const editTarget = ref<Partial<AppUser> | null>(null)
+const { confirmAction } = useConfirmation()
+
+// FormKit PrimeVue 다이얼로그 스키마
+const editSchema = ref<any>([
+  { $formkit: 'primeInputText', name: 'username', label: '아이디', outerClass: 'col-6 md:col-6', validation: 'required' },
+  { $formkit: 'primeInputText', name: 'full_name', label: '이름', outerClass: 'col-6 md:col-6' },
+  { $formkit: 'primeInputText', name: 'email', label: '이메일', outerClass: 'col-12 md:col-6', validation: 'required|email' },
+  { $formkit: 'primeSelect', name: 'department_id', label: '부서', outerClass: 'col-12 md:col-6', options: departmentOptions, optionLabel: 'name', optionValue: 'id', placeholder: '부서 선택', showClear: true },
+  { $formkit: 'primePassword', name: 'password', label: '비밀번호', outerClass: 'col-6 md:col-6', toggleMask: true, feedback: false, inputProps: { placeholder: '6자 이상' } },
+  { $formkit: 'primePassword', name: 'password_confirm', label: '비밀번호 확인', outerClass: 'col-6 md:col-6', toggleMask: true, feedback: false, inputProps: { placeholder: '비밀번호 확인' } },
+  { $formkit: 'primeCheckbox', name: 'is_active', label: '사용', outerClass: 'col-12 md:col-6' },
+])
 function openCreate() {
   editTarget.value = { username: '', email: '', full_name: '', is_active: true, department_id: null, password: '', password_confirm: '' } as any
   dialogVisible.value = true
@@ -138,16 +151,19 @@ async function saveUser() {
   dialogVisible.value = false
   await loadUsers()
 }
-async function deleteInDialog() {
-  if (!editTarget.value?.id) return
-  try {
-    deleting.value = true
-    await $fetch(`/api/users/${editTarget.value.id}`, { method: 'DELETE' })
-    dialogVisible.value = false
-    await loadUsers()
-  } finally {
-    deleting.value = false
-  }
+function deleteInDialog() {
+  const currentId = editTarget.value?.id
+  if (!currentId) return
+  confirmAction(async () => {
+    try {
+      deleting.value = true
+      await $fetch(`/api/users/${currentId}`, { method: 'DELETE' })
+      dialogVisible.value = false
+      await loadUsers()
+    } finally {
+      deleting.value = false
+    }
+  }, '삭제 완료', '사용자를 삭제했습니다.', '삭제 확인', '해당 사용자를 삭제하시겠습니까?', { compact: true, acceptLabel: '삭제', rejectLabel: '취소', icon: 'pi pi-exclamation-triangle' })
 }
 
 function onCellDoubleClicked(event: any) {
@@ -208,44 +224,23 @@ async function loadDepartmentsOptions() {
       </ClientOnly>
     </div>
 
-    <Dialog v-model:visible="dialogVisible" header="사용자 등록/수정" :modal="true" :style="{ width: '540px' }">
-      <div class="grid grid-cols-12 gap-3">
-        <div class="col-span-12 md:col-span-6">
-          <label class="block mb-1">아이디 <span class="text-red-500">*</span></label>
-          <InputText v-model="(editTarget as any).username" class="w-full" />
-        </div>
-        <div class="col-span-12 md:col-span-6">
-          <label class="block mb-1">이름</label>
-          <InputText v-model="(editTarget as any).full_name" class="w-full" />
-        </div>
-        <div class="col-span-12">
-          <label class="block mb-1">이메일 <span class="text-red-500">*</span></label>
-          <InputText v-model="(editTarget as any).email" class="w-full" />
-        </div>
-        <div class="col-span-6 md:col-span-6">
-          <label class="block mb-1">비밀번호<span v-if="!(editTarget as any)?.id" class="text-red-500"> *</span></label>
-          <Password v-model="(editTarget as any).password" class="w-full" toggle-mask :feedback="false" :input-props="{ placeholder: '6자 이상' }" />
-        </div>
-        <div class="col-span-6 md:col-span-6">
-          <label class="block mb-1">비밀번호 확인<span v-if="!(editTarget as any)?.id" class="text-red-500"> *</span></label>
-          <Password v-model="(editTarget as any).password_confirm" class="w-full" toggle-mask :feedback="false" :input-props="{ placeholder: '비밀번호 확인' }" />
-        </div>
-        <div class="col-span-12 md:col-span-6">
-          <label class="block mb-1">부서</label>
-          <Dropdown class="w-full" v-model="(editTarget as any).department_id" :options="departmentOptions" optionValue="id" optionLabel="name" placeholder="부서 선택" showClear />
-        </div>
-        <div class="col-span-12 md:col-span-6">
-          <label class="block mb-1">사용/미사용</label>
-          <div class="flex items-center gap-3">
-            <InputSwitch v-model="(editTarget as any).is_active" inputId="isActiveUser" />
-            <span class="text-sm">{{ (editTarget as any).is_active ? '사용' : '미사용' }}</span>
-          </div>
-        </div>
+    <Dialog v-model:visible="dialogVisible" header="사용자 등록/수정" :modal="true" :style="{ width: '640px' }">
+      <div class="w-full compact-form">
+        <FormKitDataEdit
+          v-model="editTarget"
+          :schema="editSchema"
+          :debug-schema="false"
+          :debug-data="false"
+          form-class="form-horizontal grid-12"
+          submit-label=""
+        />
       </div>
       <template #footer>
-        <Button v-if="(editTarget as any)?.id" label="삭제" severity="danger" :loading="deleting" @click="deleteInDialog" />
-        <Button label="취소" severity="secondary" @click="dialogVisible = false" />
-        <Button label="저장" @click="saveUser" />
+        <div class="compact-form flex items-center gap-2">
+          <Button v-if="(editTarget as any)?.id" label="삭제" severity="danger" :loading="deleting" @click="deleteInDialog" />
+          <Button label="취소" severity="secondary" @click="dialogVisible = false" />
+          <Button label="저장" @click="saveUser" />
+        </div>
       </template>
     </Dialog>
   </div>
