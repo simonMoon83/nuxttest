@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs'
 import sql from 'mssql'
 
 const config: sql.config = {
-  server: process.env.DB_HOST || 'localhost',
+  server: process.env.DB_HOST || 'infopath.iptime.org',
   port: process.env.DB_PORT ? Number.parseInt(process.env.DB_PORT, 10) : 1433,
   user: process.env.DB_USER || 'frame',
   password: process.env.DB_PASSWORD || 'frame',

@@ -118,7 +118,7 @@ const { confirmAction } = useConfirmation()
 
 // FormKit PrimeVue 다이얼로그 스키마
 const editSchema = ref<any>([
-  { $formkit: 'primeInputText', name: 'username', label: '아이디', outerClass: 'col-6 md:col-6', validation: 'required' },
+  { $formkit: 'primeInputText', name: 'username', label: LBL001 : '아이디', outerClass: 'col-6 md:col-6', validation: 'required' },
   { $formkit: 'primeInputText', name: 'full_name', label: '이름', outerClass: 'col-6 md:col-6' },
   { $formkit: 'primeInputText', name: 'email', label: '이메일', outerClass: 'col-12 md:col-6', validation: 'required|email' },
   { $formkit: 'primeSelect', name: 'department_id', label: '부서', outerClass: 'col-12 md:col-6', options: departmentOptions, optionLabel: 'name', optionValue: 'id', placeholder: '부서 선택', showClear: true },
