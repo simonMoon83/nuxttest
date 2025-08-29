@@ -1,11 +1,8 @@
 <script setup lang='ts'>
-definePageMeta({ middleware: 'auth', name: 'Dashboard4' })
+definePageMeta({ middleware: 'auth', name: 'Dashboard6' })
 
-import { ref, onMounted, shallowRef, markRaw, computed, watch } from 'vue'
+import { ref, onMounted, shallowRef, markRaw, computed } from 'vue'
 
-const colorMode = useColorMode()
-
-const apiBase = ref<string>(import.meta.client ? (localStorage.getItem('influxApiBase') || 'http://127.0.0.1:8000') : 'http://127.0.0.1:8000')
 const isLoading = ref(false)
 const errorMessage = ref('')
 
@@ -14,21 +11,20 @@ const testRows = ref<any[]>([])
 const specRows = ref<any[]>([])
 const lastUpdated = ref<string>('')
 
-// 위젯용 간단 KPI
+// KPI
 const kpiWidgets = computed(() => [
   { label: 'TEST Rows', value: testRows.value.length },
   { label: 'SPEC Rows', value: specRows.value.length },
   { label: 'Updated', value: lastUpdated.value || '-' },
-  { label: 'API', value: apiBase.value.replace(/^https?:\/\//, '') },
 ])
 
-// AG Charts (Vue)
+// AG Charts
 const AgChartsComp = shallowRef<any>(null)
 
 // ECharts
 const VChart = shallowRef<any>(null)
 const echartsReady = ref(false)
-const baseChartOptions = { 
+const baseChartOptions = {
   tooltip: { trigger: 'axis' }, legend: { top: 0 }, grid: { left: 40, right: 20, top: 30, bottom: 40 },
   toolbox: { show: true, right: 10, feature: { dataZoom: { yAxisIndex: 'none', xAxisIndex: 'all' }, restore: {}, saveAsImage: {} } },
   dataZoom: [ { type: 'inside', zoomOnMouseWheel: true, moveOnMouseWheel: true, moveOnMouseMove: false }, { type: 'slider' } ],
@@ -41,28 +37,25 @@ const specLineOptions = ref<any>({ title: { text: 'SPEC (ECharts)' }, ...baseCha
 const agTestOptions = ref<any>({ title: { text: 'TEST (AG Charts)' }, series: [], axes: [ { type: 'time', position: 'bottom' }, { type: 'number', position: 'left' } ], legend: { enabled: true } })
 const agSpecOptions = ref<any>({ title: { text: 'SPEC (AG Charts)' }, series: [], axes: [ { type: 'time', position: 'bottom' }, { type: 'number', position: 'left' } ], legend: { enabled: true } })
 
-function buildUrl(base: string, path: string, params: Record<string, string | string[] | undefined>) {
-  const usp = new URLSearchParams()
-  Object.entries(params).forEach(([k, v]) => {
-    if (Array.isArray(v)) v.forEach(val => usp.append(k, val))
-    else if (typeof v === 'string' && v.length > 0) usp.append(k, v)
-  })
-  return `${base}${path}?${usp.toString()}`
-}
-
 function updateCharts() {
   // TEST chart (group by TAGID)
   const map = new Map<string, any[]>()
   testRows.value.forEach(r => { const k = r.TAGID || 'TAG'; if (!map.has(k)) map.set(k, []); map.get(k)!.push([new Date(r._time).getTime(), r._value]) })
   const seriesTest = Array.from(map.entries()).map(([k, data]) => ({ name: k, type: 'line', showSymbol: false, data }))
   testLineOptions.value = { ...testLineOptions.value, series: seriesTest }
-  // AG Charts: one series per TAGID
+  // AG Charts
   const agSeriesTest = Array.from(map.entries()).map(([k, arr]) => ({ type: 'line', data: arr.map(([x,y]) => ({ x, y })), xKey: 'x', yKey: 'y', yName: k, marker: { enabled: false } }))
   agTestOptions.value = { ...agTestOptions.value, series: agSeriesTest }
 
   // SPEC chart (value + limits)
   const to = (key: string) => specRows.value.map(r => [new Date(r._time).getTime(), r[key]])
-  const seriesSpec = [ { name: 'VALUE', type: 'line', showSymbol: false, data: to('_value') }, { name: 'LSL', type: 'line', showSymbol: false, data: to('lsl') }, { name: 'USL', type: 'line', showSymbol: false, data: to('usl') }, { name: 'LCL', type: 'line', showSymbol: false, data: to('lcl') }, { name: 'UCL', type: 'line', showSymbol: false, data: to('ucl') } ]
+  const seriesSpec = [
+    { name: 'VALUE', type: 'line', showSymbol: false, data: to('_value') },
+    { name: 'LSL', type: 'line', showSymbol: false, data: to('lsl') },
+    { name: 'USL', type: 'line', showSymbol: false, data: to('usl') },
+    { name: 'LCL', type: 'line', showSymbol: false, data: to('lcl') },
+    { name: 'UCL', type: 'line', showSymbol: false, data: to('ucl') },
+  ]
   specLineOptions.value = { ...specLineOptions.value, series: seriesSpec }
   // AG Charts: five series
   agSpecOptions.value = { ...agSpecOptions.value, series: [
@@ -77,8 +70,8 @@ function updateCharts() {
 async function fetchAll() {
   isLoading.value = true; errorMessage.value = ''
   try {
-    const urlTest = buildUrl(apiBase.value, '/gettest', { tag: 'A', bucket: 'testspc', window: '1d', measurement: 'TESTSPC' })
-    const urlSpec = buildUrl(apiBase.value, '/getspectest', { tag: 'A', bucket: 'testspecspc', window: '4h', measurement: 'TESTSPECSPC' })
+    const urlTest = `/api/influx/gettest?${new URLSearchParams({ tag: 'A', bucket: 'testspc', window: '1d', measurement: 'TESTSPC' })}`
+    const urlSpec = `/api/influx/getspectest?${new URLSearchParams({ tag: 'A', bucket: 'testspecspc', window: '4h', measurement: 'TESTSPECSPC' })}`
     const [r1, r2] = await Promise.all([ fetch(urlTest), fetch(urlSpec) ])
     const [j1, j2] = await Promise.all([ r1.json(), r2.json() ])
     testRows.value = j1?.data || []
@@ -93,9 +86,8 @@ async function fetchAll() {
 }
 
 onMounted(async () => {
-  if (!import.meta.client) return
   try {
-    // ECharts 등록 → 컴포넌트 로드
+    // ECharts
     const { use } = await import('echarts/core')
     const { LineChart } = await import('echarts/charts')
     const { GridComponent, TooltipComponent, LegendComponent, DataZoomComponent, TitleComponent, ToolboxComponent } = await import('echarts/components')
@@ -106,7 +98,7 @@ onMounted(async () => {
     if (Comp) VChart.value = markRaw(Comp)
     echartsReady.value = true
 
-    // AG Charts 컴포넌트 로드
+    // AG Charts
     const modAg: any = await import('ag-charts-vue3')
     const AgComp = modAg.AgCharts || modAg.default || null
     if (AgComp) AgChartsComp.value = markRaw(AgComp)
@@ -118,7 +110,7 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-3">
-    <!-- KPI 위젯 -->
+    <!-- KPI -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
       <div v-for="w in kpiWidgets" :key="w.label" class="card p-3">
         <div class="text-xs text-gray-500">{{ w.label }}</div>
@@ -128,9 +120,9 @@ onMounted(async () => {
 
     <p v-if="errorMessage" class="text-sm text-red-600">{{ errorMessage }}</p>
 
-    <!-- 2x2 대시보드: 상단 AG Charts 2개, 하단 ECharts 2개 -->
+    <!-- 2x2 대시보드 -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-      <!-- 1) TEST - AG Charts -->
+      <!-- TEST - AG Charts -->
       <div class="card p-3">
         <div class="mb-2 flex items-center justify-between">
           <h3 class="text-base font-medium">TESTSPC (AG Charts)</h3>
@@ -141,7 +133,7 @@ onMounted(async () => {
         </ClientOnly>
       </div>
 
-      <!-- 2) SPEC - AG Charts -->
+      <!-- SPEC - AG Charts -->
       <div class="card p-3">
         <div class="mb-2 flex items-center justify-between">
           <h3 class="text-base font-medium">TESTSPECSPC (AG Charts)</h3>
@@ -152,7 +144,7 @@ onMounted(async () => {
         </ClientOnly>
       </div>
 
-      <!-- 3) TEST - ECharts -->
+      <!-- TEST - ECharts -->
       <div class="card p-3">
         <div class="mb-2 flex items-center justify-between">
           <h3 class="text-base font-medium">TESTSPC (ECharts)</h3>
@@ -163,7 +155,7 @@ onMounted(async () => {
         </ClientOnly>
       </div>
 
-      <!-- 4) SPEC - ECharts -->
+      <!-- SPEC - ECharts -->
       <div class="card p-3">
         <div class="mb-2 flex items-center justify-between">
           <h3 class="text-base font-medium">TESTSPECSPC (ECharts)</h3>

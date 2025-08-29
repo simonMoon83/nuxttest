@@ -146,12 +146,22 @@ const deleting = ref(false)
 
 // FormKit PrimeVue 다이얼로그 스키마
 const editSchema = ref<any>([
+  { $formkit: 'hidden', name: 'id' },
   { $formkit: 'primeInputText', name: 'name', label: '부서명', outerClass: 'col-6 md:col-6', validation: 'required' },
   { $formkit: 'primeInputText', name: 'code', label: '코드', outerClass: 'col-6 md:col-6', validation: 'required' },
   { $formkit: 'primeSelect', name: 'parent_id', label: '상위부서', outerClass: 'col-12 md:col-6', options: parentOptions, optionLabel: 'label', optionValue: 'id', placeholder: '상위부서 선택(없으면 루트)', showClear: true, filter: true },
   { $formkit: 'primeTextarea', name: 'description', label: '설명', outerClass: 'col-12', rows: 3 },
   { $formkit: 'primeInputNumber', name: 'sort_order', label: '순서', outerClass: 'col-6 md:col-6', min: 0 },
   { $formkit: 'primeCheckbox', name: 'is_active', label: '사용', outerClass: 'col-6 md:col-6' },
+  {
+    $el: 'div',
+    attrs: { class: 'col-12 w-full flex justify-end items-center gap-x-2 mt-2' },
+    children: [
+      { $cmp: 'Button', if: '$id', props: { label: '삭제', severity: 'danger', loading: deleting.value, onClick: () => deleteInDialog() } },
+      { $cmp: 'Button', props: { label: '취소', severity: 'secondary', onClick: () => { dialogVisible.value = false } } },
+      { $cmp: 'Button', props: { label: '저장', onClick: () => saveDepartment() } },
+    ],
+  },
 ])
 
 function openCreate() {
@@ -207,7 +217,7 @@ function onCellDoubleClicked(event: any) {
 
 function exportExcel() {
   const api = gridApi.value
-  if (api) api.exportDataAsExcel({ sheetName: 'Departments' })
+  if (api) api.exportDataAsExcel({ fileName: 'DepartmentList', sheetName: 'Departments' })
 }
 
 function onGridReady(params: any) {
@@ -312,13 +322,6 @@ async function loadParentOptions() {
           submit-label=""
         />
       </div>
-      <template #footer>
-        <div class="compact-form flex items-center gap-2">
-          <Button v-if="(editTarget as any)?.id" label="삭제" severity="danger" :loading="deleting" @click="deleteInDialog" />
-          <Button label="취소" severity="secondary" @click="dialogVisible = false" />
-          <Button label="저장" @click="saveDepartment" />
-        </div>
-      </template>
     </Dialog>
   </div>
 </template>

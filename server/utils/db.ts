@@ -2,12 +2,20 @@ import process from 'node:process'
 import bcrypt from 'bcryptjs'
 import sql from 'mssql'
 
+function requiredEnv(key: string): string {
+  const v = process.env[key]
+  if (!v || v.trim() === '') {
+    throw new Error(`Missing required environment variable: ${key}`)
+  }
+  return v
+}
+
 const config: sql.config = {
-  server: process.env.DB_HOST || 'localhost',
+  server: requiredEnv('DB_HOST'),
   port: process.env.DB_PORT ? Number.parseInt(process.env.DB_PORT, 10) : 1433,
-  user: process.env.DB_USER || 'frame',
-  password: process.env.DB_PASSWORD || 'frame',
-  database: process.env.DB_NAME || 'theframework',
+  user: requiredEnv('DB_USER'),
+  password: requiredEnv('DB_PASSWORD'),
+  database: requiredEnv('DB_NAME'),
   options: {
     encrypt: process.env.DB_ENCRYPT === 'true',
     trustServerCertificate: process.env.DB_TRUST_SERVER_CERT !== 'false',
@@ -132,6 +140,9 @@ export async function initializeDatabase() {
     // departments 테이블 생성/보강
     await ensureDepartmentsTable(connection)
 
+    // notifications 테이블 생성/보강
+    await ensureNotificationsTable(connection)
+
     console.warn('데이터베이스 및 테이블 초기화 완료')
   }
   catch (error) {
@@ -199,4 +210,55 @@ async function ensureDepartmentsTable(connection: sql.ConnectionPool) {
   await addColumnIfMissing('is_active', 'is_active BIT NOT NULL DEFAULT 1')
   await addColumnIfMissing('created_at', 'created_at DATETIME2 NULL DEFAULT GETDATE()')
   await addColumnIfMissing('updated_at', 'updated_at DATETIME2 NULL DEFAULT GETDATE()')
+}
+
+// notifications 테이블 초기화 (수신자별 알림 저장)
+async function ensureNotificationsTable(connection: sql.ConnectionPool) {
+  // 테이블 존재 여부 확인
+  const check = await connection.request().query(`
+      SELECT COUNT(*) as count 
+      FROM information_schema.tables 
+      WHERE table_name = 'notifications'
+    `)
+
+  if (check.recordset[0].count === 0) {
+    await connection.request().query(`
+        CREATE TABLE notifications (
+          id INT IDENTITY(1,1) PRIMARY KEY,
+          user_id INT NOT NULL,
+          title NVARCHAR(200) NOT NULL,
+          message NVARCHAR(1000) NULL,
+          is_read BIT NOT NULL DEFAULT 0,
+          created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+          read_at DATETIME2 NULL,
+          CONSTRAINT FK_notifications_user FOREIGN KEY (user_id) REFERENCES app_users(id)
+        )
+      `)
+    await connection.request().query(`
+        CREATE INDEX IX_notifications_user_created 
+        ON notifications(user_id, created_at DESC)
+      `)
+    console.warn('notifications 테이블이 생성되었습니다.')
+  } else {
+    console.warn('notifications 테이블이 이미 존재합니다.')
+  }
+
+  // 필요한 컬럼 존재 여부 확인 후 보강 (idempotent)
+  const columns = await connection.request().query(`
+    SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'notifications'
+  `)
+  const colSet = new Set(columns.recordset.map((r: any) => r.COLUMN_NAME.toLowerCase()))
+
+  async function addColumnIfMissing(name: string, ddl: string) {
+    if (!colSet.has(name.toLowerCase())) {
+      await connection.request().query(`ALTER TABLE notifications ADD ${ddl}`)
+      console.warn(`notifications.${name} 컬럼을 추가했습니다.`)
+    }
+  }
+
+  await addColumnIfMissing('title', 'title NVARCHAR(200) NOT NULL DEFAULT N""')
+  await addColumnIfMissing('message', 'message NVARCHAR(1000) NULL')
+  await addColumnIfMissing('is_read', 'is_read BIT NOT NULL DEFAULT 0')
+  await addColumnIfMissing('created_at', 'created_at DATETIME2 NOT NULL DEFAULT GETDATE()')
+  await addColumnIfMissing('read_at', 'read_at DATETIME2 NULL')
 }
