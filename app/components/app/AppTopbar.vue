@@ -6,6 +6,17 @@ const headerCollapsed = useState<boolean>('headerCollapsed', () => false)
 const collapseBtnRef = ref<any>(null)
 const expandBtnPos = ref<{ top: number; left: number } | null>(null)
 
+// Notifications
+const notificationStore = useNotificationStore()
+const notifPanel = ref()
+const notifButtonRef = ref<any>(null)
+onMounted(() => {
+  try { if (authStore.user) notificationStore.startPolling(30000) } catch {}
+})
+onBeforeUnmount(() => {
+  try { notificationStore.stopPolling() } catch {}
+})
+
 const router = useRouter()
 
 // Global menu search
@@ -121,6 +132,50 @@ function expandHeader() {
               @item-select="onMenuPick"
             />
           </div>
+          <!-- Notification button -->
+          <ClientOnly>
+            <span class="relative mr-1">
+              <button
+                ref="notifButtonRef"
+                v-show="authStore.user"
+                class="w-8 h-8 rounded-full flex items-center justify-center border border-gray-300 dark:border-gray-600 bg-white/70 dark:bg-gray-800/60 backdrop-blur-sm hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm"
+                @click="(e:any) => notifPanel?.toggle(e)"
+                v-tooltip.bottom="'알림'"
+              >
+                <i class="pi pi-bell text-gray-700 dark:text-gray-200 text-base"></i>
+                <span
+                  v-if="notificationStore.hasUnread"
+                  class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] leading-none rounded-full px-1 py-0.5"
+                >
+                  New
+                </span>
+              </button>
+            </span>
+            <OverlayPanel ref="notifPanel" :breakpoints="{ '960px': '90vw', '640px': '95vw' }" style="width: 360px; max-width: 90vw;">
+              <div class="flex items-center justify-between mb-2">
+                <div class="font-semibold">알림</div>
+                <Button label="모두 읽음" size="small" text @click="notificationStore.markAllRead()" />
+              </div>
+              <div class="max-h-80 overflow-auto">
+                <ul class="divide-y divide-gray-200 dark:divide-gray-700">
+                  <li v-for="n in notificationStore.items" :key="n.id" class="py-2 px-1 flex gap-2 items-start">
+                    <span class="mt-1">
+                      <span :class="['inline-block w-2.5 h-2.5 rounded-full', n.is_read ? 'bg-gray-400' : 'bg-rose-500']"></span>
+                    </span>
+                    <div class="flex-1 min-w-0">
+                      <div class="text-sm font-medium" :class="n.is_read ? 'text-gray-500' : 'text-gray-900 dark:text-gray-100'">{{ n.title }}</div>
+                      <div class="text-xs text-gray-500 whitespace-pre-wrap break-words">{{ n.message }}</div>
+                      <div class="text-[11px] text-gray-400">{{ new Date(n.created_at).toLocaleString() }}</div>
+                    </div>
+                    <div>
+                      <Button v-if="!n.is_read" label="읽음" size="small" text @click="notificationStore.markRead([n.id])" />
+                    </div>
+                  </li>
+                  <li v-if="!notificationStore.items.length" class="py-6 text-center text-sm text-gray-500">알림이 없습니다.</li>
+                </ul>
+              </div>
+            </OverlayPanel>
+          </ClientOnly>
           <ClientOnly>
             <button
               v-show="authStore.user"
