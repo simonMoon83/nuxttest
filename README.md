@@ -133,3 +133,15 @@ JetBrains is supporting this open source project with:
 
 
 python -m uvicorn python.influx_api:app --host 127.0.0.1 --port 8000
+
+(.venv) PS D:\02_Project\nuxttest> nvm ls
+
+  * 24.4.1 (Currently using 64-bit executable)
+    22.18.0
+    10.24.1
+(.venv) PS D:\02_Project\nuxttest> nvm install 22
+Installation complete.
+If you want to use this version, type:
+
+nvm use 22.18.0
+(.venv) PS D:\02_Project\nuxttest> nvm use 22    
