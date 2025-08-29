@@ -41,24 +41,6 @@ const specLineOptions = ref<any>({ title: { text: 'SPEC (ECharts)' }, ...baseCha
 const agTestOptions = ref<any>({ title: { text: 'TEST (AG Charts)' }, series: [], axes: [ { type: 'time', position: 'bottom' }, { type: 'number', position: 'left' } ], legend: { enabled: true } })
 const agSpecOptions = ref<any>({ title: { text: 'SPEC (AG Charts)' }, series: [], axes: [ { type: 'time', position: 'bottom' }, { type: 'number', position: 'left' } ], legend: { enabled: true } })
 
-// PrimeVue Chart & DataTable
-const primeChartData = ref<any>({ labels: [], datasets: [] }) // TEST
-const primeChartOptions = ref<any>({
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: { legend: { position: 'top' }, tooltip: { enabled: true } },
-  scales: { x: { title: { display: true, text: 'Time' } }, y: { title: { display: true, text: 'Value' } } }
-})
-const tableRows = ref<any[]>([])
-// SPEC용 PrimeVue Chart
-const primeSpecChartData = ref<any>({ labels: [], datasets: [] })
-const primeSpecChartOptions = ref<any>({
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: { legend: { position: 'top' }, tooltip: { enabled: true } },
-  scales: { x: { title: { display: true, text: 'Time' } }, y: { title: { display: true, text: 'Value' } } }
-})
-
 function buildUrl(base: string, path: string, params: Record<string, string | string[] | undefined>) {
   const usp = new URLSearchParams()
   Object.entries(params).forEach(([k, v]) => {
@@ -90,48 +72,6 @@ function updateCharts() {
     { type: 'line', data: to('lcl').map(([x,y]) => ({ x, y })), xKey: 'x', yKey: 'y', yName: 'LCL', marker: { enabled: false } },
     { type: 'line', data: to('ucl').map(([x,y]) => ({ x, y })), xKey: 'x', yKey: 'y', yName: 'UCL', marker: { enabled: false } },
   ] }
-
-  // PrimeVue Chart (라인) - TEST 데이터 기반, TAGID별 시리즈, x축은 시간 라벨
-  const uniqueTimes: string[] = Array.from(new Set(testRows.value.map(r => new Date(r._time).toLocaleString()))).sort()
-  const tagToRows = new Map<string, any[]>()
-  testRows.value.forEach(r => { const k = r.TAGID || 'TAG'; if (!tagToRows.has(k)) tagToRows.set(k, []); tagToRows.get(k)!.push(r) })
-  const datasets = Array.from(tagToRows.entries()).map(([tag, rows], idx) => {
-    const color = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'][idx % 5]
-    const values = uniqueTimes.map(t => {
-      const found = rows.find(rr => new Date(rr._time).toLocaleString() === t)
-      return found ? Number(found._value) : null
-    })
-    return { label: tag, data: values, borderColor: color, backgroundColor: color + '33', tension: 0.2, spanGaps: true }
-  })
-  primeChartData.value = { labels: uniqueTimes, datasets }
-
-  // PrimeVue DataTable - 납작한 행 데이터(tag, time, value)
-  tableRows.value = Array.from(tagToRows.entries()).flatMap(([tag, rows]) =>
-    rows
-      .sort((a, b) => new Date(a._time).getTime() - new Date(b._time).getTime())
-      .map(r => ({ tag, time: new Date(r._time).toLocaleString(), value: r._value }))
-  )
-
-  // PrimeVue Chart (SPEC) - VALUE & LIMITS
-  const specTimes: string[] = specRows.value.map(r => new Date(r._time).toLocaleString())
-  const mk = (key: string, label: string, color: string) => ({
-    label,
-    data: specRows.value.map(r => Number(r[key])),
-    borderColor: color,
-    backgroundColor: color + '33',
-    tension: 0.2,
-    spanGaps: true,
-  })
-  primeSpecChartData.value = {
-    labels: specTimes,
-    datasets: [
-      mk('_value', 'VALUE', '#3B82F6'),
-      mk('lsl', 'LSL', '#10B981'),
-      mk('usl', 'USL', '#F59E0B'),
-      mk('lcl', 'LCL', '#8B5CF6'),
-      mk('ucl', 'UCL', '#EF4444'),
-    ],
-  }
 }
 
 async function fetchAll() {
@@ -231,31 +171,6 @@ onMounted(async () => {
         </div>
         <ClientOnly>
           <component :is="VChart" v-if="echartsReady && VChart" :option="specLineOptions" autoresize style="height: 300px; width: 100%" />
-        </ClientOnly>
-      </div>
-    </div>
-
-    <!-- PrimeVue Chart (TEST) + PrimeVue Chart (SPEC) 세트 -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-      <!-- PrimeVue Chart (TEST) -->
-      <div class="card p-3">
-        <div class="mb-2 flex items-center justify-between">
-          <h3 class="text-base font-medium">TESTSPC (PrimeVue Chart)</h3>
-          <Button size="small" icon="pi pi-refresh" text @click="fetchAll" :loading="isLoading" />
-        </div>
-        <ClientOnly>
-          <Chart type="line" :data="primeChartData" :options="primeChartOptions" style="height: 300px; width: 100%" />
-        </ClientOnly>
-      </div>
-
-      <!-- PrimeVue Chart (SPEC) -->
-      <div class="card p-3">
-        <div class="mb-2 flex items-center justify-between">
-          <h3 class="text-base font-medium">TESTSPECSPC (PrimeVue Chart)</h3>
-          <Button size="small" icon="pi pi-refresh" text @click="fetchAll" :loading="isLoading" />
-        </div>
-        <ClientOnly>
-          <Chart type="line" :data="primeSpecChartData" :options="primeSpecChartOptions" style="height: 300px; width: 100%" />
         </ClientOnly>
       </div>
     </div>
