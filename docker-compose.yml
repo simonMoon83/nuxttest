@@ -14,16 +14,16 @@ services:
       # Nitro 정적 경로에도 동일 폴더를 연결 (SSR 빌드 산출물 경로)
       - ./public/uploads:/app/.output/public/uploads
     environment:
-      DB_HOST: mssql-server-instance
-      DB_PORT: "1433"
-      DB_USER: frame
-      DB_PASSWORD: frame
-      DB_NAME: theframework
-      DB_TRUST_SERVER_CERT: "true"
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-1433}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_TRUST_SERVER_CERT: ${DB_TRUST_SERVER_CERT:-true}
       # 필요 시 주석 해제하여 DB 초기화 스킵
-      SKIP_DB_INIT: "true"
+      SKIP_DB_INIT: ${SKIP_DB_INIT:-true}
       # 애플리케이션이 참조하는 업로드 경로
-      UPLOADS_DIR: /uploads
+      UPLOADS_DIR: ${UPLOADS_DIR:-/uploads}
     networks:
       - nuxtnet
     restart: unless-stopped
@@ -40,16 +40,16 @@ services:
       # (대안1) 운영에서도 호스트 경로 고정 필요 시 바인드 사용:
       # - /absolute/host/uploads:/uploads
     environment:
-      DB_HOST: mssql-server-instance
-      DB_PORT: "1433"
-      DB_USER: frame
-      DB_PASSWORD: frame
-      DB_NAME: theframework
-      DB_TRUST_SERVER_CERT: "true"
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-1433}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_TRUST_SERVER_CERT: ${DB_TRUST_SERVER_CERT:-true}
       # 필요 시 주석 해제하여 DB 초기화 스킵
-      SKIP_DB_INIT: "true"
+      SKIP_DB_INIT: ${SKIP_DB_INIT:-true}
       # 애플리케이션이 참조하는 업로드 경로
-      UPLOADS_DIR: /uploads
+      UPLOADS_DIR: ${UPLOADS_DIR:-/uploads}
     networks:
       - nuxtnet
     restart: unless-stopped

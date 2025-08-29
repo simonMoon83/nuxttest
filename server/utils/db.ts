@@ -2,12 +2,20 @@ import process from 'node:process'
 import bcrypt from 'bcryptjs'
 import sql from 'mssql'
 
+function requiredEnv(key: string): string {
+  const v = process.env[key]
+  if (!v || v.trim() === '') {
+    throw new Error(`Missing required environment variable: ${key}`)
+  }
+  return v
+}
+
 const config: sql.config = {
-  server: process.env.DB_HOST || 'infopath.iptime.org',
+  server: requiredEnv('DB_HOST'),
   port: process.env.DB_PORT ? Number.parseInt(process.env.DB_PORT, 10) : 1433,
-  user: process.env.DB_USER || 'frame',
-  password: process.env.DB_PASSWORD || 'frame',
-  database: process.env.DB_NAME || 'theframework',
+  user: requiredEnv('DB_USER'),
+  password: requiredEnv('DB_PASSWORD'),
+  database: requiredEnv('DB_NAME'),
   options: {
     encrypt: process.env.DB_ENCRYPT === 'true',
     trustServerCertificate: process.env.DB_TRUST_SERVER_CERT !== 'false',
