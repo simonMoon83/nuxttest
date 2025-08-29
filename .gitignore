@@ -30,7 +30,7 @@ public/uploads/
 
 # Env
 .env
-.evn.local
+.env.local
 
 # Testing
 reports
