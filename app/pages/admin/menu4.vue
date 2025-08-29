@@ -147,6 +147,7 @@ function getNextSortOrder(parentId: number | null): number { const s = menuData.
 const parentMenuOptions = computed(() => [{ label: '최상위 메뉴', value: null }, ...menuData.value.filter(m => !m.is_separator && m.parent_id === null).map(m => ({ label: m.title, value: m.id }))])
 
 const editSchema = ref<any>([
+  { $formkit: 'hidden', name: 'id' },
   { $formkit: 'primeCheckbox', name: 'is_separator', label: '구분선', outerClass: 'col-12' },
   { $formkit: 'primeInputText', name: 'title', label: '메뉴명', outerClass: 'col-6', validation: 'required', if: "$value.is_separator !== true" },
   { $formkit: 'primeInputText', name: 'href', label: '링크', outerClass: 'col-6', help: '예: /path/to/page', if: "$value.is_separator !== true" },
@@ -154,6 +155,15 @@ const editSchema = ref<any>([
   { $formkit: 'primeSelect', name: 'parent_id', label: '상위 메뉴', outerClass: 'col-6', options: parentMenuOptions, optionLabel: 'label', optionValue: 'value', placeholder: '상위 메뉴 선택', showClear: true, filter: true, if: "$value.is_separator !== true" },
   { $formkit: 'primeInputNumber', name: 'sort_order', label: '정렬 순서', outerClass: 'col-6', min: 0 },
   { $formkit: 'primeCheckbox', name: 'is_active', label: '활성', outerClass: 'col-6', if: "$value.is_separator !== true" },
+  {
+    $el: 'div',
+    attrs: { class: 'col-12 w-full flex justify-end items-center gap-x-2 mt-2' },
+    children: [
+      { $cmp: 'Button', if: '$id', props: { label: '삭제', severity: 'danger', loading: deleting.value, onClick: () => deleteInDialog() } },
+      { $cmp: 'Button', props: { label: '취소', severity: 'secondary', onClick: () => closeDialog() } },
+      { $cmp: 'Button', props: { label: '저장', loading: saving.value, onClick: () => saveMenu() } },
+    ],
+  },
 ])
 
 async function saveMenu() {
@@ -275,13 +285,6 @@ onMounted(() => { loadMenu() })
           submit-label=""
         />
       </div>
-      <template #footer>
-        <div class="compact-form flex items-center gap-2">
-          <Button v-if="(editTarget as any)?.id && (editTarget as any)?.id !== 0" label="삭제" severity="danger" :loading="deleting" @click="deleteInDialog" />
-          <Button label="취소" severity="secondary" @click="closeDialog" />
-          <Button label="저장" :loading="saving" @click="saveMenu" />
-        </div>
-      </template>
     </Dialog>
     
   </div>

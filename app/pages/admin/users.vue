@@ -118,6 +118,8 @@ const { confirmAction } = useConfirmation()
 
 // FormKit PrimeVue 다이얼로그 스키마
 const editSchema = ref<any>([
+  // ensure `$value.id` is available inside schema conditions
+  { $formkit: 'hidden', name: 'id' },
   { $formkit: 'primeInputText', name: 'username', label: '아이디', outerClass: 'col-6 md:col-6', validation: 'required' },
   { $formkit: 'primeInputText', name: 'full_name', label: '이름', outerClass: 'col-6 md:col-6' },
   { $formkit: 'primeInputText', name: 'email', label: '이메일', outerClass: 'col-12 md:col-6', validation: 'required|email' },
@@ -125,6 +127,15 @@ const editSchema = ref<any>([
   { $formkit: 'primePassword', name: 'password', label: '비밀번호', outerClass: 'col-6 md:col-6', toggleMask: true, feedback: false, inputProps: { placeholder: '6자 이상' } },
   { $formkit: 'primePassword', name: 'password_confirm', label: '비밀번호 확인', outerClass: 'col-6 md:col-6', toggleMask: true, feedback: false, inputProps: { placeholder: '비밀번호 확인' } },
   { $formkit: 'primeCheckbox', name: 'is_active', label: '사용', outerClass: 'col-12 md:col-6' },
+  {
+    $el: 'div',
+    attrs: { class: 'col-12 w-full flex justify-end items-center gap-x-2 mt-2' },
+    children: [
+      { $cmp: 'Button', if: '$id', props: { label: '삭제', severity: 'danger', loading: deleting.value, onClick: () => deleteInDialog() } },
+      { $cmp: 'Button', props: { label: '취소', severity: 'secondary', onClick: () => { dialogVisible.value = false } } },
+      { $cmp: 'Button', props: { label: '저장', onClick: () => saveUser() } },
+    ],
+  },
 ])
 function openCreate() {
   editTarget.value = { username: '', email: '', full_name: '', is_active: true, department_id: null, password: '', password_confirm: '' } as any
@@ -249,13 +260,6 @@ async function loadDepartmentsOptions() {
           submit-label=""
         />
       </div>
-      <template #footer>
-        <div class="compact-form flex items-center gap-2">
-          <Button v-if="(editTarget as any)?.id" label="삭제" severity="danger" :loading="deleting" @click="deleteInDialog" />
-          <Button label="취소" severity="secondary" @click="dialogVisible = false" />
-          <Button label="저장" @click="saveUser" />
-        </div>
-      </template>
     </Dialog>
   </div>
 </template>
