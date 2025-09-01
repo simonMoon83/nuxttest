@@ -7,32 +7,32 @@
   - 스토어: `app/stores/chat.ts` (`useChatStore`)
 - 백엔드 API: `server/api/chats/*`
   - 목록: `index.get.ts`
-  - 메시지: `[id]/messages.get.ts`, `[id]/message.post.ts`, `[id]/attach.post.ts`, `[id]/around.get.ts`, `[id]/search.get.ts`
-  - 읽음: `[id]/read.post.ts`, `read-all.post.ts`
-  - 시작: `start.post.ts`(1:1), `start-group.post.ts`(그룹), `[id]/members.get.ts`
+  - 메시지: `id/messages.get.ts`, `id/message.post.ts`, `id/attach.post.ts`, `id/around.get.ts`, `id/search.get.ts`
+  - 읽음: `id/read.post.ts`, `read-all.post.ts`
+  - 시작: `start.post.ts`(1:1), `start-group.post.ts`(그룹), `id/members.get.ts`
   - 실시간: `stream.get.ts` (SSE)
 
 ## Architecture
 ```mermaid
 flowchart LR
   subgraph FE[Frontend]
-    CL[ChatList.vue]\n검색/목록/미읽음
-    CW[ChatWindow.vue]\n대화/전송/검색/첨부/읽음
+    CL["ChatList.vue<br/>검색/목록/미읽음"]
+    CW["ChatWindow.vue<br/>대화/전송/검색/첨부/읽음"]
     ST[(useChatStore)]
   end
   subgraph API[Server API]
-    IDX[index.get]\n대화 목록
-    MSGS[[id]/messages.get]
-    SEND[[id]/message.post]
-    ATT[[id]/attach.post]
-    AROUND[[id]/around.get]
-    SEARCH[[id]/search.get]
-    READ[[id]/read.post]
-    READALL[read-all.post]
-    START[start.post]
-    SGRP[start-group.post]
-    MEM[[id]/members.get]
-    SSE[stream.get]\nSSE
+    IDX["GET /api/chats (index.get)<br/>대화 목록"]
+    MSGS["GET /api/chats/:id/messages"]
+    SEND["POST /api/chats/:id/message"]
+    ATT["POST /api/chats/:id/attach"]
+    AROUND["GET /api/chats/:id/around"]
+    SEARCH["GET /api/chats/:id/search"]
+    READ["POST /api/chats/:id/read"]
+    READALL["POST /api/chats/read-all"]
+    START["POST /api/chats/start"]
+    SGRP["POST /api/chats/start-group"]
+    MEM["GET /api/chats/:id/members"]
+    SSE["GET /api/chats/stream"]
   end
   DB[(MSSQL)]
   BUS[[chatBus]]
