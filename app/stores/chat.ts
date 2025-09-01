@@ -9,9 +9,12 @@ export interface ChatConversation {
   updated_at: string
   last_content: string | null
   last_at: string | null
+  last_at_text?: string | null
   unread_count: number
   other_user_id?: number | null
   other_user_name?: string | null
+  member_count?: number
+  last_sender_name?: string | null
 }
 
 export interface ChatAttachment {
@@ -27,9 +30,12 @@ export interface ChatMessage {
   id: number
   chat_id: number
   sender_id: number
+  sender_name?: string | null
   content: string | null
   created_at: string
+  created_at_text?: string
   attachments?: ChatAttachment[]
+  unread_count?: number
 }
 
 export const useChatStore = defineStore('chat', () => {
@@ -38,6 +44,8 @@ export const useChatStore = defineStore('chat', () => {
   const conversations = ref<ChatConversation[]>([])
   const messagesByChat = ref<Record<number, ChatMessage[]>>({})
   const activeChatId = ref<number | null>(null)
+  // Track last processed read marker per chat per user to avoid double-decrement
+  const lastReadByUser = ref<Record<number, Record<number, number>>>({})
 
   const unreadTotal = computed(() => conversations.value.reduce((s, c) => s + (c.unread_count || 0), 0))
 
@@ -45,14 +53,37 @@ export const useChatStore = defineStore('chat', () => {
   const sseConnected = ref(false)
   const pollingTimer = ref<number | null>(null)
 
+  function formatYMDHMSLocal(d: Date) {
+    const pad = (n: number) => n.toString().padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  }
+
   async function fetchConversations() {
     const res = await $fetch<{ success: boolean, data: ChatConversation[] }>(`/api/chats`)
     conversations.value = res.data || []
   }
 
+  async function markReadAll() {
+    await $fetch(`/api/chats/read-all`, { method: 'post' })
+    // locally clear conversation unread badges
+    conversations.value = conversations.value.map(c => ({ ...c, unread_count: 0 }))
+  }
+
   async function fetchMessages(chatId: number, days = 7) {
     const res = await $fetch<{ success: boolean, data: ChatMessage[] }>(`/api/chats/${chatId}/messages`, { query: { days } })
     messagesByChat.value[chatId] = res.data || []
+  }
+
+  async function searchMessages(chatId: number, q: string, limit = 50, offset = 0) {
+    if (!q || !q.trim()) return [] as ChatMessage[]
+    const res = await $fetch<{ success: boolean, data: ChatMessage[] }>(`/api/chats/${chatId}/search`, { query: { q, limit, offset } })
+    return res.data || []
+  }
+
+  async function fetchAround(chatId: number, messageId: number, before = 50, after = 50) {
+    const res = await $fetch<{ success: boolean, data: ChatMessage[] }>(`/api/chats/${chatId}/around`, { query: { messageId, before, after } })
+    messagesByChat.value[chatId] = res.data || []
+    return messagesByChat.value[chatId]
   }
 
   function getMessages(chatId: number) {
@@ -115,7 +146,19 @@ export const useChatStore = defineStore('chat', () => {
   function appendMessageLocal(message: ChatMessage) {
     const arr = messagesByChat.value[message.chat_id] || (messagesByChat.value[message.chat_id] = [])
     // ensure no duplicates
-    if (!arr.find(m => m.id === message.id)) arr.push(message)
+    if (!arr.find(m => m.id === message.id)) {
+      // ensure preformatted timestamp exists for UI
+      if (!message.created_at_text && message.created_at) {
+        try { message.created_at_text = formatYMDHMSLocal(new Date(message.created_at)) } catch {}
+      }
+      // infer initial unread_count for my message if not provided (e.g., from SSE/POST response)
+      if (message.sender_id === (auth.user?.id || 0) && (message.unread_count === undefined || message.unread_count === null)) {
+        const conv = conversations.value.find(c => c.id === message.chat_id)
+        const others = Math.max(0, (conv?.member_count || (conv?.is_group ? 0 : 1)) - 1)
+        message.unread_count = others
+      }
+      arr.push(message)
+    }
   }
 
   function updateConversationOnNewMessage(chatId: number, message: ChatMessage) {
@@ -123,9 +166,11 @@ export const useChatStore = defineStore('chat', () => {
     if (idx >= 0) {
       const conv = conversations.value[idx]
       if (conv) {
-        conv.last_content = message.content || (message.attachments?.length ? `[${message.attachments.length} file(s)]` : '')
+        conv.last_content = message.content || (message.attachments?.length ? '파일 첨부' : '')
         conv.last_at = message.created_at
+        try { conv.last_at_text = formatYMDHMSLocal(new Date(message.created_at)) } catch {}
         conv.updated_at = message.created_at
+        conv.last_sender_name = message.sender_name ?? conv.last_sender_name
         // increase unread if not active and not mine
         const me = auth.user?.id
         if (activeChatId.value !== chatId && message.sender_id !== me) {
@@ -193,7 +238,25 @@ export const useChatStore = defineStore('chat', () => {
         return
       }
       case 'read': {
-        // optionally handle read receipts
+        // Decrement unread counters for MY messages in [prev_last, new_last] once per reader
+        const { chat_id, user_id, last_message_id } = ev.data || {}
+        const me = auth.user?.id
+        if (!chat_id || !user_id || !last_message_id || !me) return
+        if (user_id === me) return // ignore my own read events
+        const list = messagesByChat.value[chat_id]
+        if (!list || !list.length) return
+
+        const chatMap = lastReadByUser.value[chat_id] || (lastReadByUser.value[chat_id] = {})
+        const prevLast = chatMap[user_id] || 0
+        const newLast = Math.max(prevLast, Number(last_message_id) || 0)
+        if (newLast <= prevLast) return
+
+        for (const m of list) {
+          if (m.sender_id === me && m.id > prevLast && m.id <= newLast && (m.unread_count || 0) > 0) {
+            m.unread_count = Math.max(0, (m.unread_count || 0) - 1)
+          }
+        }
+        chatMap[user_id] = newLast
         return
       }
       case 'conversation': {
@@ -237,8 +300,11 @@ export const useChatStore = defineStore('chat', () => {
     openChat,
     createOrOpenDirectChat,
     markRead,
+    markReadAll,
     sendMessage,
     uploadAttachments,
+    searchMessages,
+    fetchAround,
     startSSE,
     stopSSE,
     startPolling,

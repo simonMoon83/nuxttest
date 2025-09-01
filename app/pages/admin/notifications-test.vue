@@ -134,7 +134,7 @@ onMounted(() => {
                   </div>
                 </td>
                 <td class="py-2">
-                  {{ new Date(n.created_at).toLocaleString() }}
+                  {{ n.created_at_text || n.created_at }}
                 </td>
               </tr>
               <tr v-if="!notificationStore.items.length">

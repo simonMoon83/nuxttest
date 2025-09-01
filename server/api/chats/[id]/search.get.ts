@@ -11,7 +11,12 @@ export default defineEventHandler(async (event) => {
   }
 
   const q = getQuery(event)
-  const days = Math.min(Number(q.days || 7), 30) // safety cap
+  const term = String(q.q || '').trim()
+  if (!term) {
+    throw createError({ statusCode: 400, statusMessage: 'q 파라미터가 필요합니다' })
+  }
+  const limit = Math.min(Math.max(Number(q.limit || 50), 1), 200)
+  const offset = Math.max(Number(q.offset || 0), 0)
 
   const connection = await getDbConnection()
 
@@ -22,9 +27,12 @@ export default defineEventHandler(async (event) => {
     .query(`SELECT COUNT(1) as cnt FROM chat_members WHERE chat_id=@chat_id AND user_id=@user_id`)
   if (!mem.recordset[0].cnt) throw createError({ statusCode: 403, statusMessage: '권한 없음' })
 
+  const like = `%${term}%`
+
+  // 메시지 검색 (내용 또는 첨부파일 이름)
   const messages = await connection.request()
     .input('chat_id', sql.Int, chatId)
-    .input('days', sql.Int, days)
+    .input('like', sql.NVarChar, like)
     .query(`
       SELECT m.id, m.chat_id, m.sender_id,
              COALESCE(NULLIF(LTRIM(RTRIM(u.full_name)), ''), u.username) AS sender_name,
@@ -40,8 +48,14 @@ export default defineEventHandler(async (event) => {
       FROM chat_messages m
       JOIN app_users u ON u.id = m.sender_id
       WHERE m.chat_id = @chat_id
-        AND m.created_at >= DATEADD(day, -@days, GETDATE())
-      ORDER BY m.created_at ASC, m.id ASC
+        AND (
+          (m.content IS NOT NULL AND m.content LIKE @like)
+          OR EXISTS (
+            SELECT 1 FROM chat_attachments a WHERE a.message_id = m.id AND a.file_name LIKE @like
+          )
+        )
+      ORDER BY m.created_at DESC, m.id DESC
+      OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY
     `)
 
   const ids = messages.recordset.map(r => r.id)

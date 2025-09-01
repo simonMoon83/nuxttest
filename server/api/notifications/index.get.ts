@@ -15,7 +15,9 @@ export default defineEventHandler(async (event) => {
       .input('limit', sql.Int, limit)
 
     const listResult = await request.query(`
-      SELECT id, title, message, is_read, created_at, read_at
+      SELECT id, title, message, is_read, created_at, read_at,
+             CONVERT(varchar(19), created_at, 120) AS created_at_text,
+             CASE WHEN read_at IS NULL THEN NULL ELSE CONVERT(varchar(19), read_at, 120) END AS read_at_text
       FROM notifications
       WHERE user_id = @user_id
       ORDER BY created_at DESC

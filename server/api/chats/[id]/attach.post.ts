@@ -57,6 +57,11 @@ export default defineEventHandler(async (event) => {
         VALUES(@chat_id, @sender_id, @content)
       `)
     const message = msgRes.recordset[0]
+    // Resolve sender_name
+    const nameRes = await new sql.Request(tx)
+      .input('uid', sql.Int, senderId)
+      .query(`SELECT COALESCE(NULLIF(LTRIM(RTRIM(full_name)), ''), username) AS name FROM app_users WHERE id=@uid`)
+    const sender_name = nameRes.recordset?.[0]?.name || null
 
     const atts: any[] = []
     for (const f of files) {
@@ -101,9 +106,9 @@ export default defineEventHandler(async (event) => {
       .query(`SELECT user_id FROM chat_members WHERE chat_id=@chat_id`)
     const userIds = members.recordset.map((r: any) => r.user_id as number)
 
-    emitToUsers(userIds, { type: 'message', data: { chat_id: chatId, message: { ...message, attachments: atts } } })
+    emitToUsers(userIds, { type: 'message', data: { chat_id: chatId, message: { ...message, sender_name, attachments: atts } } })
 
-    return { success: true, data: { message: { ...message, attachments: atts } } }
+    return { success: true, data: { message: { ...message, sender_name, attachments: atts } } }
   } catch (e) {
     await tx.rollback()
     throw e

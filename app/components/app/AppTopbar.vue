@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { makeHierarchicalSelectOptions, type DepartmentBase } from '../../composables/departments'
 const authStore = useAuthStore()
 const tabsStore = useTabsStore()
 const showProfileCard = ref(false)
@@ -17,8 +18,80 @@ const chatButtonRef = ref<any>(null)
 const showChatDialog = ref(false)
 const currentChatId = ref<number | null>(null)
 const showStartChat = ref(false)
-const userSearchText = ref('')
-const userSuggestions = ref<any[]>([])
+// Group chat inputs
+const groupTitle = ref('')
+const selectedUsers = ref<any[]>([])
+const selectedDeptId = ref<number | null>(null)
+const deptIncludeSub = ref(true)
+const deptOptions = ref<Array<{ id: number; label: string }>>([])
+// Org tree for hierarchical selection
+const orgTreeNodes = ref<any[]>([])
+const orgTreeSelection = ref<Record<string, any>>({})
+const orgTreeLoading = ref(false)
+const orgNodeMap = ref<Record<string, any>>({})
+
+async function loadDepartments() {
+  try {
+    const res: any = await $fetch('/api/departments')
+    const list = (res?.data || []) as DepartmentBase[]
+    deptOptions.value = makeHierarchicalSelectOptions(list, { includeCode: true })
+  } catch (e) {
+    deptOptions.value = []
+  }
+}
+
+async function loadOrgTree() {
+  orgTreeLoading.value = true
+  try {
+    const res: any = await $fetch('/api/org/tree')
+    const nodes = (res?.data || []) as any[]
+    orgTreeNodes.value = nodes
+    // rebuild flat node map for quick lookup
+    const map: Record<string, any> = {}
+    const dfs = (arr: any[]) => {
+      for (const n of arr) {
+        map[n.key] = n
+        if (Array.isArray(n.children) && n.children.length) dfs(n.children)
+      }
+    }
+    dfs(nodes)
+    orgNodeMap.value = map
+  } catch (e) {
+    orgTreeNodes.value = []
+    orgNodeMap.value = {}
+  } finally {
+    orgTreeLoading.value = false
+  }
+}
+
+watch(showStartChat, async (v) => {
+  if (v) {
+    await Promise.all([loadDepartments(), loadOrgTree()])
+  }
+})
+
+// Sync selected users/dept from tree selection
+watch(orgTreeSelection, (sel) => {
+  const users: any[] = []
+  let dept: number | null = null
+  for (const key of Object.keys(sel || {})) {
+    const state = (sel as any)[key]
+    const checked = state === true || state?.checked === true
+    if (!checked) continue
+    const node = orgNodeMap.value[key]
+    if (!node) continue
+    if (node.type === 'user' && node?.data?.id) {
+      users.push({ id: node.data.id, label: node.label })
+    } else if (node.type === 'dept') {
+      const id = node?.data?.id
+      if (typeof id === 'number' && id > 0 && dept == null) dept = id
+    }
+  }
+  selectedUsers.value = users
+  selectedDeptId.value = dept
+}, { deep: true })
+
+const canStart = computed(() => selectedUsers.value.length > 0 || !!selectedDeptId.value)
 onMounted(() => {
   try {
     if (authStore.user) {
@@ -75,38 +148,52 @@ function onMenuPick(e: any) {
   }
 }
 
-async function completeUserSearch(event: any) {
-  const q = (event?.query || '').toString().toLowerCase().trim()
-  if (!q) { userSuggestions.value = []; return }
-  try {
-    const res: any = await $fetch('/api/users', { params: { search: q } })
-    const meId = authStore.user?.id
-    const items = (res?.data || []).filter((u: any) => u.id !== meId && (u.is_active ?? true))
-    userSuggestions.value = items.map((u: any) => ({ id: u.id, label: u.full_name || u.username }))
-  } catch (e) {
-    userSuggestions.value = []
-  }
-}
+// user search & picker removed; replaced by org tree selection
 
-async function onUserPick(e: any) {
-  const item = e?.value
-  const userId = item?.id
-  if (!userId) return
+async function startChat() {
   try {
-    const res: any = await $fetch('/api/chats/start', { method: 'POST', body: { targetUserId: userId } })
-    const chatId = res?.chatId
-    if (chatId) {
-      currentChatId.value = chatId
-      showChatDialog.value = true
-      try { chatPanel.value?.hide() } catch {}
-      try { chatStore.openChat(chatId) } catch {}
-      try { chatStore.fetchConversations() } catch {}
-      showStartChat.value = false
-      userSearchText.value = ''
-      userSuggestions.value = []
+    // Decide 1:1 vs group
+    if (!selectedDeptId.value && selectedUsers.value.length === 1) {
+      // 1:1
+      const userId = selectedUsers.value[0]?.id
+      if (!userId) return
+      const res: any = await $fetch('/api/chats/start', { method: 'POST', body: { targetUserId: userId } })
+      const chatId = res?.chatId
+      if (chatId) {
+        currentChatId.value = chatId
+        showChatDialog.value = true
+        try { chatPanel.value?.hide() } catch {}
+        try { chatStore.openChat(chatId) } catch {}
+        try { chatStore.fetchConversations() } catch {}
+      }
+    } else {
+      // Group
+      const body = {
+        title: groupTitle.value?.trim() || null,
+        memberUserIds: selectedUsers.value.map((u: any) => u.id),
+        departmentId: selectedDeptId.value || null,
+        includeSub: deptIncludeSub.value,
+      }
+      const res: any = await $fetch('/api/chats/start-group', { method: 'POST', body })
+      const chatId = res?.chatId
+      if (chatId) {
+        currentChatId.value = chatId
+        showChatDialog.value = true
+        try { chatPanel.value?.hide() } catch {}
+        try { chatStore.openChat(chatId) } catch {}
+        try { chatStore.fetchConversations() } catch {}
+      }
     }
   } catch (error) {
     // TODO: 에러 토스트 처리 가능
+  } finally {
+    // Reset dialog state
+    showStartChat.value = false
+    groupTitle.value = ''
+    selectedUsers.value = []
+    selectedDeptId.value = null
+    deptIncludeSub.value = true
+    orgTreeSelection.value = {}
   }
 }
 
@@ -221,7 +308,7 @@ function expandHeader() {
                       <div class="flex-1 min-w-0">
                         <div class="text-sm font-medium" :class="n.is_read ? 'text-gray-500' : 'text-gray-900 dark:text-gray-100'">{{ n.title }}</div>
                         <div class="text-xs text-gray-500 whitespace-pre-wrap break-words">{{ n.message }}</div>
-                        <div class="text-[11px] text-gray-400">{{ new Date(n.created_at).toLocaleString() }}</div>
+                        <div class="text-[11px] text-gray-400">{{ n.created_at_text || n.created_at }}</div>
                       </div>
                       <div>
                         <Button v-if="!n.is_read" label="읽음" size="small" text @click="notificationStore.markRead([n.id])" />
@@ -297,19 +384,36 @@ function expandHeader() {
     @logout="handleLogout"
   />
   <ChatWindow v-model:visible="showChatDialog" :chat-id="currentChatId" />
-  <Dialog v-model:visible="showStartChat" header="새 채팅 시작" modal :style="{ width: '420px', maxWidth: '95vw' }">
-    <div class="p-2">
-      <AutoComplete
-        v-model="userSearchText"
-        :suggestions="userSuggestions"
-        optionLabel="label"
-        :minLength="1"
-        placeholder="사용자 검색 (이름/아이디)"
-        inputClass="w-full"
-        @complete="completeUserSearch"
-        @item-select="onUserPick"
-      />
-      <div class="text-xs text-gray-500 mt-2">사용자를 선택하면 1:1 채팅이 시작됩니다.</div>
+  <Dialog v-model:visible="showStartChat" header="새 채팅 시작" modal :style="{ width: '520px', maxWidth: '95vw' }">
+    <div class="p-2 space-y-3">
+      <div>
+        <label class="text-xs text-gray-500">그룹 제목 (선택)</label>
+        <input v-model="groupTitle" type="text" class="w-full p-inputtext mt-1" placeholder="예: 프로젝트 A 회의" />
+      </div>
+
+      <div>
+        <label class="text-xs text-gray-500">조직/사용자 선택</label>
+        <div class="mt-1 border rounded p-2 max-h-72 overflow-auto">
+          <Tree
+            :value="orgTreeNodes"
+            selectionMode="checkbox"
+            v-model:selectionKeys="orgTreeSelection"
+            :filter="true"
+            filterMode="lenient"
+            class="w-full"
+          />
+        </div>
+        <div class="mt-2 flex items-center gap-2">
+          <Checkbox v-model="deptIncludeSub" :binary="true" inputId="inclSub" />
+          <label for="inclSub" class="text-xs text-gray-600">부서 선택 시 하위부서 포함</label>
+        </div>
+        <div class="text-xs text-gray-500 mt-1">부서 또는 여러 사용자를 선택하세요. 한 명만 선택하고 부서를 비우면 1:1로 시작합니다.</div>
+      </div>
+
+      <div class="pt-2 flex justify-end gap-2">
+        <Button label="취소" text @click="showStartChat = false" />
+        <Button label="시작" :disabled="!canStart" @click="startChat" />
+      </div>
     </div>
   </Dialog>
 </template>

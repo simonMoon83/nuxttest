@@ -4,7 +4,9 @@ export interface NotificationItem {
   message?: string | null
   is_read: boolean
   created_at: string
+  created_at_text?: string
   read_at?: string | null
+  read_at_text?: string | null
 }
 
 interface ListResponse {
@@ -23,6 +25,11 @@ export const useNotificationStore = defineStore('notifications', () => {
   const initialized = ref(false)
 
   const hasUnread = computed(() => unreadCount.value > 0)
+
+  function formatYMDHMSLocal(d: Date) {
+    const pad = (n: number) => n.toString().padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  }
 
   async function fetchList(limit = 50) {
     isLoading.value = true
@@ -71,7 +78,12 @@ export const useNotificationStore = defineStore('notifications', () => {
       })
       // 낙관적 업데이트
       const idSet = new Set(ids)
-      items.value = items.value.map((n) => idSet.has(n.id) ? { ...n, is_read: true, read_at: n.read_at ?? new Date().toISOString() } : n)
+      const now = new Date()
+      const nowIso = now.toISOString()
+      const nowText = formatYMDHMSLocal(now)
+      items.value = items.value.map((n) => idSet.has(n.id)
+        ? { ...n, is_read: true, read_at: n.read_at ?? nowIso, read_at_text: n.read_at_text ?? nowText }
+        : n)
       unreadCount.value = Math.max(0, items.value.filter(n => !n.is_read).length)
     } catch (e) {
       // fallback: 재조회
@@ -85,7 +97,15 @@ export const useNotificationStore = defineStore('notifications', () => {
         method: 'POST',
         body: { markAll: true }
       })
-      items.value = items.value.map((n) => ({ ...n, is_read: true, read_at: n.read_at ?? new Date().toISOString() }))
+      const now = new Date()
+      const nowIso = now.toISOString()
+      const nowText = formatYMDHMSLocal(now)
+      items.value = items.value.map((n) => ({
+        ...n,
+        is_read: true,
+        read_at: n.read_at ?? nowIso,
+        read_at_text: n.read_at_text ?? nowText
+      }))
       unreadCount.value = 0
     } catch (e) {
       await fetchList()

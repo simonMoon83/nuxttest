@@ -40,15 +40,106 @@ watch([() => props.visible, () => props.chatId], async ([vis, id]) => {
     await chat.fetchMessages(id)
     await chat.markRead(id)
     nextTick(() => scrollToBottom())
-  }
-  else if (!vis) {
+  } else if (!vis) {
     chat.setActiveChat(null)
   }
 }, { immediate: true })
 
+// Search state & actions (full history via /api/chats/[id]/search)
+const searchQuery = ref('')
+const searchResults = ref<any[]>([])
+const searching = ref(false)
+const resultOffset = ref(0)
+const hasMoreResults = ref(false)
+const recentQueries = ref<string[]>([])
+const searchDataListId = computed(() => `chat-search-dl-${props.chatId || 0}`)
+
+function loadRecentQueries() {
+  const key = `chat-search:${props.chatId || 0}`
+  try {
+    recentQueries.value = JSON.parse(localStorage.getItem(key) || '[]')
+  } catch { recentQueries.value = [] }
+}
+
+function saveRecentQuery(q: string) {
+  const key = `chat-search:${props.chatId || 0}`
+  const t = q.trim()
+  if (!t) return
+  const list = [t, ...recentQueries.value.filter(x => x !== t)].slice(0, 10)
+  recentQueries.value = list
+  localStorage.setItem(key, JSON.stringify(list))
+}
+
+watch(() => props.chatId, () => loadRecentQueries(), { immediate: true })
+
+async function runSearch(reset = true) {
+  const id = props.chatId
+  if (!id || !searchQuery.value.trim()) {
+    if (reset) {
+      searchResults.value = []
+      hasMoreResults.value = false
+      resultOffset.value = 0
+    }
+    return
+  }
+  if (reset) {
+    searchResults.value = []
+    resultOffset.value = 0
+  }
+  searching.value = true
+  try {
+    saveRecentQuery(searchQuery.value)
+    const res = await chat.searchMessages(id, searchQuery.value, 50, resultOffset.value)
+    searchResults.value = reset ? res : [...searchResults.value, ...res]
+    hasMoreResults.value = res.length === 50
+    resultOffset.value += res.length
+  } finally {
+    searching.value = false
+  }
+}
+
+function clearSearch() {
+  searchQuery.value = ''
+  searchResults.value = []
+  hasMoreResults.value = false
+  resultOffset.value = 0
+}
+
+let searchTimer: ReturnType<typeof setTimeout> | null = null
+function onSearchInput() {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => runSearch(true), 220)
+}
+
+const highlightMessageId = ref<number | null>(null)
+
+async function openResult(m: any) {
+  const id = props.chatId || m.chat_id
+  if (!id) return
+  try {
+    // prevent auto-bottom behavior while loading
+    atBottom.value = false
+    focusMessageId.value = m.id
+    await chat.fetchAround(id, m.id, 60, 60)
+    // proactively scroll to the message after data loads (watcher may not fire if length unchanged)
+    nextTick(() => {
+      scrollToMessage(m.id as number)
+      setTimeout(() => scrollToMessage(m.id as number, 4), 120)
+    })
+  } catch {}
+  // Close search panel after opening
+  clearSearch()
+  // Let the watcher and image-load hooks handle scrolling via focusMessageId
+  // Clear focus flag a bit later to re-enable normal autoscroll
+  setTimeout(() => { if (focusMessageId.value === m.id) focusMessageId.value = null }, 600)
+  highlightMessageId.value = m.id
+  setTimeout(() => { if (highlightMessageId.value === m.id) highlightMessageId.value = null }, 1600)
+}
+
 // Track whether list is already at bottom to decide autoscroll on new messages
 const atBottom = ref(true)
 const hasNewBelow = ref(false)
+const focusMessageId = ref<number | null>(null)
 
 function isNearBottom(el: HTMLElement, threshold = 20) {
   return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold
@@ -154,7 +245,14 @@ watch(() => (messages.value ? messages.value.length : 0), async () => {
   const last = messages.value && messages.value[messages.value.length - 1]
   const isMine = !!last && last.sender_id === meId.value
   if (props.visible) {
-    if (isMine || atBottom.value) {
+    // If focusing a searched message, suppress auto-bottom and scroll to that message instead
+    if (focusMessageId.value) {
+      nextTick(() => {
+        scrollToMessage(focusMessageId.value as number)
+        setTimeout(() => scrollToMessage(focusMessageId.value as number, 4), 120)
+      })
+      hasNewBelow.value = false
+    } else if (isMine || atBottom.value) {
       nextTick(() => {
         scrollToBottom()
         setTimeout(() => scrollToBottom(), 50)
@@ -177,6 +275,36 @@ function scrollToBottom() {
     el.scrollTop = el.scrollHeight
     atBottom.value = true
   })
+}
+
+function computeOffsetTopWithin(el: HTMLElement, container: HTMLElement) {
+  let y = 0
+  let node: HTMLElement | null = el
+  while (node && node !== container) {
+    y += node.offsetTop
+    node = node.offsetParent as HTMLElement | null
+  }
+  return y
+}
+
+function scrollToMessage(messageId: number, retry = 8) {
+  const container = messagesEl.value
+  if (!container) return
+  const el = document.getElementById(`msg-${messageId}`)
+  if (!el) {
+    if (retry > 0) setTimeout(() => scrollToMessage(messageId, retry - 1), 60)
+    return
+  }
+  const e = el as HTMLElement
+  // Prefer native centering within the nearest scrollable container
+  if (typeof e.scrollIntoView === 'function') {
+    e.scrollIntoView({ block: 'center', inline: 'nearest' })
+  } else {
+    // Fallback: compute offset relative to the container scroll context
+    const y = computeOffsetTopWithin(e, container)
+    container.scrollTop = Math.max(0, y - (container.clientHeight / 2) + (e.clientHeight / 2))
+  }
+  atBottom.value = false
 }
 
 function close() {
@@ -250,7 +378,10 @@ function fileUrl(att: ChatAttachment) {
 }
 
 function formatTime(v: string) {
-  try { return new Date(v).toLocaleString() } catch { return v }
+  try {
+    const d = new Date(v)
+    return new Intl.DateTimeFormat('ko-KR', { timeStyle: 'short', hour12: true, timeZone: 'Asia/Seoul' }).format(d)
+  } catch { return v }
 }
 
 function formatSize(n?: number) {
@@ -265,6 +396,11 @@ function formatSize(n?: number) {
 
 function onAttachmentImageLoad() {
   if (!props.visible) return
+  if (focusMessageId.value) {
+    // When focusing a search target, keep current scroll and try re-centering that message
+    nextTick(() => scrollToMessage(focusMessageId.value as number, 4))
+    return
+  }
   const last = messages.value && messages.value[messages.value.length - 1]
   const isMine = !!last && last.sender_id === meId.value
   if (isMine || atBottom.value) {
@@ -272,6 +408,26 @@ function onAttachmentImageLoad() {
     hasNewBelow.value = false
   } else {
     hasNewBelow.value = true
+  }
+}
+
+// Participants dialog state & actions
+const showMembers = ref(false)
+const members = ref<Array<{ id: number; name: string; username: string; is_active: boolean }>>([])
+const membersLoading = ref(false)
+
+async function openMembers() {
+  const id = props.chatId
+  if (!id) return
+  membersLoading.value = true
+  try {
+    const res: any = await $fetch(`/api/chats/${id}/members`)
+    members.value = (res?.data || [])
+  } catch (e) {
+    members.value = []
+  } finally {
+    membersLoading.value = false
+    showMembers.value = true
   }
 }
 </script>
@@ -282,12 +438,54 @@ function onAttachmentImageLoad() {
       <div class="flex items-center gap-2">
         <i class="pi pi-comments"></i>
         <span class="font-semibold">{{ chatTitle }}</span>
+        <button v-if="currentConversation && currentConversation.is_group && currentConversation.member_count"
+                class="text-xs text-gray-500 hover:text-gray-700 underline-offset-2 hover:underline"
+                type="button"
+                @click.stop="openMembers">
+          ({{ currentConversation.member_count }})
+        </button>
       </div>
     </template>
 
     <div class="flex flex-col gap-3 h-[70vh] max-h-[70vh]">
+      <!-- Search Bar -->
+      <div class="flex items-center gap-2 mb-2">
+        <input v-model="searchQuery"
+               class="p-inputtext p-inputtext-sm flex-1"
+               placeholder="채팅 내 검색"
+               :list="searchDataListId"
+               @input="onSearchInput"
+               @keydown.enter="runSearch(true)" />
+        <datalist :id="searchDataListId">
+          <option v-for="s in recentQueries" :key="s" :value="s" />
+        </datalist>
+        <Button size="small" icon="pi pi-search" label="검색" @click="runSearch(true)" />
+        <Button v-if="searchQuery" size="small" text label="지우기" @click="clearSearch" />
+      </div>
+      <!-- Search Results -->
+      <div v-if="searchQuery || searchResults.length" class="mb-2 max-h-48 overflow-auto rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+        <div v-if="searching" class="p-2 text-sm text-gray-500">검색중...</div>
+        <ul v-else class="divide-y divide-gray-200 dark:divide-gray-700">
+          <li v-for="r in searchResults" :key="r.id" class="p-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800" @click="openResult(r)">
+            <div class="text-[11px] text-gray-500">{{ r.created_at_text || formatTime(r.created_at) }} · {{ r.sender_name }}</div>
+            <div class="text-sm truncate" v-if="r.content">{{ r.content }}</div>
+            <div class="text-sm text-gray-500" v-else>파일 첨부</div>
+          </li>
+          <li v-if="!searchResults.length" class="p-2 text-sm text-gray-500">결과 없음</li>
+        </ul>
+        <div v-if="hasMoreResults" class="p-2 text-center">
+          <Button size="small" text label="더 보기" @click="runSearch(false)" />
+        </div>
+      </div>
+
       <div ref="messagesEl" class="flex-1 min-h-0 overflow-auto p-2 pb-10 bg-gray-50 dark:bg-gray-800/30 rounded border border-gray-200 dark:border-gray-700" @scroll="onMessagesScroll">
-        <div v-for="m in messages" :key="m.id" class="mb-3">
+        <div v-for="m in messages" :key="m.id" :id="`msg-${m.id}`"
+             :class="['mb-3 transition-colors', highlightMessageId === m.id ? 'bg-amber-50 dark:bg-amber-900/20 rounded' : '']">
+          <!-- Sender name (group chats, non-self) -->
+          <div v-if="currentConversation && currentConversation.is_group && m.sender_id !== meId"
+               class="text-[11px] text-gray-500 mb-0.5 text-left">
+            {{ m.sender_name || '알 수 없음' }}
+          </div>
           <!-- Text bubble (only if content exists) -->
           <div :class="['flex', m.sender_id === meId ? 'justify-end' : 'justify-start']" v-if="m.content">
             <div class="max-w-[85%] rounded px-3 py-2 shadow text-sm whitespace-pre-wrap break-words bg-white dark:bg-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700">
@@ -317,7 +515,13 @@ function onAttachmentImageLoad() {
             </div>
           </div>
 
-          <div :class="['text-[11px] text-gray-400 mt-0.5', m.sender_id === meId ? 'text-right' : 'text-left']">{{ formatTime(m.created_at) }}</div>
+          <div :class="['text-[11px] text-gray-400 mt-0.5', m.sender_id === meId ? 'text-right' : 'text-left']">
+            <span>{{ m.created_at_text || formatTime(m.created_at) }}</span>
+            <span v-if="m.sender_id === meId && (m.unread_count || 0) > 0"
+                  class="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-[10px] align-middle">
+              {{ m.unread_count }}
+            </span>
+          </div>
         </div>
         <div v-if="!messages.length" class="text-center text-sm text-gray-500 py-6">메시지가 없습니다.</div>
 
@@ -364,6 +568,32 @@ function onAttachmentImageLoad() {
         <Button label="닫기" text @click="close" />
       </div>
     </template>
+  </Dialog>
+
+  <!-- Participants dialog -->
+  <Dialog v-model:visible="showMembers" header="참여자" modal :style="{ width: '420px', maxWidth: '95vw' }">
+    <div class="p-2">
+      <div v-if="membersLoading" class="text-sm text-gray-500">로딩중...</div>
+      <ul v-else class="divide-y divide-gray-200 dark:divide-gray-700">
+        <li v-for="m in members" :key="m.id" class="py-2 flex items-center gap-2">
+          <div class="w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center">
+            <i class="pi pi-user text-xs"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm truncate">
+              {{ m.name }}
+              <span v-if="m.id === meId" class="ml-1 text-[10px] text-gray-500">(나)</span>
+            </div>
+            <div class="text-[11px] text-gray-400 truncate">@{{ m.username }}</div>
+          </div>
+          <span class="text-[10px] px-1.5 py-0.5 rounded"
+                :class="m.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600'">
+            {{ m.is_active ? '활성' : '비활성' }}
+          </span>
+        </li>
+        <li v-if="!members.length" class="py-6 text-center text-sm text-gray-500">참여자가 없습니다.</li>
+      </ul>
+    </div>
   </Dialog>
 </template>
 
