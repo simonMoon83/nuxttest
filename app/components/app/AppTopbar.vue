@@ -10,11 +10,28 @@ const expandBtnPos = ref<{ top: number; left: number } | null>(null)
 const notificationStore = useNotificationStore()
 const notifPanel = ref()
 const notifButtonRef = ref<any>(null)
+// Chat
+const chatStore = useChatStore()
+const chatPanel = ref()
+const chatButtonRef = ref<any>(null)
+const showChatDialog = ref(false)
+const currentChatId = ref<number | null>(null)
+const showStartChat = ref(false)
+const userSearchText = ref('')
+const userSuggestions = ref<any[]>([])
 onMounted(() => {
-  try { if (authStore.user) notificationStore.startPolling(30000) } catch {}
+  try {
+    if (authStore.user) {
+      notificationStore.startPolling(30000)
+      chatStore.startSSE()
+      chatStore.startPolling(30000)
+      chatStore.fetchConversations()
+    }
+  } catch {}
 })
 onBeforeUnmount(() => {
   try { notificationStore.stopPolling() } catch {}
+  try { chatStore.stopSSE(); chatStore.stopPolling() } catch {}
 })
 
 const router = useRouter()
@@ -58,8 +75,46 @@ function onMenuPick(e: any) {
   }
 }
 
-function redirectToGithub() {
-  window.open('https://github.com/sfxcode/nuxt3-primevue-starter', '_blank')
+async function completeUserSearch(event: any) {
+  const q = (event?.query || '').toString().toLowerCase().trim()
+  if (!q) { userSuggestions.value = []; return }
+  try {
+    const res: any = await $fetch('/api/users', { params: { search: q } })
+    const meId = authStore.user?.id
+    const items = (res?.data || []).filter((u: any) => u.id !== meId && (u.is_active ?? true))
+    userSuggestions.value = items.map((u: any) => ({ id: u.id, label: u.full_name || u.username }))
+  } catch (e) {
+    userSuggestions.value = []
+  }
+}
+
+async function onUserPick(e: any) {
+  const item = e?.value
+  const userId = item?.id
+  if (!userId) return
+  try {
+    const res: any = await $fetch('/api/chats/start', { method: 'POST', body: { targetUserId: userId } })
+    const chatId = res?.chatId
+    if (chatId) {
+      currentChatId.value = chatId
+      showChatDialog.value = true
+      try { chatPanel.value?.hide() } catch {}
+      try { chatStore.openChat(chatId) } catch {}
+      try { chatStore.fetchConversations() } catch {}
+      showStartChat.value = false
+      userSearchText.value = ''
+      userSuggestions.value = []
+    }
+  } catch (error) {
+    // TODO: 에러 토스트 처리 가능
+  }
+}
+
+function openChatFromList(chatId: number) {
+  currentChatId.value = chatId
+  showChatDialog.value = true
+  try { chatPanel.value?.hide() } catch {}
+  chatStore.openChat(chatId)
 }
 
 async function handleLogout() {
@@ -178,6 +233,28 @@ function expandHeader() {
               </OverlayPanel>
             </ClientOnly>
             <ClientOnly>
+              <span class="relative">
+                <button
+                  ref="chatButtonRef"
+                  v-show="authStore.user"
+                  class="w-8 h-8 rounded-full flex items-center justify-center border border-gray-300 dark:border-gray-600 bg-white/70 dark:bg-gray-800/60 backdrop-blur-sm hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm"
+                  @click="(e:any) => chatPanel?.toggle(e)"
+                  v-tooltip.bottom="'채팅'"
+                >
+                  <i class="pi pi-comments text-gray-700 dark:text-gray-200 text-base"></i>
+                  <span
+                    v-if="chatStore.unreadTotal > 0"
+                    class="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] leading-none rounded-full px-1 py-0.5"
+                  >
+                    {{ chatStore.unreadTotal }}
+                  </span>
+                </button>
+              </span>
+              <OverlayPanel ref="chatPanel" :breakpoints="{ '960px': '90vw', '640px': '95vw' }" style="width: 360px; max-width: 90vw;">
+                <ChatList @open="openChatFromList" @start="() => { showStartChat = true; try { chatPanel?.hide() } catch {} }" />
+              </OverlayPanel>
+            </ClientOnly>
+            <ClientOnly>
               <button
                 v-show="authStore.user"
                 class="w-8 h-8 rounded-full flex items-center justify-center border border-gray-300 dark:border-gray-600 bg-white/70 dark:bg-gray-800/60 backdrop-blur-sm hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm"
@@ -188,9 +265,6 @@ function expandHeader() {
               </button>
             </ClientOnly>
             <AppColorMode />
-            <span v-tooltip.bottom="'GitHub 저장소'">
-              <Button icon="pi pi-github" text @click="redirectToGithub" />
-            </span>
             <span v-tooltip.bottom="'로그아웃'">
               <Button icon="pi pi-sign-out" text severity="danger" @click="handleLogout" />
             </span>
@@ -222,6 +296,22 @@ function expandHeader() {
     :user="authStore.user"
     @logout="handleLogout"
   />
+  <ChatWindow v-model:visible="showChatDialog" :chat-id="currentChatId" />
+  <Dialog v-model:visible="showStartChat" header="새 채팅 시작" modal :style="{ width: '420px', maxWidth: '95vw' }">
+    <div class="p-2">
+      <AutoComplete
+        v-model="userSearchText"
+        :suggestions="userSuggestions"
+        optionLabel="label"
+        :minLength="1"
+        placeholder="사용자 검색 (이름/아이디)"
+        inputClass="w-full"
+        @complete="completeUserSearch"
+        @item-select="onUserPick"
+      />
+      <div class="text-xs text-gray-500 mt-2">사용자를 선택하면 1:1 채팅이 시작됩니다.</div>
+    </div>
+  </Dialog>
 </template>
 
 <style scoped lang="scss">

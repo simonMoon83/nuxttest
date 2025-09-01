@@ -10,21 +10,23 @@ function requiredEnv(key: string): string {
   return v
 }
 
-const config: sql.config = {
-  server: requiredEnv('DB_HOST'),
-  port: process.env.DB_PORT ? Number.parseInt(process.env.DB_PORT, 10) : 1433,
-  user: requiredEnv('DB_USER'),
-  password: requiredEnv('DB_PASSWORD'),
-  database: requiredEnv('DB_NAME'),
-  options: {
-    encrypt: process.env.DB_ENCRYPT === 'true',
-    trustServerCertificate: process.env.DB_TRUST_SERVER_CERT !== 'false',
-  },
-  pool: {
-    max: process.env.DB_POOL_MAX ? Number.parseInt(process.env.DB_POOL_MAX, 10) : 10,
-    min: process.env.DB_POOL_MIN ? Number.parseInt(process.env.DB_POOL_MIN, 10) : 0,
-    idleTimeoutMillis: process.env.DB_POOL_IDLE_MS ? Number.parseInt(process.env.DB_POOL_IDLE_MS, 10) : 30000,
-  },
+function buildConfig(): sql.config {
+  return {
+    server: requiredEnv('DB_HOST'),
+    port: process.env.DB_PORT ? Number.parseInt(process.env.DB_PORT, 10) : 1433,
+    user: requiredEnv('DB_USER'),
+    password: requiredEnv('DB_PASSWORD'),
+    database: requiredEnv('DB_NAME'),
+    options: {
+      encrypt: process.env.DB_ENCRYPT === 'true',
+      trustServerCertificate: process.env.DB_TRUST_SERVER_CERT !== 'false',
+    },
+    pool: {
+      max: process.env.DB_POOL_MAX ? Number.parseInt(process.env.DB_POOL_MAX, 10) : 10,
+      min: process.env.DB_POOL_MIN ? Number.parseInt(process.env.DB_POOL_MIN, 10) : 0,
+      idleTimeoutMillis: process.env.DB_POOL_IDLE_MS ? Number.parseInt(process.env.DB_POOL_IDLE_MS, 10) : 30000,
+    },
+  }
 }
 
 let pool: sql.ConnectionPool | null = null
@@ -40,7 +42,7 @@ async function connectWithRetry(): Promise<sql.ConnectionPool> {
   let attempt = 0
   while (true) {
     try {
-      const newPool = new sql.ConnectionPool(config)
+      const newPool = new sql.ConnectionPool(buildConfig())
       await newPool.connect()
       return newPool
     }
@@ -48,7 +50,7 @@ async function connectWithRetry(): Promise<sql.ConnectionPool> {
       if (attempt >= maxRetries) {
         throw error
       }
-      const waitMs = initialDelay * (2 ** attempt)
+      const waitMs = initialDelay // 고정 지연: 시도마다 동일한 대기 시간
       console.warn(`DB 연결 실패 (시도 ${attempt + 1}/${maxRetries + 1}). ${waitMs}ms 후 재시도합니다...`)
       await sleep(waitMs)
       attempt += 1
@@ -142,6 +144,9 @@ export async function initializeDatabase() {
 
     // notifications 테이블 생성/보강
     await ensureNotificationsTable(connection)
+
+    // chat 관련 테이블 생성/보강
+    await ensureChatTables(connection)
 
     console.warn('데이터베이스 및 테이블 초기화 완료')
   }
@@ -261,4 +266,115 @@ async function ensureNotificationsTable(connection: sql.ConnectionPool) {
   await addColumnIfMissing('is_read', 'is_read BIT NOT NULL DEFAULT 0')
   await addColumnIfMissing('created_at', 'created_at DATETIME2 NOT NULL DEFAULT GETDATE()')
   await addColumnIfMissing('read_at', 'read_at DATETIME2 NULL')
+}
+
+// chat(대화) 관련 테이블 초기화
+async function ensureChatTables(connection: sql.ConnectionPool) {
+  // chats 테이블
+  const checkChats = await connection.request().query(`
+      SELECT COUNT(*) as count 
+      FROM information_schema.tables 
+      WHERE table_name = 'chats'
+    `)
+
+  if (checkChats.recordset[0].count === 0) {
+    await connection.request().query(`
+        CREATE TABLE chats (
+          id INT IDENTITY(1,1) PRIMARY KEY,
+          is_group BIT NOT NULL DEFAULT 0,
+          title NVARCHAR(200) NULL,
+          created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+          updated_at DATETIME2 NOT NULL DEFAULT GETDATE()
+        )
+      `)
+    await connection.request().query(`
+        CREATE INDEX IX_chats_updated ON chats(updated_at DESC)
+      `)
+    console.warn('chats 테이블이 생성되었습니다.')
+  } else {
+    console.warn('chats 테이블이 이미 존재합니다.')
+  }
+
+  // chat_members 테이블
+  const checkMembers = await connection.request().query(`
+      SELECT COUNT(*) as count 
+      FROM information_schema.tables 
+      WHERE table_name = 'chat_members'
+    `)
+
+  if (checkMembers.recordset[0].count === 0) {
+    await connection.request().query(`
+        CREATE TABLE chat_members (
+          id INT IDENTITY(1,1) PRIMARY KEY,
+          chat_id INT NOT NULL,
+          user_id INT NOT NULL,
+          joined_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+          last_read_message_id INT NULL,
+          last_read_at DATETIME2 NULL,
+          CONSTRAINT FK_chat_members_chat FOREIGN KEY (chat_id) REFERENCES chats(id),
+          CONSTRAINT FK_chat_members_user FOREIGN KEY (user_id) REFERENCES app_users(id)
+        )
+      `)
+    await connection.request().query(`
+        CREATE UNIQUE INDEX UX_chat_members_unique ON chat_members(chat_id, user_id)
+      `)
+    console.warn('chat_members 테이블이 생성되었습니다.')
+  } else {
+    console.warn('chat_members 테이블이 이미 존재합니다.')
+  }
+
+  // chat_messages 테이블
+  const checkMessages = await connection.request().query(`
+      SELECT COUNT(*) as count 
+      FROM information_schema.tables 
+      WHERE table_name = 'chat_messages'
+    `)
+
+  if (checkMessages.recordset[0].count === 0) {
+    await connection.request().query(`
+        CREATE TABLE chat_messages (
+          id INT IDENTITY(1,1) PRIMARY KEY,
+          chat_id INT NOT NULL,
+          sender_id INT NOT NULL,
+          content NVARCHAR(2000) NULL,
+          created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+          CONSTRAINT FK_chat_messages_chat FOREIGN KEY (chat_id) REFERENCES chats(id),
+          CONSTRAINT FK_chat_messages_sender FOREIGN KEY (sender_id) REFERENCES app_users(id)
+        )
+      `)
+    await connection.request().query(`
+        CREATE INDEX IX_chat_messages_chat_created ON chat_messages(chat_id, created_at DESC)
+      `)
+    console.warn('chat_messages 테이블이 생성되었습니다.')
+  } else {
+    console.warn('chat_messages 테이블이 이미 존재합니다.')
+  }
+
+  // chat_attachments 테이블
+  const checkAttachments = await connection.request().query(`
+      SELECT COUNT(*) as count 
+      FROM information_schema.tables 
+      WHERE table_name = 'chat_attachments'
+    `)
+
+  if (checkAttachments.recordset[0].count === 0) {
+    await connection.request().query(`
+        CREATE TABLE chat_attachments (
+          id INT IDENTITY(1,1) PRIMARY KEY,
+          message_id INT NOT NULL,
+          file_name NVARCHAR(255) NOT NULL,
+          file_path NVARCHAR(400) NOT NULL,
+          mime_type NVARCHAR(200) NULL,
+          size INT NULL,
+          created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+          CONSTRAINT FK_chat_attachments_message FOREIGN KEY (message_id) REFERENCES chat_messages(id)
+        )
+      `)
+    await connection.request().query(`
+        CREATE INDEX IX_chat_attachments_message ON chat_attachments(message_id)
+      `)
+    console.warn('chat_attachments 테이블이 생성되었습니다.')
+  } else {
+    console.warn('chat_attachments 테이블이 이미 존재합니다.')
+  }
 }
