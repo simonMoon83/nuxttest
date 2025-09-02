@@ -34,6 +34,58 @@ const chatTitle = computed(() => {
   return c.other_user_name || c.title || '대화'
 })
 
+// Invite dialog (org tree) state
+const showInvite = ref(false)
+const orgTreeNodes = ref<any[]>([])
+const orgTreeSelection = ref<Record<string, any>>({})
+const orgTreeLoading = ref(false)
+const deptIncludeSub = ref(true)
+
+async function loadOrgTree() {
+  orgTreeLoading.value = true
+  try {
+    const res: any = await $fetch('/api/org/tree')
+    orgTreeNodes.value = res?.data || []
+  } catch { orgTreeNodes.value = [] }
+  finally { orgTreeLoading.value = false }
+}
+
+watch(showInvite, async (v) => { if (v) await loadOrgTree() })
+
+const invitedUserIds = computed(() => {
+  const ids: number[] = []
+  for (const key of Object.keys(orgTreeSelection.value || {})) {
+    const node = (orgTreeSelection.value as any)[key]
+    if (!node) continue
+    if (key.startsWith('u-') && node?.checked) {
+      const id = Number(key.slice(2))
+      if (Number.isFinite(id) && id > 0) ids.push(id)
+    }
+  }
+  return Array.from(new Set(ids))
+})
+
+async function submitInvite() {
+  const id = props.chatId
+  if (!id) return
+  // find selected dept (single dept support like start chat UI)
+  let departmentId: number | null = null
+  for (const key of Object.keys(orgTreeSelection.value || {})) {
+    if (key.startsWith('d-') && (orgTreeSelection.value as any)[key]?.checked) {
+      const d = Number(key.slice(2))
+      if (Number.isFinite(d)) { departmentId = d; break }
+    }
+  }
+  try {
+    await $fetch(`/api/chats/${id}/invite`, {
+      method: 'POST',
+      body: { userIds: invitedUserIds.value, departmentId, includeSub: deptIncludeSub.value }
+    })
+    showInvite.value = false
+    orgTreeSelection.value = {}
+  } catch {}
+}
+
 watch([() => props.visible, () => props.chatId], async ([vis, id]) => {
   if (vis && id) {
     chat.setActiveChat(id)
@@ -444,6 +496,7 @@ async function openMembers() {
                 @click.stop="openMembers">
           ({{ currentConversation.member_count }})
         </button>
+        <Button size="small" text icon="pi pi-user-plus" label="초대" @click.stop="() => showInvite = true" />
       </div>
     </template>
 
@@ -599,6 +652,36 @@ async function openMembers() {
         </li>
         <li v-if="!members.length" class="py-6 text-center text-sm text-gray-500">참여자가 없습니다.</li>
       </ul>
+    </div>
+  </Dialog>
+
+  <!-- Invite dialog (org tree) -->
+  <Dialog v-model:visible="showInvite" header="참여자 초대" modal :style="{ width: '520px', maxWidth: '95vw' }">
+    <div class="p-3 space-y-3">
+      <div>
+        <label class="text-xs text-gray-500">조직/사용자 선택</label>
+        <div class="mt-1 border rounded p-2 max-h-72 overflow-auto">
+          <div v-if="orgTreeLoading" class="text-sm text-gray-500">로딩중...</div>
+          <Tree v-else
+            :value="orgTreeNodes"
+            selectionMode="checkbox"
+            v-model:selectionKeys="orgTreeSelection"
+            :filter="true"
+            filterMode="lenient"
+            class="w-full"
+          />
+        </div>
+        <div class="mt-2 flex items-center gap-2">
+          <Checkbox v-model="deptIncludeSub" :binary="true" inputId="invInclSub" />
+          <label for="invInclSub" class="text-xs text-gray-600">부서 선택 시 하위부서 포함</label>
+        </div>
+        <div class="text-xs text-gray-500 mt-1">부서 또는 여러 사용자를 선택하세요.</div>
+      </div>
+
+      <div class="pt-2 flex justify-end gap-2">
+        <Button label="취소" text @click="() => { showInvite = false; orgTreeSelection = {}; }" />
+        <Button label="초대하기" :disabled="!invitedUserIds.length && !Object.keys(orgTreeSelection || {}).some(k => k.startsWith('d-') && (orgTreeSelection as any)[k]?.checked)" @click="submitInvite" />
+      </div>
     </div>
   </Dialog>
 </template>

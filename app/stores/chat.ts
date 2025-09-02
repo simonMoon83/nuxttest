@@ -154,6 +154,12 @@ export const useChatStore = defineStore('chat', () => {
     await fetchConversations()
   }
 
+  async function inviteMembers(chatId: number, userIds: number[]) {
+    await $fetch(`/api/chats/${chatId}/invite`, { method: 'POST', body: { userIds } })
+    // 멤버 수 변동 가능성 있으므로 목록 최신화
+    await fetchConversations()
+  }
+
   function appendMessageLocal(message: ChatMessage) {
     const arr = messagesByChat.value[message.chat_id] || (messagesByChat.value[message.chat_id] = [])
     // ensure no duplicates
@@ -298,6 +304,31 @@ export const useChatStore = defineStore('chat', () => {
           updateConversationOnNewMessage(chatId, msg)
           return
         }
+        if (data?.action === 'invited') {
+          const chatId = data.chat_id
+          const inviterName = data.inviter_name || '사용자'
+          const invitedNames: string[] = Array.isArray(data.invited_user_names) ? data.invited_user_names : []
+          const list = invitedNames.slice(0, 2).join(', ')
+          const more = invitedNames.length > 2 ? ` 외 ${invitedNames.length - 2}명` : ''
+          const text = invitedNames.length ? `${inviterName} 님이 ${list}${more}을(를) 초대했습니다.` : `${inviterName} 님이 참여자를 초대했습니다.`
+
+          const sysMessageId = Date.now()
+          const msg = {
+            id: sysMessageId,
+            chat_id: chatId,
+            sender_id: 0,
+            sender_name: null,
+            content: text,
+            created_at: new Date().toISOString(),
+            created_at_text: undefined,
+            attachments: [] as any[],
+          } as ChatMessage
+          appendMessageLocal(msg)
+          updateConversationOnNewMessage(chatId, msg)
+          // 멤버 수 변동 반영을 위해 목록 리프레시
+          void fetchConversations()
+          return
+        }
         // fallback: 목록 갱신
         void fetchConversations()
         return
@@ -342,6 +373,7 @@ export const useChatStore = defineStore('chat', () => {
     sendMessage,
     uploadAttachments,
     leaveChat,
+    inviteMembers,
     searchMessages,
     fetchAround,
     startSSE,
