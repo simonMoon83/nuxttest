@@ -33,6 +33,9 @@ const modeOptions = [
 ]
 const search = ref('')
 
+// 확인 다이얼로그
+const { confirmAction } = useConfirmation()
+
 async function loadOrgTree() {
   orgTreeLoading.value = true
   try {
@@ -184,11 +187,18 @@ async function deleteSelected() {
 }
 
 async function deleteAll() {
-  try {
-    await $fetch('/api/notifications/delete', { method: 'POST', body: { all: true, mode: mode.value } })
+  confirmAction(async () => {
+    try {
+      await $fetch('/api/notifications/delete', { method: 'POST', body: { all: true, mode: mode.value } })
+    } catch {}
     selectedIds.value = []
     await refresh()
-  } catch {}
+  }, '완료', '알림메세지를 모두 삭제했습니다.', '알림메세지 전체 삭제', ' 전체 알림 메세지를 삭제합니다.', {
+    acceptClass: 'p-button-danger',
+    acceptLabel: '삭제',
+    rejectLabel: '취소',
+    icon: 'pi pi-exclamation-triangle'
+  })
 }
 </script>
 

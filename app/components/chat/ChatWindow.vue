@@ -86,6 +86,19 @@ async function submitInvite() {
   } catch {}
 }
 
+// Leave chat with confirmation
+const { confirmAction } = useConfirmation()
+
+async function onLeaveCurrentChat() {
+  const id = props.chatId
+  if (!id) return
+  confirmAction(async () => {
+    await chat.leaveChat(id)
+    await chat.fetchConversations()
+    emit('update:visible', false)
+  }, '완료', '채팅방에서 나갔습니다.', '채팅방 나가기', '이 채팅방을 나가시겠어요?')
+}
+
 watch([() => props.visible, () => props.chatId], async ([vis, id]) => {
   if (vis && id) {
     chat.setActiveChat(id)
@@ -469,16 +482,27 @@ async function openMembers() {
 <template>
   <Dialog :visible="visible" modal :blockScroll="true" appendTo="body" :style="{ width: '720px', maxWidth: '95vw' }" @update:visible="v => emit('update:visible', v)">
     <template #header>
-      <div class="flex items-center gap-2">
-        <i class="pi pi-comments"></i>
-        <span class="font-semibold">{{ chatTitle }}</span>
-        <button v-if="currentConversation && currentConversation.is_group && currentConversation.member_count"
-                class="text-xs text-gray-500 hover:text-gray-700 underline-offset-2 hover:underline"
-                type="button"
-                @click.stop="openMembers">
-          ({{ currentConversation.member_count }})
-        </button>
-        <Button size="small" text icon="pi pi-user-plus" label="초대" @click.stop="() => showInvite = true" />
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i class="pi pi-comments"></i>
+          <span class="font-semibold">{{ chatTitle }}</span>
+          <button v-if="currentConversation && currentConversation.is_group && currentConversation.member_count"
+                  class="text-xs text-gray-500 hover:text-gray-700 underline-offset-2 hover:underline"
+                  type="button"
+                  @click.stop="openMembers">
+            ({{ currentConversation.member_count }})
+          </button>
+        </div>
+        <div class="flex items-center gap-2">
+          <Button size="small" text icon="pi pi-user-plus" label="초대" @click.stop="() => showInvite = true" />
+          <button
+            class="w-7 h-7 rounded-full flex items-center justify-center border border-gray-300 dark:border-gray-600 bg-white/70 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm"
+            v-tooltip.bottom="'나가기'"
+            @click.stop="onLeaveCurrentChat"
+          >
+            <i class="pi pi-sign-out text-gray-700 dark:text-gray-200 text-sm"></i>
+          </button>
+        </div>
       </div>
     </template>
 

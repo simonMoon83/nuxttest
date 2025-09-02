@@ -52,9 +52,9 @@ onMounted(() => {
       <div class="flex items-center gap-2">
         <div class="text-xs text-gray-500">미읽음 {{ chat.unreadTotal }}</div>
         <button
-          v-if="chat.unreadTotal > 0"
-          class="h-7 px-2 rounded flex items-center justify-center border border-gray-300 dark:border-gray-600 bg-white/70 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm text-xs"
-          @click="markAllRead"
+          class="h-7 px-2 rounded flex items-center justify-center border border-gray-300 dark:border-gray-600 bg-white/70 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm text-xs disabled:opacity-60 disabled:cursor-not-allowed"
+          :disabled="chat.unreadTotal <= 0"
+          @click="chat.unreadTotal > 0 && markAllRead()"
           v-tooltip.left="'모두 읽음'"
         >
           <i class="pi pi-check-circle mr-1 text-green-600"></i>
