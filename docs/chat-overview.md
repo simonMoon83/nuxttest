@@ -10,6 +10,7 @@
   - 메시지: `id/messages.get.ts`, `id/message.post.ts`, `id/attach.post.ts`, `id/around.get.ts`, `id/search.get.ts`
   - 읽음: `id/read.post.ts`, `read-all.post.ts`
   - 시작: `start.post.ts`(1:1), `start-group.post.ts`(그룹), `id/members.get.ts`
+  - 멤버변경: `id/invite.post.ts`(초대), `id/leave.post.ts`(나가기)
   - 실시간: `stream.get.ts` (SSE)
 
 ## Architecture
@@ -43,6 +44,7 @@ flowchart LR
   SSE --> ST
   API --> DB
   SEND & ATT & READ & READALL --> BUS --> SSE
+  INVITE & LEAVE --> BUS --> SSE
 ```
 
 ## Data Model (요약)
@@ -69,6 +71,8 @@ flowchart LR
   - 읽음 처리: 메시지 변화 감시 시 활성 대화면 `markRead(id)` 호출.
   - 스크롤 상태 추적: 하단 여부에 따라 자동 스크롤/신규 메시지 표시 배지.
   - 멤버 보기(그룹): `[id]/members` 다이얼로그.
+  - 초대: 조직도 트리(부서/사용자 체크박스, 하위부서 포함 옵션) → `POST /api/chats/:id/invite`.
+  - 시스템 메시지: `sender_id = 0`인 텍스트를 중앙에 표시(초대/나가기 안내).
 - `useChatStore`
   - API 래핑: `fetchConversations`, `fetchMessages`, `searchMessages`, `fetchAround`, `sendMessage`, `uploadAttachments`, `markRead`, `markReadAll` 등.
   - SSE: `/api/chats/stream` 수신 → `handleSSE()`에서 `message`, `read` 이벤트 반영. 폴백 폴링 제공.
@@ -178,6 +182,28 @@ sequenceDiagram
   TB->>TB: currentChatId 설정, 패널 닫기
   TB->>CW: ChatWindow 열기(v-model:visible)
   TB->>ST: openChat(chatId), fetchConversations()
+
+## Sequence: Invite & Leave
+```mermaid
+sequenceDiagram
+  participant CW as ChatWindow.vue
+  participant ST as useChatStore
+  participant INV as POST /api/chats/:id/invite
+  participant LEA as POST /api/chats/:id/leave
+  participant SSE as /api/chats/stream
+
+  Note over CW: 초대 다이얼로그(조직도 트리)
+  CW->>INV: { userIds[]? , departmentId?, includeSub? }
+  INV-->>SSE: emit conversation(action: invited, inviter_name, invited_user_names)
+  SSE-->>ST: conversation(invited)
+  ST->>ST: 시스템 메시지 삽입, 목록 갱신
+
+  Note over CW: 나가기 버튼(목록/창)
+  CW->>LEA: POST /leave
+  LEA-->>SSE: emit conversation(action: left, user_name)
+  SSE-->>ST: conversation(left)
+  ST->>ST: 시스템 메시지 삽입 또는 본인 나감 시 목록 갱신
+```
 ```
 
 ## Operational Notes

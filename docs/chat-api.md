@@ -72,6 +72,28 @@
 - Response: `{ success: true }`
 - Side effects: 각 대화의 최신 메시지 id 기준 `type: 'read'` SSE 다건 전송
 
+## Leave Chat (나가기)
+- Method: POST
+- Path: `/api/chats/:id/leave`
+- Impl: `server/api/chats/[id]/leave.post.ts`
+- Body: (없음)
+- Response: `{ success: true }`
+- Side effects:
+  - `chat_members`에서 본인 제거
+  - SSE `type: 'conversation'` 전송: `{ chat_id, action: 'left', user_id, user_name }`
+
+## Invite Members (초대)
+- Method: POST
+- Path: `/api/chats/:id/invite`
+- Impl: `server/api/chats/[id]/invite.post.ts`
+- Body: `{ userIds?: number[], departmentId?: number, includeSub?: boolean }`
+- Behavior:
+  - 중복 멤버 제외 후 `chat_members`에 추가, 필요 시 `chats.is_group = 1`
+  - 부서 지정 시 해당 부서(옵션: 하위부서 포함) 전체 사용자 초대 가능
+- Response: `{ success: true, added: number }`
+- Side effects:
+  - SSE `type: 'conversation'` 전송: `{ chat_id, action: 'invited', inviter_id, inviter_name, invited_user_ids[], invited_user_names[] }`
+
 ## Start Direct Chat (1:1)
 - Method: POST
 - Path: `/api/chats/start`
@@ -107,6 +129,9 @@
   - `ping`
   - `message`: `{ chat_id, message }`
   - `read`: `{ chat_id, user_id, last_message_id }`
+  - `conversation`:
+    - 멤버 초대: `{ chat_id, action: 'invited', inviter_id, inviter_name, invited_user_ids[], invited_user_names[] }`
+    - 멤버 나감: `{ chat_id, action: 'left', user_id, user_name }`
 
 ## Example cURL
 ```bash
