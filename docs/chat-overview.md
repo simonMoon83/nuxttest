@@ -183,6 +183,8 @@ sequenceDiagram
   TB->>CW: ChatWindow 열기(v-model:visible)
   TB->>ST: openChat(chatId), fetchConversations()
 
+```
+
 ## Sequence: Invite & Leave
 ```mermaid
 sequenceDiagram
@@ -203,7 +205,6 @@ sequenceDiagram
   LEA-->>SSE: emit conversation(action: left, user_name)
   SSE-->>ST: conversation(left)
   ST->>ST: 시스템 메시지 삽입 또는 본인 나감 시 목록 갱신
-```
 ```
 
 ## Operational Notes
