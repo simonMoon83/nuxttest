@@ -255,11 +255,10 @@ export const useChatStore = defineStore('chat', () => {
         return
       }
       case 'read': {
-        // Decrement unread counters for MY messages in [prev_last, new_last] once per reader
+        // Decrement unread counters for messages where the reader was previously counted as unread.
+        // For any message with id in (prevLast, newLast] and sender_id !== reader_id, reduce unread_count by 1.
         const { chat_id, user_id, last_message_id } = ev.data || {}
-        const me = auth.user?.id
-        if (!chat_id || !user_id || !last_message_id || !me) return
-        if (user_id === me) return // ignore my own read events
+        if (!chat_id || !user_id || !last_message_id) return
         const list = messagesByChat.value[chat_id]
         if (!list || !list.length) return
 
@@ -269,7 +268,7 @@ export const useChatStore = defineStore('chat', () => {
         if (newLast <= prevLast) return
 
         for (const m of list) {
-          if (m.sender_id === me && m.id > prevLast && m.id <= newLast && (m.unread_count || 0) > 0) {
+          if (m.id > prevLast && m.id <= newLast && m.sender_id !== user_id && (m.unread_count || 0) > 0) {
             m.unread_count = Math.max(0, (m.unread_count || 0) - 1)
           }
         }

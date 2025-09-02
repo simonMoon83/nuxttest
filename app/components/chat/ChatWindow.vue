@@ -575,7 +575,7 @@ async function openMembers() {
 
           <div :class="['text-[11px] text-gray-400 mt-0.5', m.sender_id === meId ? 'text-right' : 'text-left']">
             <span>{{ m.created_at_text || formatTime(m.created_at) }}</span>
-            <span v-if="m.sender_id === meId && (m.unread_count || 0) > 0"
+            <span v-if="(m.unread_count || 0) > 0"
                   class="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-[10px] align-middle">
               {{ m.unread_count }}
             </span>
