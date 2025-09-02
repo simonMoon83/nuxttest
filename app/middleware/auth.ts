@@ -6,15 +6,9 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
     return
   }
 
-  // 서버사이드에서는 인증 체크 건너뛰기
-  if (import.meta.server) {
-    console.log('🔄 서버사이드에서는 인증 체크 건너뛰기')
-    return
-  }
-
   // 클라이언트에서만 인증 확인
   try {
-    console.log('🔍 미들웨어: 클라이언트에서 인증 확인 중...')
+    console.log('🔍 미들웨어: 인증 확인 중...')
     await authStore.initAuth()
     
     if (!authStore.isLoggedIn) {

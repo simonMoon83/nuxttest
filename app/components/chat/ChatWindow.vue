@@ -103,26 +103,9 @@ const searchResults = ref<any[]>([])
 const searching = ref(false)
 const resultOffset = ref(0)
 const hasMoreResults = ref(false)
-const recentQueries = ref<string[]>([])
-const searchDataListId = computed(() => `chat-search-dl-${props.chatId || 0}`)
+ 
 
-function loadRecentQueries() {
-  const key = `chat-search:${props.chatId || 0}`
-  try {
-    recentQueries.value = JSON.parse(localStorage.getItem(key) || '[]')
-  } catch { recentQueries.value = [] }
-}
-
-function saveRecentQuery(q: string) {
-  const key = `chat-search:${props.chatId || 0}`
-  const t = q.trim()
-  if (!t) return
-  const list = [t, ...recentQueries.value.filter(x => x !== t)].slice(0, 10)
-  recentQueries.value = list
-  localStorage.setItem(key, JSON.stringify(list))
-}
-
-watch(() => props.chatId, () => loadRecentQueries(), { immediate: true })
+ 
 
 async function runSearch(reset = true) {
   const id = props.chatId
@@ -140,7 +123,6 @@ async function runSearch(reset = true) {
   }
   searching.value = true
   try {
-    saveRecentQuery(searchQuery.value)
     const res = await chat.searchMessages(id, searchQuery.value, 50, resultOffset.value)
     searchResults.value = reset ? res : [...searchResults.value, ...res]
     hasMoreResults.value = res.length === 50
@@ -506,12 +488,8 @@ async function openMembers() {
         <input v-model="searchQuery"
                class="p-inputtext p-inputtext-sm flex-1"
                placeholder="채팅 내 검색"
-               :list="searchDataListId"
                @input="onSearchInput"
                @keydown.enter="runSearch(true)" />
-        <datalist :id="searchDataListId">
-          <option v-for="s in recentQueries" :key="s" :value="s" />
-        </datalist>
         <Button size="small" icon="pi pi-search" label="검색" @click="runSearch(true)" />
         <Button v-if="searchQuery" size="small" text label="지우기" @click="clearSearch" />
       </div>

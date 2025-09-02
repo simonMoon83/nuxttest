@@ -60,7 +60,8 @@ export const useAuthStore = defineStore('auth', () => {
 
   const checkAuth = async () => {
     try {
-      const data = await $fetch<AuthResponse>('/api/auth/me')
+      const headers = import.meta.server ? useRequestHeaders(['cookie']) : undefined
+      const data = await $fetch<AuthResponse>('/api/auth/me', { headers })
       user.value = data.user
       return true
     }
@@ -79,7 +80,8 @@ export const useAuthStore = defineStore('auth', () => {
     
     // 서버와 클라이언트 모두에서 인증 상태 확인 시도
     try {
-      const data = await $fetch<AuthResponse>('/api/auth/me')
+      const headers = import.meta.server ? useRequestHeaders(['cookie']) : undefined
+      const data = await $fetch<AuthResponse>('/api/auth/me', { headers })
       if (data && data.user) {
         user.value = data.user
         return true

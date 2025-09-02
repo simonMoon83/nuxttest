@@ -52,12 +52,11 @@ export default defineEventHandler(async (event) => {
       full_name: user.full_name
     })
 
-    // 쿠키에 토큰 설정
+    // 쿠키에 토큰 설정 (세션 쿠키: 브라우저 닫으면 삭제)
     setCookie(event, 'auth-token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 60 * 60 * 24 // 24시간
+      sameSite: 'strict'
     })
 
     return {
