@@ -3,7 +3,6 @@ import { makeHierarchicalSelectOptions, type DepartmentBase } from '../../compos
 import type { NotificationItem } from '../../stores/notifications'
 const authStore = useAuthStore()
 const tabsStore = useTabsStore()
-const showProfileCard = ref(false)
 const headerCollapsed = useState<boolean>('headerCollapsed', () => false)
 const collapseBtnRef = ref<any>(null)
 const expandBtnPos = ref<{ top: number; left: number } | null>(null)
@@ -218,9 +217,9 @@ async function handleLogout() {
   await authStore.logout()
 }
 
-function toggleProfileCard() {
-  showProfileCard.value = !showProfileCard.value
-}
+// Profile (unified as OverlayPanel like notifications/chat)
+const profilePanel = ref()
+const profileButtonRef = ref<any>(null)
 
 function collapseHeader() {
   try {
@@ -366,14 +365,61 @@ function expandHeader() {
               </OverlayPanel>
             </ClientOnly>
             <ClientOnly>
-              <button
-                v-show="authStore.user"
-                class="w-8 h-8 rounded-full flex items-center justify-center border border-gray-300 dark:border-gray-600 bg-white/70 dark:bg-gray-800/60 backdrop-blur-sm hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm"
-                @click="toggleProfileCard"
-                v-tooltip.bottom="'프로필 보기'"
-              >
-                <i class="pi pi-user text-gray-700 dark:text-gray-200 text-base"></i>
-              </button>
+              <span class="relative">
+                <button
+                  ref="profileButtonRef"
+                  v-show="authStore.user"
+                  class="w-8 h-8 rounded-full flex items-center justify-center border border-gray-300 dark:border-gray-600 bg-white/70 dark:bg-gray-800/60 backdrop-blur-sm hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm"
+                  @click="(e:any) => profilePanel?.toggle(e)"
+                  v-tooltip.bottom="'프로필 보기'"
+                >
+                  <i class="pi pi-user text-gray-700 dark:text-gray-200 text-base"></i>
+                </button>
+              </span>
+              <OverlayPanel ref="profilePanel" :breakpoints="{ '960px': '90vw', '640px': '95vw' }" style="width: 320px; max-width: 90vw;">
+                <div class="space-y-3">
+                  <div class="flex items-center gap-3 pb-2 border-b border-gray-200 dark:border-gray-700">
+                    <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center shrink-0">
+                      <i class="pi pi-user"></i>
+                    </div>
+                    <div class="min-w-0">
+                      <div class="text-sm font-semibold truncate">{{ authStore.user?.full_name || authStore.user?.username || '사용자' }}</div>
+                      <div class="text-xs text-gray-500 truncate">{{ authStore.user?.email || '' }}</div>
+                    </div>
+                  </div>
+                  <div class="flex flex-col gap-2">
+                    <button
+                      class="h-9 px-3 rounded flex items-center gap-2 border border-gray-300 dark:border-gray-600 bg-white/70 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm text-sm text-left"
+                      @click="() => { navigateTo('/profile/edit'); try { profilePanel?.hide() } catch {} }"
+                    >
+                      <i class="pi pi-user-edit text-gray-600"></i>
+                      프로필 편집
+                    </button>
+                    <button
+                      class="h-9 px-3 rounded flex items-center gap-2 border border-gray-300 dark:border-gray-600 bg-white/70 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm text-sm text-left"
+                      @click="() => { navigateTo('/settings'); try { profilePanel?.hide() } catch {} }"
+                    >
+                      <i class="pi pi-cog text-gray-600"></i>
+                      계정 설정
+                    </button>
+                    <button
+                      class="h-9 px-3 rounded flex items-center gap-2 border border-gray-300 dark:border-gray-600 bg-white/70 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm text-sm text-left"
+                      @click="() => { navigateTo('/help'); try { profilePanel?.hide() } catch {} }"
+                    >
+                      <i class="pi pi-question-circle text-gray-600"></i>
+                      도움말
+                    </button>
+                    <div class="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                    <button
+                      class="h-9 px-3 rounded flex items-center gap-2 border border-gray-300 dark:border-gray-600 bg-white/70 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm text-sm text-left text-red-600"
+                      @click="() => { handleLogout(); try { profilePanel?.hide() } catch {} }"
+                    >
+                      <i class="pi pi-sign-out"></i>
+                      로그아웃
+                    </button>
+                  </div>
+                </div>
+              </OverlayPanel>
             </ClientOnly>
             <AppColorMode />
             <span v-tooltip.bottom="'로그아웃'">
@@ -401,12 +447,7 @@ function expandHeader() {
     </Teleport>
   </ClientOnly>
 
-  <!-- 사용자 프로필 카드 -->
-  <AppUserProfileCard2
-    v-model:visible="showProfileCard"
-    :user="authStore.user"
-    @logout="handleLogout"
-  />
+  <!-- 사용자 프로필 카드 → 알림/채팅과 동일한 OverlayPanel로 통일 -->
   <ChatWindow v-model:visible="showChatDialog" :chat-id="currentChatId" />
   <Dialog v-model:visible="showNotificationDialog" header="알림 상세" modal :style="{ width: '520px', maxWidth: '95vw' }">
     <div class="p-2 space-y-2" v-if="selectedNotification">
