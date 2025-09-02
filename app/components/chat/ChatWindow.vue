@@ -481,6 +481,11 @@ async function openMembers() {
       <div ref="messagesEl" class="flex-1 min-h-0 overflow-auto p-2 pb-10 bg-gray-50 dark:bg-gray-800/30 rounded border border-gray-200 dark:border-gray-700" @scroll="onMessagesScroll">
         <div v-for="m in messages" :key="m.id" :id="`msg-${m.id}`"
              :class="['mb-3 transition-colors', highlightMessageId === m.id ? 'bg-amber-50 dark:bg-amber-900/20 rounded' : '']">
+          <!-- System message (e.g., left/joined) -->
+          <div v-if="m.sender_id === 0 && m.content" class="text-center text-[12px] text-gray-500 my-2">
+            {{ m.content }}
+          </div>
+          <template v-else>
           <!-- Sender name (group chats, non-self) -->
           <div v-if="currentConversation && currentConversation.is_group && m.sender_id !== meId"
                class="text-[11px] text-gray-500 mb-0.5 text-left">
@@ -522,6 +527,7 @@ async function openMembers() {
               {{ m.unread_count }}
             </span>
           </div>
+          </template>
         </div>
         <div v-if="!messages.length" class="text-center text-sm text-gray-500 py-6">메시지가 없습니다.</div>
 

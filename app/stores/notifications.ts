@@ -7,6 +7,9 @@ export interface NotificationItem {
   created_at_text?: string
   read_at?: string | null
   read_at_text?: string | null
+  sender_id?: number | null
+  sender_name?: string | null
+  sender_username?: string | null
 }
 
 interface ListResponse {

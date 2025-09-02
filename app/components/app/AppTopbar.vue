@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { makeHierarchicalSelectOptions, type DepartmentBase } from '../../composables/departments'
+import type { NotificationItem } from '../../stores/notifications'
 const authStore = useAuthStore()
 const tabsStore = useTabsStore()
 const showProfileCard = ref(false)
@@ -11,6 +12,15 @@ const expandBtnPos = ref<{ top: number; left: number } | null>(null)
 const notificationStore = useNotificationStore()
 const notifPanel = ref()
 const notifButtonRef = ref<any>(null)
+const showNotificationDialog = ref(false)
+const selectedNotification = ref<NotificationItem | null>(null)
+
+function openNotificationDetail(n: NotificationItem) {
+  selectedNotification.value = n
+  showNotificationDialog.value = true
+  try { notifPanel.value?.hide() } catch {}
+  try { if (!n.is_read) notificationStore.markRead([n.id]) } catch {}
+}
 // Chat
 const chatStore = useChatStore()
 const chatPanel = ref()
@@ -303,15 +313,29 @@ function expandHeader() {
                   <ul class="divide-y divide-gray-200 dark:divide-gray-700">
                     <li v-for="n in notificationStore.items" :key="n.id" class="py-2 px-1 flex gap-2 items-start">
                       <span class="mt-1">
-                        <span :class="['inline-block w-2.5 h-2.5 rounded-full', n.is_read ? 'bg-gray-400' : 'bg-rose-500']"></span>
+                        <span
+                          :class="['inline-block w-2.5 h-2.5 rounded-full', n.is_read ? 'bg-gray-400' : 'bg-rose-500', !n.is_read ? 'cursor-pointer' : '']"
+                          v-tooltip.bottom="'읽음 표시'"
+                          @click.stop="!n.is_read && notificationStore.markRead([n.id])"
+                        ></span>
                       </span>
-                      <div class="flex-1 min-w-0">
-                        <div class="text-sm font-medium" :class="n.is_read ? 'text-gray-500' : 'text-gray-900 dark:text-gray-100'">{{ n.title }}</div>
-                        <div class="text-xs text-gray-500 whitespace-pre-wrap break-words">{{ n.message }}</div>
-                        <div class="text-[11px] text-gray-400">{{ n.created_at_text || n.created_at }}</div>
-                      </div>
-                      <div>
-                        <Button v-if="!n.is_read" label="읽음" size="small" text @click="notificationStore.markRead([n.id])" />
+                      <div class="flex-1 min-w-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/40 rounded px-1 py-0.5" @click="openNotificationDetail(n)">
+                        <div class="flex items-center justify-between gap-2">
+                          <div class="flex-1 min-w-0 text-sm font-medium whitespace-nowrap overflow-hidden text-ellipsis" :class="n.is_read ? 'text-gray-500' : 'text-gray-900 dark:text-gray-100'">{{ n.title }}</div>
+                          <div class="shrink-0 flex items-center gap-1">
+                            <span class="text-[11px] text-gray-400">{{ n.created_at_text || n.created_at }}</span>
+                            <Button
+                              v-if="!n.is_read"
+                              icon="pi pi-check"
+                              text
+                              rounded
+                              size="small"
+                              v-tooltip.bottom="'읽음 표시'"
+                              @click.stop="notificationStore.markRead([n.id])"
+                            />
+                          </div>
+                        </div>
+                        <div class="text-xs text-gray-500 whitespace-nowrap overflow-hidden text-ellipsis">{{ n.message || '' }}</div>
                       </div>
                     </li>
                     <li v-if="!notificationStore.items.length" class="py-6 text-center text-sm text-gray-500">알림이 없습니다.</li>
@@ -384,6 +408,19 @@ function expandHeader() {
     @logout="handleLogout"
   />
   <ChatWindow v-model:visible="showChatDialog" :chat-id="currentChatId" />
+  <Dialog v-model:visible="showNotificationDialog" header="알림 상세" modal :style="{ width: '520px', maxWidth: '95vw' }">
+    <div class="p-2 space-y-2" v-if="selectedNotification">
+      <div class="text-sm font-semibold">{{ selectedNotification.title }}</div>
+      <div class="text-sm text-gray-600 whitespace-pre-wrap break-words">{{ selectedNotification.message || '' }}</div>
+      <div class="text-[11px] text-gray-400">
+        생성: {{ selectedNotification.created_at_text || selectedNotification.created_at }}
+        <span v-if="selectedNotification.read_at_text || selectedNotification.read_at"> · 읽음: {{ selectedNotification.read_at_text || selectedNotification.read_at }}</span>
+      </div>
+    </div>
+    <template #footer>
+      <Button label="닫기" @click="showNotificationDialog = false" />
+    </template>
+  </Dialog>
   <Dialog v-model:visible="showStartChat" header="새 채팅 시작" modal :style="{ width: '520px', maxWidth: '95vw' }">
     <div class="p-2 space-y-3">
       <div>

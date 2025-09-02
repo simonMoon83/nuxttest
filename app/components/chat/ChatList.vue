@@ -26,6 +26,16 @@ async function markAllRead() {
   } catch {}
 }
 
+const { confirmAction } = useConfirmation()
+const { showSuccessMessage } = useMessages()
+
+async function onLeave(chatId: number) {
+  confirmAction(async () => {
+    await chat.leaveChat(chatId)
+    await chat.fetchConversations()
+  }, '완료', '채팅방에서 나갔습니다.', '채팅방 나가기', '이 채팅방을 나가시겠어요?')
+}
+
 onMounted(() => {
   try {
     chat.startSSE()
@@ -64,15 +74,14 @@ onMounted(() => {
     </div>
     <div class="max-h-80 overflow-auto">
       <ul class="divide-y divide-gray-200 dark:divide-gray-700">
-        <li v-for="c in items" :key="c.id" class="py-2 px-1 flex items-center gap-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded"
-            @click="open(c)">
+        <li v-for="c in items" :key="c.id" class="py-2 px-1 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded">
           <div class="relative w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center shrink-0">
             <i :class="['text-sm', c.is_group ? 'pi pi-users' : 'pi pi-user']"></i>
             <span v-if="c.unread_count > 0" class="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] leading-none rounded-full px-1.5 py-0.5 shadow">
               {{ c.unread_count }}
             </span>
           </div>
-          <div class="flex-1 min-w-0">
+          <div class="flex-1 min-w-0 cursor-pointer" @click="open(c)">
             <div class="flex items-center justify-between gap-2">
               <div class="text-sm font-medium truncate">
                 {{ c.is_group ? (c.title || '그룹채팅') : (c.other_user_name || '대화') }}
@@ -90,7 +99,15 @@ onMounted(() => {
               </template>
             </div>
           </div>
-          
+          <div class="shrink-0 flex items-center">
+            <button
+              class="w-7 h-7 rounded-full flex items-center justify-center border border-gray-300 dark:border-gray-600 bg-white/70 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm"
+              v-tooltip.left="'나가기'"
+              @click.stop="onLeave(c.id)"
+            >
+              <i class="pi pi-sign-out text-gray-700 dark:text-gray-200 text-sm"></i>
+            </button>
+          </div>
         </li>
         <li v-if="!chat.conversations.length" class="py-6 text-center text-sm text-gray-500">대화가 없습니다.</li>
       </ul>

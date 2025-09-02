@@ -231,12 +231,14 @@ async function ensureNotificationsTable(connection: sql.ConnectionPool) {
         CREATE TABLE notifications (
           id INT IDENTITY(1,1) PRIMARY KEY,
           user_id INT NOT NULL,
+          sender_id INT NULL,
           title NVARCHAR(200) NOT NULL,
           message NVARCHAR(1000) NULL,
           is_read BIT NOT NULL DEFAULT 0,
           created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
           read_at DATETIME2 NULL,
-          CONSTRAINT FK_notifications_user FOREIGN KEY (user_id) REFERENCES app_users(id)
+          CONSTRAINT FK_notifications_user FOREIGN KEY (user_id) REFERENCES app_users(id),
+          CONSTRAINT FK_notifications_sender FOREIGN KEY (sender_id) REFERENCES app_users(id)
         )
       `)
     await connection.request().query(`
@@ -266,6 +268,7 @@ async function ensureNotificationsTable(connection: sql.ConnectionPool) {
   await addColumnIfMissing('is_read', 'is_read BIT NOT NULL DEFAULT 0')
   await addColumnIfMissing('created_at', 'created_at DATETIME2 NOT NULL DEFAULT GETDATE()')
   await addColumnIfMissing('read_at', 'read_at DATETIME2 NULL')
+  await addColumnIfMissing('sender_id', 'sender_id INT NULL')
 }
 
 // chat(대화) 관련 테이블 초기화

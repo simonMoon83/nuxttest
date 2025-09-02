@@ -143,6 +143,17 @@ export const useChatStore = defineStore('chat', () => {
     await markRead(chatId)
   }
 
+  async function leaveChat(chatId: number) {
+    await $fetch(`/api/chats/${chatId}/leave`, { method: 'POST' })
+    // 로컬 상태에서 해당 대화를 제거하고, 현재 열려있으면 닫기
+    conversations.value = conversations.value.filter(c => c.id !== chatId)
+    if (activeChatId.value === chatId) {
+      activeChatId.value = null
+    }
+    // 목록 재조회로 정합성 유지
+    await fetchConversations()
+  }
+
   function appendMessageLocal(message: ChatMessage) {
     const arr = messagesByChat.value[message.chat_id] || (messagesByChat.value[message.chat_id] = [])
     // ensure no duplicates
@@ -260,7 +271,34 @@ export const useChatStore = defineStore('chat', () => {
         return
       }
       case 'conversation': {
-        // future: handle new conversation
+        // handle conversation events (e.g., member left)
+        const data = ev.data || {}
+        if (data?.action === 'left') {
+          const chatId = data.chat_id
+          const userName = data.user_name || '사용자'
+          const me = auth.user?.id
+          // 본인이 나간 경우: 목록 갱신만 (이미 leaveChat에서 처리)
+          if (data.user_id && me && data.user_id === me) {
+            void fetchConversations()
+            return
+          }
+          // 시스템 메시지로 남김: 가상 메시지 객체 푸시
+          const sysMessageId = Date.now()
+          const msg = {
+            id: sysMessageId,
+            chat_id: chatId,
+            sender_id: 0,
+            sender_name: null,
+            content: `${userName} 님이 나갔습니다.`,
+            created_at: new Date().toISOString(),
+            created_at_text: undefined,
+            attachments: [] as any[],
+          } as ChatMessage
+          appendMessageLocal(msg)
+          updateConversationOnNewMessage(chatId, msg)
+          return
+        }
+        // fallback: 목록 갱신
         void fetchConversations()
         return
       }
@@ -303,6 +341,7 @@ export const useChatStore = defineStore('chat', () => {
     markReadAll,
     sendMessage,
     uploadAttachments,
+    leaveChat,
     searchMessages,
     fetchAround,
     startSSE,

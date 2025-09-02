@@ -12,7 +12,7 @@ interface CreateNotificationBody {
 export default defineEventHandler(async (event) => {
   try {
     // 인증 확인 (작성자 식별용)
-    getCurrentUserId(event)
+    const senderId = getCurrentUserId(event)
     const body = await readBody(event) as CreateNotificationBody
     if (!body?.title || typeof body.title !== 'string') {
       throw createError({ statusCode: 400, statusMessage: 'title은 필수입니다.' })
@@ -33,9 +33,10 @@ export default defineEventHandler(async (event) => {
       const result = await connection.request()
         .input('title', sql.NVarChar(200), title)
         .input('message', sql.NVarChar(1000), message)
+        .input('sender_id', sql.Int, senderId)
         .query(`
-          INSERT INTO notifications (user_id, title, message)
-          SELECT id, @title, @message
+          INSERT INTO notifications (user_id, sender_id, title, message)
+          SELECT id, @sender_id, @title, @message
           FROM app_users
           WHERE is_active = 1
         `)
@@ -55,11 +56,12 @@ export default defineEventHandler(async (event) => {
         for (const uid of targetIds) {
           const res = await new sql.Request(tx)
             .input('user_id', sql.Int, uid)
+            .input('sender_id', sql.Int, senderId)
             .input('title', sql.NVarChar(200), title)
             .input('message', sql.NVarChar(1000), message)
             .query(`
-              INSERT INTO notifications (user_id, title, message)
-              VALUES (@user_id, @title, @message)
+              INSERT INTO notifications (user_id, sender_id, title, message)
+              VALUES (@user_id, @sender_id, @title, @message)
             `)
           created += res?.rowsAffected?.[0] || 0
         }
@@ -73,15 +75,16 @@ export default defineEventHandler(async (event) => {
 
     // case 3: 호환성 유지 - 대상 미제공 시 자기 자신에게 생성
     // (기존 클라이언트가 title, message만 보내는 경우를 지원)
-    const currentUserId = getCurrentUserId(event)
+    const currentUserId = senderId
     const res = await connection.request()
       .input('user_id', sql.Int, currentUserId)
+      .input('sender_id', sql.Int, senderId)
       .input('title', sql.NVarChar(200), title)
       .input('message', sql.NVarChar(1000), message)
       .query(`
-        INSERT INTO notifications (user_id, title, message)
+        INSERT INTO notifications (user_id, sender_id, title, message)
         OUTPUT INSERTED.id
-        VALUES (@user_id, @title, @message)
+        VALUES (@user_id, @sender_id, @title, @message)
       `)
     const id = res.recordset?.[0]?.id
     return { success: true, id, created: id ? 1 : 0 }
