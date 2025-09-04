@@ -306,7 +306,15 @@ function expandHeader() {
               <OverlayPanel ref="notifPanel" :breakpoints="{ '960px': '90vw', '640px': '95vw' }" style="width: 360px; max-width: 90vw;">
                 <div class="flex items-center justify-between mb-2">
                   <div class="font-semibold">알림</div>
-                  <Button label="모두 읽음" size="small" text @click="notificationStore.markAllRead()" />
+                  <button
+                    class="h-7 px-2 rounded flex items-center justify-center border border-gray-300 dark:border-gray-600 bg-white/70 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm text-xs disabled:opacity-60 disabled:cursor-not-allowed"
+                    :disabled="!notificationStore.hasUnread"
+                    @click="notificationStore.hasUnread && notificationStore.markAllRead()"
+                    v-tooltip.left="'모두 읽음'"
+                  >
+                    <i class="pi pi-check-circle mr-1 text-green-600"></i>
+                    모두 읽음
+                  </button>
                 </div>
                 <div class="max-h-80 overflow-auto">
                   <ul class="divide-y divide-gray-200 dark:divide-gray-700">
