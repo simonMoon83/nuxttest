@@ -1,7 +1,6 @@
 <script setup lang='ts'>
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
 import { TreeDataModule, ExcelExportModule, CellSelectionModule, ClipboardModule } from 'ag-grid-enterprise'
-import { makeHierarchicalSelectOptions } from '@/composables/departments'
 import { AgGridVue } from 'ag-grid-vue3'
 import { computed, onMounted, ref, shallowRef, watch } from 'vue'
 import 'ag-grid-community/styles/ag-grid.css'
@@ -9,7 +8,7 @@ import 'ag-grid-community/styles/ag-theme-quartz.css'
 
 definePageMeta({ layout: 'default', middleware: ['auth', 'role'], permission: { resource: 'menu:/admin/roles', action: 'read' } })
 
-const { addElement } = useFormKitSchema()
+// const { addElement } = useFormKitSchema()
 const { confirmAction } = useConfirmation()
 const colorMode = useColorMode()
 const toast = useToast()
@@ -72,7 +71,7 @@ const updateGridTheme = () => {
   }
 }
 watch(() => colorMode.value, () => { updateGridTheme() })
-onMounted(() => { updateGridTheme(); loadRoles(); loadMenus(); loadDepartments() })
+onMounted(() => { updateGridTheme(); loadRoles(); loadMenus() })
 
 async function loadRoles() {
   const q = filters.value?.q || ''
@@ -100,14 +99,20 @@ const editSchema = ref<any>([
 function openCreate() {
   editTarget.value = { role_name: '', role_description: '', is_active: true, permissions: {} } as any
   selectedRole.value = null
+  orgTreeSelection.value = {}
   dialogVisible.value = true
+  // 새 생성 시 메뉴 권한 표시 초기화
+  rebuildMenuRowData()
 }
 function openEdit(row: RoleRow) {
   editTarget.value = { ...row, permissions: row.permissions || {} }
   selectedRole.value = row
   loadAssignedUsers(row.id)
   loadAssignedDepts(row.id)
+  orgTreeSelection.value = {}
   dialogVisible.value = true
+  // 선택한 역할의 권한으로 메뉴 체크 상태 반영
+  rebuildMenuRowData()
 }
 
 async function saveRole() {
@@ -238,53 +243,20 @@ function menuCheckboxRenderer(params: any) {
 }
 
 const assignedUsers = ref<any[]>([])
-const userSearchFilters = ref<any>({ q: '', dept: '', departmentId: null as number | null })
-const userSearch = ref<string>('')
-const userDepartmentOptions = ref<{ id: number, name: string }[]>([])
-const userSearchResult = ref<any[]>([])
-const userSearchGridApi = shallowRef<any | null>(null)
 const assignedUsersGridApi = shallowRef<any | null>(null)
-const userSearchSelection = ref<any[]>([])
-const userSearchColDefs = ref<any[]>([
-  { headerName: '', colId: 'select', width: 40, checkboxSelection: true, headerCheckboxSelection: true, suppressMenu: true },
-  { field: 'department_name', headerName: '부서', minWidth: 160 },
-  { field: 'username', headerName: '아이디', minWidth: 120 },
-  { field: 'full_name', headerName: '이름', minWidth: 140 },
-  { headerName: '추가', colId: 'add', width: 80, valueGetter: () => '추가', cellClass: 'action-cell' },
-])
 const assignedUsersColDefs = ref<any[]>([
-  { field: 'department_name', headerName: '부서', minWidth: 160 },
-  { field: 'username', headerName: '아이디', minWidth: 120 },
-  { field: 'full_name', headerName: '이름', minWidth: 120 },
-  { headerName: '삭제', colId: 'remove', width: 80, valueGetter: () => '삭제', cellClass: 'action-cell danger' },
+  { field: 'department_name', headerName: '부서', width: 140, minWidth: 120 },
+  { field: 'username', headerName: '아이디', width: 120, minWidth: 100 },
+  { field: 'full_name', headerName: '이름', width: 120, minWidth: 100 },
+  { headerName: '삭제', colId: 'remove', width: 90, valueGetter: () => '삭제', cellClass: 'action-cell danger' },
 ])
 const compactGridOpts = ref<any>({ rowHeight: 26, headerHeight: 28, rowSelection: 'multiple', defaultColDef: { filter: true } })
-async function loadUserDepartmentsOptions() {
-  const res = await $fetch<any>('/api/departments', { params: { search: '' } })
-  if (res?.success) {
-    userDepartmentOptions.value = makeHierarchicalSelectOptions((res.data || []), { labelKey: 'name', includeCode: true })
-  }
-}
-async function searchUsers() {
-  const f = userSearchFilters.value || {}
-  const res = await $fetch<any>('/api/users', { params: { search: (f.q || userSearch.value || ''), dept: f.dept || '', departmentId: f.departmentId || null } })
-  userSearchResult.value = res?.success ? (res.data || []) : []
-}
+//
 async function loadAssignedUsers(roleId: number) {
   const res = await $fetch<any>('/api/roles/' + roleId + '/users')
   assignedUsers.value = res?.success ? (res.data || []) : []
 }
-async function addUserToRole(userId: number) {
-  const roleId = editTarget.value?.id
-  if (!roleId) return
-  await $fetch(`/api/users/${userId}/roles`, { method: 'POST', body: { role_id: roleId } })
-  await loadAssignedUsers(roleId)
-}
-function onUserSearchGridReady(p: any) { userSearchGridApi.value = p.api }
 function onAssignedUsersGridReady(p: any) { assignedUsersGridApi.value = p.api }
-function onUserSearchCellClicked(event: any) {
-  if (event?.column?.getColId?.() === 'add') addUserToRole(event?.data?.id)
-}
 function onAssignedUsersCellClicked(event: any) {
   if (event?.column?.getColId?.() === 'remove') removeUserFromRole(event?.data?.id)
 }
@@ -308,29 +280,7 @@ async function removeAllUsersFromRole() {
     await loadAssignedUsers(roleId)
   }, '삭제 완료', `사용자 ${count}명 할당을 해제했습니다.`, '전체 삭제 확인', '선택된 역할에서 모든 사용자를 삭제하시겠습니까?', { compact: true, acceptLabel: '삭제', rejectLabel: '취소', icon: 'pi pi-exclamation-triangle' })
 }
-async function addSelectedUsersToRole() {
-  const roleId = editTarget.value?.id
-  if (!roleId) return
-  const api = userSearchGridApi.value
-  const rows = api?.getSelectedRows?.() || []
-  for (const r of rows) {
-    const uid = r?.id
-    if (!uid) continue
-    await $fetch(`/api/users/${uid}/roles`, { method: 'POST', body: { role_id: roleId } })
-  }
-  await loadAssignedUsers(roleId)
-}
-async function addAllFilteredUsersToRole() {
-  const roleId = editTarget.value?.id
-  if (!roleId) return
-  const list = userSearchResult.value || []
-  for (const r of list) {
-    const uid = r?.id
-    if (!uid) continue
-    await $fetch(`/api/users/${uid}/roles`, { method: 'POST', body: { role_id: roleId } })
-  }
-  await loadAssignedUsers(roleId)
-}
+//
 
 // 조직/사용자 트리 선택(채팅 초대와 동일 패턴)
 const orgTreeNodes = ref<any[]>([])
@@ -429,77 +379,15 @@ async function addSelectedDeptsToRole() {
   await loadAssignedDepts(roleId)
 }
 
-async function addFromTreeSelection() {
-  // 부서가 선택된 경우 부서 할당, 사용자 선택된 경우 사용자 할당
-  if (selectedDeptIds.value.length > 0) await addSelectedDeptsToRole()
-  if (invitedUserIds.value.length > 0) await addUsersFromTreeSelection()
-}
-
-const departments = ref<{ id: number; name: string }[]>([])
-const departmentSelectOptions = ref<Array<{ id: number; label: string; flatLabel: string }>>([])
 const assignedDepts = ref<any[]>([])
-const selectedDeptId = ref<number | null>(null)
-const departmentTreeOptions = ref<any[]>([])
-const selectedDeptKey = ref<string | null>(null)
-const deptSearchFilters = ref<any>({ name: '', departmentId: null as number | null })
 const assignedDeptsGridApi = shallowRef<any | null>(null)
-const assignedDeptsQuick = ref('')
 const assignedDeptsColDefs = ref<any[]>([
-  { field: 'name', headerName: '부서', minWidth: 140 },
-  { headerName: '삭제', colId: 'remove', width: 80, valueGetter: () => '삭제', cellClass: 'action-cell danger' },
+  { field: 'name', headerName: '부서', width: 200, minWidth: 140 },
+  { headerName: '삭제', colId: 'remove', width: 90, valueGetter: () => '삭제', cellClass: 'action-cell danger' },
 ])
-async function loadDepartments() {
-  const res = await $fetch<any>('/api/departments', { params: { search: '' } })
-  if (res?.success) {
-    const rows = (res.data || [])
-    departments.value = rows.map((d: any) => ({ id: d.id, name: d.name }))
-    // 검색 가능한 드롭다운 옵션 (코드 + 부서명, 계층 포함)
-    const hierarchical = makeHierarchicalSelectOptions(rows, { labelKey: 'label', includeCode: true }) as any[]
-    departmentSelectOptions.value = hierarchical.map((o: any) => ({ id: o.id, label: o.label, flatLabel: o.label.replace(/^[\s\u2000-\u200F\u202F\u205F\u3000]+/, '') }))
-  }
-}
-async function searchDepartments() {
-  const f = deptSearchFilters.value || {}
-  const res = await $fetch<any>('/api/departments', { params: { search: f.name || '' } })
-  if (res?.success) departments.value = (res.data || []).map((d: any) => ({ id: d.id, name: d.name }))
-}
-async function loadDepartmentTree() {
-  // 조직 트리 API에서 부서 노드만 추출해 TreeSelect 옵션으로 변환
-  const res = await $fetch<any>('/api/org/tree')
-  const nodes = res as any
-  function pruneDeptOnly(list: any[]): any[] {
-    const acc: any[] = []
-    for (const n of (list || [])) {
-      if (n?.type === 'dept' || (n?.data?.type === 'dept')) {
-        const children = pruneDeptOnly(n.children || [])
-        acc.push({ key: n.key, label: n.label, data: n.data, children })
-      } else {
-        const children = pruneDeptOnly(n.children || [])
-        if (children.length > 0) {
-          acc.push({ key: n.key, label: n.label, data: n.data, children })
-        }
-      }
-    }
-    return acc
-  }
-  departmentTreeOptions.value = pruneDeptOnly(nodes || [])
-}
-function getDeptIdFromKey(key: string | null): number | null {
-  if (!key) return null
-  // 예상 형태: d-123
-  const m = key.match(/-(\d+)$/)
-  return m ? Number(m[1]) : null
-}
 async function loadAssignedDepts(roleId: number) {
   const res = await $fetch<any>('/api/roles/' + roleId + '/departments')
   assignedDepts.value = res?.success ? (res.data || []) : []
-}
-async function addDeptToRole() {
-  const roleId = editTarget.value?.id
-  const deptId = selectedDeptId.value ?? getDeptIdFromKey(selectedDeptKey.value)
-  if (!roleId || !deptId) return
-  await $fetch(`/api/departments/${deptId}/roles`, { method: 'POST', body: { role_id: roleId } })
-  await loadAssignedDepts(roleId)
 }
 function onAssignedDeptsGridReady(p: any) { assignedDeptsGridApi.value = p.api }
 function onAssignedDeptsCellClicked(event: any) {
@@ -528,8 +416,18 @@ async function removeAllDeptsFromRole() {
 
 const selectedRole = ref<RoleRow | null>(null)
 watch(selectedRole, async (v) => { if (v) openEdit(v) })
-onMounted(async () => { await loadUserDepartmentsOptions(); await loadDepartmentTree() })
-watch(dialogVisible, async (v) => { if (v) await loadOrgTree() })
+onMounted(async () => { /* removed unused loaders */ })
+watch(dialogVisible, async (v) => {
+  if (v) {
+    orgTreeSelection.value = {}
+    await loadOrgTree()
+    // 다이얼로그 열릴 때 현재 editTarget.permissions 기준으로 메뉴 그리드 갱신
+    rebuildMenuRowData()
+  } else {
+    // 닫힐 때도 선택 상태 초기화
+    orgTreeSelection.value = {}
+  }
+})
 </script>
 
 <template>
