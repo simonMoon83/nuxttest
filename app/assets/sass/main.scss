@@ -89,6 +89,11 @@ h6 {
   }
 }
 
+/* 카드 기본 배경을 투명하게 두어 배경 유지를 보장 */
+.card {
+  background: transparent;
+}
+
 .p-tiptap {
   strong {
     color: var(--p-primary-color);
