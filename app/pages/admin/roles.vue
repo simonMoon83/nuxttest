@@ -119,10 +119,21 @@ async function saveRole() {
   const roleName = (editTarget.value as any)?.role_name?.trim?.() || ''
   if (!roleName) return toast.add({ severity: 'warn', summary: '유효성 오류', detail: '역할명은 필수입니다.', life: 2500 })
   const body = { ...editTarget.value, permissions: editTarget.value?.permissions || {} }
-  if (!editTarget.value?.id) await $fetch('/api/roles', { method: 'POST', body })
-  else await $fetch(`/api/roles/${editTarget.value.id}`, { method: 'PUT', body })
-  dialogVisible.value = false
-  await loadRoles()
+  if (!editTarget.value?.id) {
+    const res = await $fetch<any>('/api/roles', { method: 'POST', body })
+    if (res?.success && res?.data?.id) {
+      editTarget.value = { ...(res.data || {}) }
+      toast.add({ severity: 'success', summary: '저장 완료', detail: '역할이 생성되었습니다. 이제 사용자/부서를 추가할 수 있습니다.', life: 2200 })
+      // 생성 직후에도 메뉴/그리드 상태를 최신화
+      try { await loadRoles() } catch {}
+      try { rebuildMenuRowData() } catch {}
+    }
+    return
+  } else {
+    await $fetch(`/api/roles/${editTarget.value.id}`, { method: 'PUT', body })
+    dialogVisible.value = false
+    await loadRoles()
+  }
 }
 function deleteInDialog() {
   const currentId = editTarget.value?.id
@@ -337,7 +348,10 @@ const selectedDeptIds = computed(() => {
 
 async function addUsersFromTreeSelection() {
   const roleId = editTarget.value?.id
-  if (!roleId) return
+  if (!roleId) {
+    toast.add({ severity: 'warn', summary: '먼저 저장', detail: '역할을 저장한 후 사용자 추가가 가능합니다.', life: 2000 })
+    return
+  }
   for (const uid of invitedUserIds.value) {
     await $fetch(`/api/users/${uid}/roles`, { method: 'POST', body: { role_id: roleId } })
   }
@@ -346,7 +360,10 @@ async function addUsersFromTreeSelection() {
 
 async function addSelectedDeptsToRole() {
   const roleId = editTarget.value?.id
-  if (!roleId) return
+  if (!roleId) {
+    toast.add({ severity: 'warn', summary: '먼저 저장', detail: '역할을 저장한 후 부서 추가가 가능합니다.', life: 2000 })
+    return
+  }
   // expand with descendants if option enabled
   const expandDescendants = (deptId: number): number[] => {
     const key = `d-${deptId}`
@@ -422,6 +439,11 @@ watch(dialogVisible, async (v) => {
     orgTreeSelection.value = {}
     await loadOrgTree()
     // 다이얼로그 열릴 때 현재 editTarget.permissions 기준으로 메뉴 그리드 갱신
+    // 신규 생성(등록)인 경우, 이전 편집에서 남은 할당 목록 초기화
+    if (!editTarget.value?.id) {
+      assignedUsers.value = []
+      assignedDepts.value = []
+    }
     rebuildMenuRowData()
   } else {
     // 닫힐 때도 선택 상태 초기화
@@ -535,8 +557,8 @@ watch(dialogVisible, async (v) => {
                 <label for="inclSubAssign" class="ml-1">하위부서 포함</label>
               </div>
               <div class="flex gap-2">
-                <Button label="부서 추가" :disabled="!selectedDeptIds.length" @click="addSelectedDeptsToRole" />
-                <Button label="사용자 추가" :disabled="!invitedUserIds.length" @click="addUsersFromTreeSelection" />
+                <Button label="부서 추가" :disabled="!editTarget?.id || !selectedDeptIds.length" @click="addSelectedDeptsToRole" />
+                <Button label="사용자 추가" :disabled="!editTarget?.id || !invitedUserIds.length" @click="addUsersFromTreeSelection" />
               </div>
             </div>
           </div>

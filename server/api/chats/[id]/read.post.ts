@@ -8,7 +8,9 @@ export default defineEventHandler(async (event) => {
   const chatId = Number(getRouterParam(event, 'id') || 0)
   if (!chatId) throw createError({ statusCode: 400, statusMessage: '잘못된 chat id' })
   const body = await readBody(event) as { lastMessageId?: number }
-  const lastId = Number(body?.lastMessageId || 0)
+  const rawLast = Number((body as any)?.lastMessageId)
+  const lastId = Number.isFinite(rawLast) ? rawLast : 0
+  const safeMid = (lastId > 0 && lastId <= 2147483647) ? lastId : null
 
   const connection = await getDbConnection()
 
@@ -22,7 +24,7 @@ export default defineEventHandler(async (event) => {
   await connection.request()
     .input('chat_id', sql.Int, chatId)
     .input('user_id', sql.Int, userId)
-    .input('mid', sql.Int, lastId || null)
+    .input('mid', sql.Int, safeMid)
     .query(`
       UPDATE chat_members
       SET last_read_message_id = CASE WHEN @mid IS NULL OR @mid = 0 THEN last_read_message_id ELSE @mid END,
@@ -36,7 +38,7 @@ export default defineEventHandler(async (event) => {
     .query(`SELECT user_id FROM chat_members WHERE chat_id=@chat_id`)
   const userIds = members.recordset.map((r: any) => r.user_id as number)
 
-  emitToUsers(userIds, { type: 'read', data: { chat_id: chatId, user_id: userId, last_message_id: lastId || null } })
+  emitToUsers(userIds, { type: 'read', data: { chat_id: chatId, user_id: userId, last_message_id: safeMid || null } })
 
   return { success: true }
 })

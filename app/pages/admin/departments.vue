@@ -1,9 +1,9 @@
 <script setup lang='ts'>
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
-import { TreeDataModule, ExcelExportModule, CellSelectionModule, ClipboardModule, } from 'ag-grid-enterprise'
-import { useConfirmation } from '@/composables/confirmation'
+import { CellSelectionModule, ClipboardModule, ExcelExportModule, TreeDataModule, } from 'ag-grid-enterprise'
 import { AgGridVue } from 'ag-grid-vue3'
-import { computed, onMounted, ref, watch, shallowRef } from 'vue'
+import { computed, onMounted, ref, shallowRef, watch } from 'vue'
+import { useConfirmation } from '@/composables/confirmation'
 import { buildDepartmentTypeMap, makeHierarchicalSelectOptions, orderDepartmentsForView } from '@/composables/departments'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
@@ -13,7 +13,6 @@ definePageMeta({
   middleware: 'auth'
 })
 
-const { addElement } = useFormKitSchema()
 // i18n 미사용 제거
 const colorMode = useColorMode()
 const toast = useToast()

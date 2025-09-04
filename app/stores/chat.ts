@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useAuthStore } from './auth'
 
 export interface ChatConversation {
@@ -52,6 +52,7 @@ export const useChatStore = defineStore('chat', () => {
   let sse: EventSource | null = null
   const sseConnected = ref(false)
   const pollingTimer = ref<number | null>(null)
+  let systemMessageSeq = -1
 
   function formatYMDHMSLocal(d: Date) {
     const pad = (n: number) => n.toString().padStart(2, '0')
@@ -75,7 +76,9 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function searchMessages(chatId: number, q: string, limit = 50, offset = 0) {
-    if (!q || !q.trim()) return [] as ChatMessage[]
+    if (!q || !q.trim()) {
+      return [] as ChatMessage[]
+    }
     const res = await $fetch<{ success: boolean, data: ChatMessage[] }>(`/api/chats/${chatId}/search`, { query: { q, limit, offset } })
     return res.data || []
   }
@@ -108,21 +111,30 @@ export const useChatStore = defineStore('chat', () => {
 
   async function markRead(chatId: number) {
     const msgs = getMessages(chatId)
-    const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : undefined
-    const lastId = lastMsg?.id ?? 0
+    const MAX_INT = 2147483647
+    let lastId = 0
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      const mid = Number(msgs[i]?.id)
+      if (Number.isFinite(mid) && mid > 0 && mid <= MAX_INT) {
+        lastId = mid
+        break
+      }
+    }
     await $fetch(`/api/chats/${chatId}/read`, { method: 'POST', body: { lastMessageId: lastId } })
     // update local unread count to 0
     const idx = conversations.value.findIndex(c => c.id === chatId)
     if (idx >= 0) {
       const conv = conversations.value[idx]
-      if (conv) conv.unread_count = 0
+      if (conv) {
+        conv.unread_count = 0
+      }
     }
   }
 
   async function sendMessage(chatId: number, content: string) {
     const res = await $fetch<{ success: boolean, data: { message: ChatMessage } }>(`/api/chats/${chatId}/message`, {
       method: 'POST',
-      body: { content }
+      body: { content },
     })
     appendMessageLocal(res.data.message)
     updateConversationOnNewMessage(chatId, res.data.message)
@@ -131,8 +143,12 @@ export const useChatStore = defineStore('chat', () => {
 
   async function uploadAttachments(chatId: number, files: File[], content?: string) {
     const form = new FormData()
-    if (content) form.append('content', content)
-    for (const f of files) form.append('file', f, f.name)
+    if (content) {
+      form.append('content', content)
+    }
+    for (const f of files) {
+      form.append('file', f, f.name)
+    }
     const res = await $fetch<{ success: boolean, data: { message: ChatMessage } }>(`/api/chats/${chatId}/attach`, {
       method: 'POST',
       // FormData is supported by $fetch on the client
@@ -166,7 +182,12 @@ export const useChatStore = defineStore('chat', () => {
     if (!arr.find(m => m.id === message.id)) {
       // ensure preformatted timestamp exists for UI
       if (!message.created_at_text && message.created_at) {
-        try { message.created_at_text = formatYMDHMSLocal(new Date(message.created_at)) } catch {}
+        try {
+          message.created_at_text = formatYMDHMSLocal(new Date(message.created_at))
+        }
+        catch {
+          // noop
+        }
       }
       // infer initial unread_count for my message if not provided (e.g., from SSE/POST response)
       if (message.sender_id === (auth.user?.id || 0) && (message.unread_count === undefined || message.unread_count === null)) {
@@ -185,7 +206,12 @@ export const useChatStore = defineStore('chat', () => {
       if (conv) {
         conv.last_content = message.content || (message.attachments?.length ? '파일 첨부' : '')
         conv.last_at = message.created_at
-        try { conv.last_at_text = formatYMDHMSLocal(new Date(message.created_at)) } catch {}
+        try {
+          conv.last_at_text = formatYMDHMSLocal(new Date(message.created_at))
+        }
+        catch {
+          // noop
+        }
         conv.updated_at = message.created_at
         conv.last_sender_name = message.sender_name ?? conv.last_sender_name
         // increase unread if not active and not mine
@@ -196,21 +222,25 @@ export const useChatStore = defineStore('chat', () => {
       }
       // re-sort by updated_at desc
       conversations.value = [...conversations.value].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-    } else {
+    }
+    else {
       // if not present, refetch list
       void fetchConversations()
     }
   }
 
   function startSSE() {
-    if (process.server || sse) return
+    if (import.meta.server || sse) {
+      return
+    }
     try {
       sse = new EventSource('/api/chats/stream')
       sse.onmessage = (evt) => {
         try {
           const payload = JSON.parse(evt.data)
           handleSSE(payload)
-        } catch (e) {
+        }
+        catch {
           // ignore parse errors
         }
       }
@@ -223,7 +253,8 @@ export const useChatStore = defineStore('chat', () => {
         sseConnected.value = true
         stopPolling()
       }
-    } catch (e) {
+    }
+    catch {
       console.warn('SSE not available, fallback to polling')
       startPolling()
     }
@@ -238,7 +269,9 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function handleSSE(ev: any) {
-    if (!ev || !ev.type) return
+    if (!ev || !ev.type) {
+      return
+    }
     switch (ev.type) {
       case 'connected':
       case 'ping':
@@ -258,14 +291,20 @@ export const useChatStore = defineStore('chat', () => {
         // Decrement unread counters for messages where the reader was previously counted as unread.
         // For any message with id in (prevLast, newLast] and sender_id !== reader_id, reduce unread_count by 1.
         const { chat_id, user_id, last_message_id } = ev.data || {}
-        if (!chat_id || !user_id || !last_message_id) return
+        if (!chat_id || !user_id || !last_message_id) {
+          return
+        }
         const list = messagesByChat.value[chat_id]
-        if (!list || !list.length) return
+        if (!list || !list.length) {
+          return
+        }
 
         const chatMap = lastReadByUser.value[chat_id] || (lastReadByUser.value[chat_id] = {})
         const prevLast = chatMap[user_id] || 0
         const newLast = Math.max(prevLast, Number(last_message_id) || 0)
-        if (newLast <= prevLast) return
+        if (newLast <= prevLast) {
+          return
+        }
 
         for (const m of list) {
           if (m.id > prevLast && m.id <= newLast && m.sender_id !== user_id && (m.unread_count || 0) > 0) {
@@ -288,7 +327,7 @@ export const useChatStore = defineStore('chat', () => {
             return
           }
           // 시스템 메시지로 남김: 가상 메시지 객체 푸시
-          const sysMessageId = Date.now()
+          const sysMessageId = systemMessageSeq--
           const msg = {
             id: sysMessageId,
             chat_id: chatId,
@@ -311,7 +350,7 @@ export const useChatStore = defineStore('chat', () => {
           const more = invitedNames.length > 2 ? ` 외 ${invitedNames.length - 2}명` : ''
           const text = invitedNames.length ? `${inviterName} 님이 ${list}${more}을(를) 초대했습니다.` : `${inviterName} 님이 참여자를 초대했습니다.`
 
-          const sysMessageId = Date.now()
+          const sysMessageId = systemMessageSeq--
           const msg = {
             id: sysMessageId,
             chat_id: chatId,
@@ -330,17 +369,21 @@ export const useChatStore = defineStore('chat', () => {
         }
         // fallback: 목록 갱신
         void fetchConversations()
-        return
+        // no return needed
       }
     }
   }
 
   function startPolling(intervalMs = 30000) {
-    if (pollingTimer.value) return
+    if (pollingTimer.value) {
+      return
+    }
     void fetchConversations()
     pollingTimer.value = window.setInterval(() => {
       void fetchConversations()
-      if (activeChatId.value) void fetchMessages(activeChatId.value)
+      if (activeChatId.value) {
+        void fetchMessages(activeChatId.value)
+      }
     }, intervalMs)
   }
 

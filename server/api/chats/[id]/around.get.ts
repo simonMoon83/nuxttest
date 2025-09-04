@@ -1,6 +1,6 @@
 import sql from 'mssql'
-import { getDbConnection } from '../../../utils/db'
 import { getCurrentUserId } from '../../../utils/auth'
+import { getDbConnection } from '../../../utils/db'
 
 export default defineEventHandler(async (event) => {
   const userId = getCurrentUserId(event)
@@ -11,8 +11,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const q = getQuery(event)
-  const messageId = Number(q.messageId || 0)
-  if (!messageId) throw createError({ statusCode: 400, statusMessage: 'messageId 필요' })
+  const rawMid = Number(q.messageId || 0)
+  const messageId = Number.isFinite(rawMid) ? rawMid : 0
+  if (!(messageId > 0 && messageId <= 2147483647)) {
+    throw createError({ statusCode: 400, statusMessage: '유효한 messageId 필요' })
+  }
   const before = Math.min(Math.max(Number(q.before || 50), 0), 200)
   const after = Math.min(Math.max(Number(q.after || 50), 0), 200)
 
@@ -23,14 +26,18 @@ export default defineEventHandler(async (event) => {
     .input('chat_id', sql.Int, chatId)
     .input('user_id', sql.Int, userId)
     .query(`SELECT COUNT(1) as cnt FROM chat_members WHERE chat_id=@chat_id AND user_id=@user_id`)
-  if (!mem.recordset[0].cnt) throw createError({ statusCode: 403, statusMessage: '권한 없음' })
+  if (!mem.recordset[0].cnt) {
+    throw createError({ statusCode: 403, statusMessage: '권한 없음' })
+  }
 
   // 기준 메시지가 같은 채팅인지 확인
   const exists = await connection.request()
     .input('chat_id', sql.Int, chatId)
     .input('mid', sql.Int, messageId)
     .query(`SELECT COUNT(1) AS cnt FROM chat_messages WHERE id=@mid AND chat_id=@chat_id`)
-  if (!exists.recordset[0].cnt) throw createError({ statusCode: 404, statusMessage: '메시지를 찾을 수 없습니다' })
+  if (!exists.recordset[0].cnt) {
+    throw createError({ statusCode: 404, statusMessage: '메시지를 찾을 수 없습니다' })
+  }
 
   // before: id <= messageId, 최근 것부터 상위 N개
   // after: id > messageId, 오래된 것부터 상위 N개
@@ -83,7 +90,7 @@ export default defineEventHandler(async (event) => {
   const ids = res.recordset.map(r => r.id)
   let attachments: any[] = []
   if (ids.length) {
-    const tvp = ids.map((id) => `(${Number(id)})`).join(',')
+    const tvp = ids.map(id => `(${Number(id)})`).join(',')
     const attRes = await connection.request().query(`
       SELECT a.id, a.message_id, a.file_name, a.file_path, a.mime_type, a.size
       FROM chat_attachments a
