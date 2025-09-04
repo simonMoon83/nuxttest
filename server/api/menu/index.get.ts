@@ -21,6 +21,7 @@ interface FormattedMenu {
   href?: string
   child?: FormattedMenu[]
   component?: string
+  permission_key?: string
 }
 
 export default defineEventHandler(async (event) => {
@@ -87,7 +88,10 @@ export default defineEventHandler(async (event) => {
       const formattedMenu: FormattedMenu = {
         title: menu.title,
         icon: menu.icon || undefined,
-        href: menu.href || undefined
+        href: menu.href || undefined,
+        permission_key: menu.href && menu.href.trim() !== ''
+          ? `menu:${menu.href}`
+          : `menu:id:${menu.id}`
       }
 
       // 자식 메뉴가 있는 경우

@@ -18,6 +18,7 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const isLoggedIn = computed(() => !!user.value)
   const isLoading = ref(false)
+  const permissions = ref<any>({})
 
   const login = async (username: string, password: string) => {
     isLoading.value = true
@@ -74,9 +75,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   const initAuth = async () => {
     // 이미 사용자가 설정되어 있으면 다시 확인하지 않음
-    if (user.value) {
-      return true
-    }
+    // 항상 권한을 최신화하기 위해 사용자 존재하더라도 권한은 재조회
     
     // 서버와 클라이언트 모두에서 인증 상태 확인 시도
     try {
@@ -84,6 +83,10 @@ export const useAuthStore = defineStore('auth', () => {
       const data = await $fetch<AuthResponse>('/api/auth/me', { headers })
       if (data && data.user) {
         user.value = data.user
+        try {
+          const p = await $fetch<{ success: boolean; permissions: any }>('/api/auth/permissions', { headers })
+          permissions.value = p?.permissions || {}
+        } catch { permissions.value = {} }
         return true
       }
       user.value = null
@@ -95,6 +98,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  const hasPermission = (resource: string, action: 'read' | 'write' = 'read') => {
+    const p = permissions.value || {}
+    if (p.all) return true
+    const v = p[resource]
+    if (!v) return false
+    if (v === 'write') return true
+    return v === action
+  }
+
   return {
     user,
     isLoggedIn,
@@ -103,5 +115,7 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     checkAuth,
     initAuth,
+    permissions,
+    hasPermission,
   }
 })

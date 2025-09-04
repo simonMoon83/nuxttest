@@ -7,6 +7,7 @@ import 'ag-grid-community/styles/ag-theme-quartz.css'
 
 const { confirmAction } = useConfirmation()
 const toast = useToast()
+const { canWritePage } = usePermission()
 
 interface MenuItem {
   id: number
@@ -21,7 +22,10 @@ interface MenuItem {
 
 interface TreeNode { key: string; data: MenuItem; children?: TreeNode[] }
 
-definePageMeta({ layout: 'default', middleware: 'auth' })
+definePageMeta({
+  layout: 'default',
+  middleware: ['auth', 'role']
+})
 
 ModuleRegistry.registerModules([AllCommunityModule, TreeDataModule, ExcelExportModule, CellSelectionModule, ClipboardModule])
 const colorMode = useColorMode()
@@ -49,7 +53,7 @@ const schema = ref<any>([
   { $el: 'div', attrs: { class: 'col-12 w-full flex justify-end items-center gap-x-2 mt-1' }, children: [
     { $cmp: 'Button', props: { label: '검색', severity: 'primary', onClick: () => onSearch() } },
     { $cmp: 'Button', props: { label: '초기화', outlined: true, severity: 'secondary', type: 'reset', onClick: () => onReset() } },
-    { $cmp: 'Button', props: { label: '등록', severity: 'secondary', onClick: () => openCreateRoot() } },
+    ...(canWritePage() ? [{ $cmp: 'Button', props: { label: '등록', severity: 'secondary', onClick: () => openCreateRoot() } }] : []),
     { $cmp: 'Button', props: { label: '엑셀', outlined: true, severity: 'secondary', onClick: () => exportExcel() } },
   ] },
 ])
@@ -133,13 +137,13 @@ function onSearch() { loadMenu() }
 function onReset() { filters.value = { title: '', href: '', activeOnly: null }; searchQuery.value = ''; loadMenu() }
 
 // CRUD & 정렬 이관
-function openCreateRoot() { openCreateWithParent(null) }
-function openCreateChild(parent: MenuItem) { openCreateWithParent(parent.id) }
+function openCreateRoot() { if (!canWritePage()) return toast.add({ severity: 'warn', summary: '권한 없음', detail: '등록 권한이 없습니다.', life: 2000 }); openCreateWithParent(null) }
+function openCreateChild(parent: MenuItem) { if (!canWritePage()) return toast.add({ severity: 'warn', summary: '권한 없음', detail: '등록 권한이 없습니다.', life: 2000 }); openCreateWithParent(parent.id) }
 function openCreateWithParent(parentId: number | null) {
   editTarget.value = { id: 0 as any, title: '', href: '', icon: '', parent_id: parentId, sort_order: getNextSortOrder(parentId), is_separator: false, is_active: true }
   dialogVisible.value = true
 }
-function openEdit(row: MenuItem) { editTarget.value = { ...row }; dialogVisible.value = true }
+function openEdit(row: MenuItem) { if (!canWritePage()) return toast.add({ severity: 'warn', summary: '권한 없음', detail: '수정 권한이 없습니다.', life: 2000 }); editTarget.value = { ...row }; dialogVisible.value = true }
 function closeDialog() { dialogVisible.value = false; editTarget.value = null }
 
 function getNextSortOrder(parentId: number | null): number { const s = menuData.value.filter(m => m.parent_id === parentId); return s.length > 0 ? Math.max(...s.map(x => x.sort_order)) + 1 : 1 }
@@ -159,14 +163,15 @@ const editSchema = ref<any>([
     $el: 'div',
     attrs: { class: 'col-12 w-full flex justify-end items-center gap-x-2 mt-2' },
     children: [
-      { $cmp: 'Button', if: '$id', props: { label: '삭제', severity: 'danger', loading: deleting.value, onClick: () => deleteInDialog() } },
+      ...(canWritePage() ? [{ $cmp: 'Button', if: '$id', props: { label: '삭제', severity: 'danger', loading: deleting.value, onClick: () => deleteInDialog() } }] : []),
       { $cmp: 'Button', props: { label: '취소', severity: 'secondary', onClick: () => closeDialog() } },
-      { $cmp: 'Button', props: { label: '저장', loading: saving.value, onClick: () => saveMenu() } },
+      ...(canWritePage() ? [{ $cmp: 'Button', props: { label: '저장', loading: saving.value, onClick: () => saveMenu() } }] : []),
     ],
   },
 ])
 
 async function saveMenu() {
+  if (!canWritePage()) return toast.add({ severity: 'warn', summary: '권한 없음', detail: '저장 권한이 없습니다.', life: 2000 })
   try {
     saving.value = true
     const body = { ...(editTarget.value as any) }
@@ -202,6 +207,7 @@ async function saveMenu() {
 }
 
 function deleteInDialog() {
+  if (!canWritePage()) return toast.add({ severity: 'warn', summary: '권한 없음', detail: '삭제 권한이 없습니다.', life: 2000 })
   const currentId = (editTarget.value as any)?.id
   if (!currentId) return
   confirmAction(async () => {
@@ -216,7 +222,7 @@ function deleteInDialog() {
   }, '삭제 완료', '메뉴를 삭제했습니다.', '삭제 확인', '해당 메뉴를 삭제하시겠습니까?', { compact: true, acceptLabel: '삭제', rejectLabel: '취소', icon: 'pi pi-exclamation-triangle' })
 }
 
-async function onToggleActive(menu: MenuItem, nextValue: boolean) { const prev = menu.is_active; menu.is_active = nextValue; try { await $fetch(`/api/menu/${menu.id}`, { method: 'PUT', body: { is_active: nextValue } }) } catch { menu.is_active = prev } }
+async function onToggleActive(menu: MenuItem, nextValue: boolean) { if (!canWritePage()) return toast.add({ severity: 'warn', summary: '권한 없음', detail: '수정 권한이 없습니다.', life: 2000 }); const prev = menu.is_active; menu.is_active = nextValue; try { await $fetch(`/api/menu/${menu.id}`, { method: 'PUT', body: { is_active: nextValue } }) } catch { menu.is_active = prev } }
 
 async function refreshMenuData() { await loadMenu(); const { refreshMenu } = useNavigationMenu(); await refreshMenu() }
 

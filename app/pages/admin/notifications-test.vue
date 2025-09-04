@@ -1,6 +1,7 @@
 <script setup lang="ts">
 definePageMeta({
   title: '알림 테스트',
+  middleware: ['auth', 'role']
 })
 
 const notificationStore = useNotificationStore()
