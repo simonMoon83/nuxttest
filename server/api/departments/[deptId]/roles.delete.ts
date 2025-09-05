@@ -5,7 +5,7 @@ export default defineEventHandler(async (event) => {
   const q = getQuery(event)
   const roleId = Number((q.roleId as any) ?? 0)
   if (!roleId) {
-    throw createError({ statusCode: 400, statusMessage: 'roleId is required' })
+    throw createError({ statusCode: 400, message: 'roleId is required' })
   }
   const db = await getDbConnection()
   await db.request().query(`

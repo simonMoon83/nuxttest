@@ -7,13 +7,13 @@ export default defineEventHandler(async (event) => {
   const chatIdRaw = getRouterParam(event, 'id') || ''
   const chatId = Number(chatIdRaw)
   if (!chatId || !Number.isFinite(chatId)) {
-    throw createError({ statusCode: 400, statusMessage: '잘못된 chat id' })
+    throw createError({ statusCode: 400, message: '잘못된 chat id' })
   }
 
   const q = getQuery(event)
   const term = String(q.q || '').trim()
   if (!term) {
-    throw createError({ statusCode: 400, statusMessage: 'q 파라미터가 필요합니다' })
+    throw createError({ statusCode: 400, message: 'q 파라미터가 필요합니다' })
   }
   const limit = Math.min(Math.max(Number(q.limit || 50), 1), 200)
   const offset = Math.max(Number(q.offset || 0), 0)
@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
     .input('chat_id', sql.Int, chatId)
     .input('user_id', sql.Int, userId)
     .query(`SELECT COUNT(1) as cnt FROM chat_members WHERE chat_id=@chat_id AND user_id=@user_id`)
-  if (!mem.recordset[0].cnt) throw createError({ statusCode: 403, statusMessage: '권한 없음' })
+  if (!mem.recordset[0].cnt) throw createError({ statusCode: 403, message: '권한 없음' })
 
   const like = `%${term}%`
 

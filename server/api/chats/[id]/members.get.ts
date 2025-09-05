@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const idParam = getRouterParam(event, 'id')
   const chatId = Number(idParam)
   if (!Number.isFinite(chatId) || chatId <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid chat id' })
+    throw createError({ statusCode: 400, message: 'Invalid chat id' })
   }
 
   const connection = await getDbConnection()
@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
     .query(`SELECT COUNT(1) AS cnt FROM chat_members WHERE chat_id = @chat_id AND user_id = @user_id`)
   const cnt = (memCheck as any).recordset?.[0]?.cnt ?? 0
   if (!cnt) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
+    throw createError({ statusCode: 403, message: 'Forbidden' })
   }
 
   const rs = await connection.request()

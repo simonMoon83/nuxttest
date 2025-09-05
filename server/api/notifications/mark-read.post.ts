@@ -28,11 +28,11 @@ export default defineEventHandler(async (event) => {
     }
 
     if (!ids.length) {
-      throw createError({ statusCode: 400, statusMessage: 'ids가 필요합니다.' })
+      throw createError({ statusCode: 400, message: 'ids가 필요합니다.' })
     }
 
     if (ids.length > 200) {
-      throw createError({ statusCode: 400, statusMessage: '한 번에 최대 200개까지 처리 가능합니다.' })
+      throw createError({ statusCode: 400, message: '한 번에 최대 200개까지 처리 가능합니다.' })
     }
 
     const req = connection.request().input('user_id', sql.Int, userId)
@@ -54,7 +54,7 @@ export default defineEventHandler(async (event) => {
   } catch (error) {
     console.error('알림 읽음 처리 실패:', error)
     if (error && typeof error === 'object' && 'statusCode' in error) throw error
-    throw createError({ statusCode: 500, statusMessage: '알림 읽음 처리 중 오류가 발생했습니다.' })
+    throw createError({ statusCode: 500, message: '알림 읽음 처리 중 오류가 발생했습니다.' })
   }
 })
 

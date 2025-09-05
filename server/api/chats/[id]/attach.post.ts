@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
   const MAX_FILE_SIZE_BYTES = maxMb * 1024 * 1024 // 개별 파일 MB 제한
   const senderId = getCurrentUserId(event)
   const chatId = Number(getRouterParam(event, 'id') || 0)
-  if (!chatId) throw createError({ statusCode: 400, statusMessage: '잘못된 chat id' })
+  if (!chatId) throw createError({ statusCode: 400, message: '잘못된 chat id' })
 
   // formidable을 사용한 대용량 파일 파싱
   const form = formidable({
@@ -45,7 +45,7 @@ export default defineEventHandler(async (event) => {
     .input('chat_id', sql.Int, chatId)
     .input('user_id', sql.Int, senderId)
     .query(`SELECT COUNT(1) as cnt FROM chat_members WHERE chat_id=@chat_id AND user_id=@user_id`)
-  if (!mem.recordset[0].cnt) throw createError({ statusCode: 403, statusMessage: '권한 없음' })
+  if (!mem.recordset[0].cnt) throw createError({ statusCode: 403, message: '권한 없음' })
 
   const uploadDir = await ensureUploadsDir()
 
@@ -85,7 +85,7 @@ export default defineEventHandler(async (event) => {
   }
 
   if (!fileList.length) {
-    throw createError({ statusCode: 400, statusMessage: '업로드할 파일이 없습니다.' })
+    throw createError({ statusCode: 400, message: '업로드할 파일이 없습니다.' })
   }
 
   const tx = new sql.Transaction(connection)

@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
     return { success: true, data: result.recordset }
   } catch (error) {
     console.error('사용자 목록 조회 실패:', error)
-    throw createError({ statusCode: 500, statusMessage: '사용자 목록을 불러오지 못했습니다.' })
+    throw createError({ statusCode: 500, message: '사용자 목록을 불러오지 못했습니다.' })
   }
 })
 

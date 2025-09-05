@@ -23,17 +23,17 @@ export default defineEventHandler(async (event) => {
 
   // 경로 이탈 방지
   if (!absPath.startsWith(absBase)) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid path' })
+    throw createError({ statusCode: 400, message: 'Invalid path' })
   }
 
   try {
     const stat = await fs.stat(absPath)
     if (!stat.isFile()) {
-      throw createError({ statusCode: 404, statusMessage: `Not a file: /uploads/${relPath}` })
+      throw createError({ statusCode: 404, message: `Not a file: /uploads/${relPath}` })
     }
   }
   catch {
-    throw createError({ statusCode: 404, statusMessage: `Page not found: /uploads/${relPath}` })
+    throw createError({ statusCode: 404, message: `Page not found: /uploads/${relPath}` })
   }
 
   setHeader(event, 'Content-Type', getContentTypeByExt(absPath))

@@ -6,7 +6,7 @@ import { emitToUsers } from '../../../utils/chatBus'
 export default defineEventHandler(async (event) => {
   const inviterId = getCurrentUserId(event)
   const chatId = Number(getRouterParam(event, 'id') || 0)
-  if (!chatId) throw createError({ statusCode: 400, statusMessage: '잘못된 chat id' })
+  if (!chatId) throw createError({ statusCode: 400, message: '잘못된 chat id' })
 
   const body = await readBody(event) as { userIds?: number[]; departmentId?: number | null; includeSub?: boolean }
   let userIds = Array.isArray(body?.userIds) ? (body!.userIds as any[]).map((n) => Number(n)).filter((n) => Number.isFinite(n) && n > 0) : []
@@ -50,7 +50,7 @@ export default defineEventHandler(async (event) => {
     .input('chat_id', sql.Int, chatId)
     .input('user_id', sql.Int, inviterId)
     .query(`SELECT COUNT(1) as cnt FROM chat_members WHERE chat_id=@chat_id AND user_id=@user_id`)
-  if (!mem.recordset[0].cnt) throw createError({ statusCode: 403, statusMessage: '권한 없음' })
+  if (!mem.recordset[0].cnt) throw createError({ statusCode: 403, message: '권한 없음' })
 
   // 기존 멤버 조회
   const existing = await connection.request()

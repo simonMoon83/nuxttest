@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event) as UserCreateBody
     if (!body?.username || !body?.email) {
-      throw createError({ statusCode: 400, statusMessage: 'username, email은 필수입니다.' })
+      throw createError({ statusCode: 400, message: 'username, email은 필수입니다.' })
     }
 
     const connection = await getDbConnection()
@@ -37,7 +37,7 @@ export default defineEventHandler(async (event) => {
   } catch (error) {
     console.error('사용자 생성 실패:', error)
     if (error && typeof error === 'object' && 'statusCode' in error) throw error
-    throw createError({ statusCode: 500, statusMessage: '사용자를 생성하지 못했습니다.' })
+    throw createError({ statusCode: 500, message: '사용자를 생성하지 못했습니다.' })
   }
 })
 

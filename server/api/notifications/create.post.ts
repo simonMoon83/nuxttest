@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
     const senderId = getCurrentUserId(event)
     const body = await readBody(event) as CreateNotificationBody
     if (!body?.title || typeof body.title !== 'string') {
-      throw createError({ statusCode: 400, statusMessage: 'title은 필수입니다.' })
+      throw createError({ statusCode: 400, message: 'title은 필수입니다.' })
     }
 
     const connection = await getDbConnection()
@@ -47,7 +47,7 @@ export default defineEventHandler(async (event) => {
     // case 2: 특정 수신자 지정
     if (targetIds.length > 0) {
       if (targetIds.length > 500) {
-        throw createError({ statusCode: 400, statusMessage: '한 번에 최대 500명까지 지정 가능합니다.' })
+        throw createError({ statusCode: 400, message: '한 번에 최대 500명까지 지정 가능합니다.' })
       }
       const tx = new sql.Transaction(connection)
       await tx.begin()
@@ -91,7 +91,7 @@ export default defineEventHandler(async (event) => {
   } catch (error) {
     console.error('알림 생성 실패:', error)
     if (error && typeof error === 'object' && 'statusCode' in error) throw error
-    throw createError({ statusCode: 500, statusMessage: '알림 생성 중 오류가 발생했습니다.' })
+    throw createError({ statusCode: 500, message: '알림 생성 중 오류가 발생했습니다.' })
   }
 })
 

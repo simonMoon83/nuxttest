@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
     }
   } catch (error) {
     console.error('부서 목록 조회 실패:', error)
-    throw createError({ statusCode: 500, statusMessage: '부서 목록을 불러오지 못했습니다.' })
+    throw createError({ statusCode: 500, message: '부서 목록을 불러오지 못했습니다.' })
   }
 })
 

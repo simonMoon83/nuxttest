@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
     if (!username || !password) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Username and password are required'
+        message: 'Username and password are required'
       })
     }
 
@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
     if (!user) {
       throw createError({
         statusCode: 401,
-        statusMessage: 'Invalid credentials'
+        message: 'Invalid credentials'
       })
     }
 
@@ -40,7 +40,7 @@ export default defineEventHandler(async (event) => {
     if (!isValidPassword) {
       throw createError({
         statusCode: 401,
-        statusMessage: 'Invalid credentials'
+        message: 'Invalid credentials'
       })
     }
 

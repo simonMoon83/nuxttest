@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
     if (!body) {
       throw createError({
         statusCode: 400,
-        statusMessage: '설정 데이터가 필요합니다'
+        message: '설정 데이터가 필요합니다'
       })
     }
     
@@ -47,7 +47,7 @@ export default defineEventHandler(async (event) => {
     
     throw createError({
       statusCode: 500,
-      statusMessage: (error as Error).message || '설정 저장 중 오류가 발생했습니다'
+      message: (error as Error).message || '설정 저장 중 오류가 발생했습니다'
     })
   }
 }) 

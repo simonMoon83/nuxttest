@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   const chatIdRaw = getRouterParam(event, 'id') || ''
   const chatId = Number(chatIdRaw)
   if (!chatId || !Number.isFinite(chatId)) {
-    throw createError({ statusCode: 400, statusMessage: '잘못된 chat id' })
+    throw createError({ statusCode: 400, message: '잘못된 chat id' })
   }
 
   const q = getQuery(event)
@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
     .input('chat_id', sql.Int, chatId)
     .input('user_id', sql.Int, userId)
     .query(`SELECT COUNT(1) as cnt FROM chat_members WHERE chat_id=@chat_id AND user_id=@user_id`)
-  if (!mem.recordset[0].cnt) throw createError({ statusCode: 403, statusMessage: '권한 없음' })
+  if (!mem.recordset[0].cnt) throw createError({ statusCode: 403, message: '권한 없음' })
 
   const messages = await connection.request()
     .input('chat_id', sql.Int, chatId)

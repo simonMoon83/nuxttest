@@ -7,10 +7,10 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event) as { targetUserId?: number }
   const other = Number(body?.targetUserId || 0)
   if (!other || !Number.isFinite(other) || other <= 0) {
-    throw createError({ statusCode: 400, statusMessage: 'targetUserId가 필요합니다.' })
+    throw createError({ statusCode: 400, message: 'targetUserId가 필요합니다.' })
   }
   if (other === me) {
-    throw createError({ statusCode: 400, statusMessage: '본인에게는 채팅을 시작할 수 없습니다.' })
+    throw createError({ statusCode: 400, message: '본인에게는 채팅을 시작할 수 없습니다.' })
   }
   const connection = await getDbConnection()
 

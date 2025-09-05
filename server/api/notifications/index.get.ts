@@ -48,7 +48,7 @@ export default defineEventHandler(async (event) => {
     }
   } catch (error) {
     console.error('알림 목록 조회 실패:', error)
-    throw createError({ statusCode: 500, statusMessage: '알림을 불러오지 못했습니다.' })
+    throw createError({ statusCode: 500, message: '알림을 불러오지 못했습니다.' })
   }
 })
 

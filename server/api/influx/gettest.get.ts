@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
 
   const tags: string[] = Array.isArray(tagParam) ? tagParam : (tagParam ? [String(tagParam)] : [])
   if (!tags.length) {
-    throw createError({ statusCode: 400, statusMessage: 'tag 파라미터를 하나 이상 제공해야 합니다.' })
+    throw createError({ statusCode: 400, message: 'tag 파라미터를 하나 이상 제공해야 합니다.' })
   }
 
   const [first] = tags
@@ -43,6 +43,6 @@ from(bucket: "${bucket}")
     return { success: true, data, bucket }
   } catch (e: any) {
     console.error('InfluxDB 쿼리 오류', e)
-    throw createError({ statusCode: 500, statusMessage: `InfluxDB 쿼리 오류: ${e?.message || e}` })
+    throw createError({ statusCode: 500, message: `InfluxDB 쿼리 오류: ${e?.message || e}` })
   }
 })

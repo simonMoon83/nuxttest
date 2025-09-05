@@ -6,7 +6,7 @@ export default defineEventHandler(async (event) => {
   if (!token) {
     throw createError({
       statusCode: 401,
-      statusMessage: 'No token provided'
+      message: 'No token provided'
     })
   }
 
@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
   if (!payload) {
     throw createError({
       statusCode: 401,
-      statusMessage: 'Invalid token'
+      message: 'Invalid token'
     })
   }
 

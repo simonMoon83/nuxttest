@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
     if (!form || form.length === 0) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'No file uploaded'
+        message: 'No file uploaded'
       })
     }
 
@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
     if (!fileData || !fileData.filename || !fileData.data) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Invalid file'
+        message: 'Invalid file'
       })
     }
 
@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
     if (!allowedExtensions.includes(fileExtension)) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Only ICO, PNG, SVG files are allowed for favicon'
+        message: 'Only ICO, PNG, SVG files are allowed for favicon'
       })
     }
 
@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
     if (fileData.data.length > 1 * 1024 * 1024) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'File size must be less than 1MB'
+        message: 'File size must be less than 1MB'
       })
     }
 
@@ -63,7 +63,7 @@ export default defineEventHandler(async (event) => {
     console.error('Favicon upload error:', error)
     throw createError({
       statusCode: 500,
-      statusMessage: (error as Error).message || 'Favicon upload failed'
+      message: (error as Error).message || 'Favicon upload failed'
     })
   }
 }) 

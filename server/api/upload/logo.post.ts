@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
     if (!form || form.length === 0) {
       throw createError({
         statusCode: 400,
-        statusMessage: '파일이 업로드되지 않았습니다'
+        message: '파일이 업로드되지 않았습니다'
       })
     }
 
@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
     if (!file || !file.data || !file.filename) {
       throw createError({
         statusCode: 400,
-        statusMessage: '올바른 파일이 아닙니다'
+        message: '올바른 파일이 아닙니다'
       })
     }
 
@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
     if (!allowedExtensions.includes(fileExtension)) {
       throw createError({
         statusCode: 400,
-        statusMessage: '지원되지 않는 파일 형식입니다. PNG, JPG, SVG, WebP 파일만 업로드 가능합니다.'
+        message: '지원되지 않는 파일 형식입니다. PNG, JPG, SVG, WebP 파일만 업로드 가능합니다.'
       })
     }
 
@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
     if (file.data.length > 2 * 1024 * 1024) {
       throw createError({
         statusCode: 400,
-        statusMessage: '파일 크기는 2MB를 초과할 수 없습니다.'
+        message: '파일 크기는 2MB를 초과할 수 없습니다.'
       })
     }
 
@@ -74,7 +74,7 @@ export default defineEventHandler(async (event) => {
     
     throw createError({
       statusCode: 500,
-      statusMessage: '파일 업로드 중 서버 오류가 발생했습니다'
+      message: '파일 업로드 중 서버 오류가 발생했습니다'
     })
   }
 }) 

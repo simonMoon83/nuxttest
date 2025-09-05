@@ -7,7 +7,7 @@ export default defineNuxtRouteMiddleware((to) => {
     const resource = required.resource
     const action = required.action || 'read'
     if (!auth.hasPermission(resource, action)) {
-      throw createError({ statusCode: 403, statusMessage: '이 페이지에 접근할 권한이 없습니다.' })
+      throw createError({ statusCode: 403, message: '이 페이지에 접근할 권한이 없습니다.' })
     }
     return
   }
@@ -15,7 +15,7 @@ export default defineNuxtRouteMiddleware((to) => {
   const path = to.path?.split('?')[0] || '/'
   const resource = `menu:${path}`
   if (!auth.hasPermission(resource, 'read')) {
-    throw createError({ statusCode: 403, statusMessage: '이 페이지에 접근할 권한이 없습니다.' })
+    throw createError({ statusCode: 403, message: '이 페이지에 접근할 권한이 없습니다.' })
   }
 })
 

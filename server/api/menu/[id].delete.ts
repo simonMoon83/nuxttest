@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
     if (!id || isNaN(Number(id))) {
       throw createError({
         statusCode: 400,
-        statusMessage: '유효하지 않은 메뉴 ID입니다.'
+        message: '유효하지 않은 메뉴 ID입니다.'
       })
     }
 
@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
     if (existingMenu.recordset.length === 0) {
       throw createError({
         statusCode: 404,
-        statusMessage: '메뉴를 찾을 수 없습니다.'
+        message: '메뉴를 찾을 수 없습니다.'
       })
     }
 
@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
     if (childMenus.recordset[0].count > 0) {
       throw createError({
         statusCode: 400,
-        statusMessage: '하위 메뉴가 있는 메뉴는 삭제할 수 없습니다. 먼저 하위 메뉴를 삭제해주세요.'
+        message: '하위 메뉴가 있는 메뉴는 삭제할 수 없습니다. 먼저 하위 메뉴를 삭제해주세요.'
       })
     }
 
@@ -60,7 +60,7 @@ export default defineEventHandler(async (event) => {
     
     return createError({
       statusCode: 500,
-      statusMessage: '메뉴 삭제에 실패했습니다.'
+      message: '메뉴 삭제에 실패했습니다.'
     })
   }
 }) 

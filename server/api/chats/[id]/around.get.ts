@@ -7,14 +7,14 @@ export default defineEventHandler(async (event) => {
   const chatIdRaw = getRouterParam(event, 'id') || ''
   const chatId = Number(chatIdRaw)
   if (!chatId || !Number.isFinite(chatId)) {
-    throw createError({ statusCode: 400, statusMessage: '잘못된 chat id' })
+    throw createError({ statusCode: 400, message: '잘못된 chat id' })
   }
 
   const q = getQuery(event)
   const rawMid = Number(q.messageId || 0)
   const messageId = Number.isFinite(rawMid) ? rawMid : 0
   if (!(messageId > 0 && messageId <= 2147483647)) {
-    throw createError({ statusCode: 400, statusMessage: '유효한 messageId 필요' })
+    throw createError({ statusCode: 400, message: '유효한 messageId 필요' })
   }
   const before = Math.min(Math.max(Number(q.before || 50), 0), 200)
   const after = Math.min(Math.max(Number(q.after || 50), 0), 200)
@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
     .input('user_id', sql.Int, userId)
     .query(`SELECT COUNT(1) as cnt FROM chat_members WHERE chat_id=@chat_id AND user_id=@user_id`)
   if (!mem.recordset[0].cnt) {
-    throw createError({ statusCode: 403, statusMessage: '권한 없음' })
+    throw createError({ statusCode: 403, message: '권한 없음' })
   }
 
   // 기준 메시지가 같은 채팅인지 확인
@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
     .input('mid', sql.Int, messageId)
     .query(`SELECT COUNT(1) AS cnt FROM chat_messages WHERE id=@mid AND chat_id=@chat_id`)
   if (!exists.recordset[0].cnt) {
-    throw createError({ statusCode: 404, statusMessage: '메시지를 찾을 수 없습니다' })
+    throw createError({ statusCode: 404, message: '메시지를 찾을 수 없습니다' })
   }
 
   // before: id <= messageId, 최근 것부터 상위 N개

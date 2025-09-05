@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
   if (getMethod(event) !== 'PUT') {
     throw createError({
       statusCode: 405,
-      statusMessage: 'Method Not Allowed'
+      message: 'Method Not Allowed'
     })
   }
 
@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
   if (!id || isNaN(Number(id))) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Invalid menu ID'
+      message: 'Invalid menu ID'
     })
   }
 
@@ -40,7 +40,7 @@ export default defineEventHandler(async (event) => {
     if (checkResult.recordset.length === 0) {
       throw createError({
         statusCode: 404,
-        statusMessage: 'Menu not found'
+        message: 'Menu not found'
       })
     }
 
@@ -50,7 +50,7 @@ export default defineEventHandler(async (event) => {
     if (updateFields.length === 0) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'No fields to update'
+        message: 'No fields to update'
       })
     }
 
@@ -113,7 +113,7 @@ export default defineEventHandler(async (event) => {
     
     throw createError({
       statusCode: 500,
-      statusMessage: 'Failed to update menu'
+      message: 'Failed to update menu'
     })
   }
 }) 

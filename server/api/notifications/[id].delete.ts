@@ -6,7 +6,7 @@ export default defineEventHandler(async (event) => {
   try {
     const userId = getCurrentUserId(event)
     const id = Number(getRouterParam(event, 'id'))
-    if (!Number.isFinite(id) || id <= 0) throw createError({ statusCode: 400, statusMessage: '잘못된 id' })
+    if (!Number.isFinite(id) || id <= 0) throw createError({ statusCode: 400, message: '잘못된 id' })
 
     const connection = await getDbConnection()
     const res = await connection.request()
@@ -18,13 +18,13 @@ export default defineEventHandler(async (event) => {
       `)
 
     const deleted = res?.rowsAffected?.[0] || 0
-    if (deleted === 0) throw createError({ statusCode: 404, statusMessage: '삭제할 알림이 없거나 권한이 없습니다.' })
+    if (deleted === 0) throw createError({ statusCode: 404, message: '삭제할 알림이 없거나 권한이 없습니다.' })
 
     return { success: true, deleted }
   } catch (error) {
     console.error('알림 삭제 실패:', error)
     if (error && typeof error === 'object' && 'statusCode' in error) throw error
-    throw createError({ statusCode: 500, statusMessage: '알림 삭제 중 오류' })
+    throw createError({ statusCode: 500, message: '알림 삭제 중 오류' })
   }
 })
 

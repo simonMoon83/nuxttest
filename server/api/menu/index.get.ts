@@ -114,7 +114,7 @@ export default defineEventHandler(async (event) => {
     
     return createError({
       statusCode: 500,
-      statusMessage: '메뉴 데이터를 불러오는데 실패했습니다.'
+      message: '메뉴 데이터를 불러오는데 실패했습니다.'
     })
   }
 }) 

@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
   const measurement = (q.measurement as string) || 'TESTSPECSPC'
 
   if (!tag) {
-    throw createError({ statusCode: 400, statusMessage: 'tag 파라미터를 제공해야 합니다.' })
+    throw createError({ statusCode: 400, message: 'tag 파라미터를 제공해야 합니다.' })
   }
 
   const cond = `r["TAGID"] == "${esc(tag)}"`
@@ -51,6 +51,6 @@ from(bucket: "${bucket}")
     return { success: true, data, bucket }
   } catch (e: any) {
     console.error('InfluxDB 쿼리 오류', e)
-    throw createError({ statusCode: 500, statusMessage: `InfluxDB 쿼리 오류: ${e?.message || e}` })
+    throw createError({ statusCode: 500, message: `InfluxDB 쿼리 오류: ${e?.message || e}` })
   }
 })

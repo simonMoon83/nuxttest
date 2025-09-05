@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
     if (!title && !is_separator) {
       throw createError({
         statusCode: 400,
-        statusMessage: '제목은 필수입니다.'
+        message: '제목은 필수입니다.'
       })
     }
 
@@ -55,7 +55,7 @@ export default defineEventHandler(async (event) => {
     
     return createError({
       statusCode: 500,
-      statusMessage: '메뉴 생성에 실패했습니다.'
+      message: '메뉴 생성에 실패했습니다.'
     })
   }
 }) 

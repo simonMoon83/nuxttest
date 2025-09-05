@@ -6,7 +6,7 @@ import { emitToUsers } from '../../../utils/chatBus'
 export default defineEventHandler(async (event) => {
   const userId = getCurrentUserId(event)
   const chatId = Number(getRouterParam(event, 'id') || 0)
-  if (!chatId) throw createError({ statusCode: 400, statusMessage: '잘못된 chat id' })
+  if (!chatId) throw createError({ statusCode: 400, message: '잘못된 chat id' })
 
   const connection = await getDbConnection()
 

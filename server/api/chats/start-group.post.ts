@@ -115,7 +115,7 @@ export default defineEventHandler(async (event) => {
   }
 
   if (members.size < 2) {
-    throw createError({ statusCode: 400, statusMessage: '그룹 채팅은 2인 이상이어야 합니다.' })
+    throw createError({ statusCode: 400, message: '그룹 채팅은 2인 이상이어야 합니다.' })
   }
 
   const tx = new sql.Transaction(connection)

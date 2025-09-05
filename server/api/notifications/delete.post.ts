@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
   } catch (error) {
     console.error('알림 일괄 삭제 실패:', error)
     if (error && typeof error === 'object' && 'statusCode' in error) throw error
-    throw createError({ statusCode: 500, statusMessage: '알림 삭제 중 오류' })
+    throw createError({ statusCode: 500, message: '알림 삭제 중 오류' })
   }
 })
 

@@ -12,7 +12,7 @@ interface DepartmentUpdateBody {
 export default defineEventHandler(async (event) => {
   try {
     const id = Number(getRouterParam(event, 'id'))
-    if (!id) throw createError({ statusCode: 400, statusMessage: '잘못된 id' })
+    if (!id) throw createError({ statusCode: 400, message: '잘못된 id' })
 
     const body = await readBody(event) as DepartmentUpdateBody
     const connection = await getDbConnection()
@@ -42,7 +42,7 @@ export default defineEventHandler(async (event) => {
   } catch (error) {
     console.error('부서 수정 실패:', error)
     if (error && typeof error === 'object' && 'statusCode' in error) throw error
-    throw createError({ statusCode: 500, statusMessage: '부서를 수정하지 못했습니다.' })
+    throw createError({ statusCode: 500, message: '부서를 수정하지 못했습니다.' })
   }
 })
 
