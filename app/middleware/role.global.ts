@@ -15,6 +15,10 @@ export default defineNuxtRouteMiddleware(async (to) => {
   }
 
   // 로그인 강제는 페이지별 'auth' 미들웨어에 위임 (여기서는 권한만 검사)
+  // 단, 비로그인 상태에서는 우선 로그인 페이지로 이동시켜 403이 먼저 발생하지 않게 함
+  if (!auth.isLoggedIn && to.path !== '/login') {
+    return navigateTo('/login')
+  }
 
   // 1) 페이지 메타의 permission이 있으면 우선 검사
   const required: any = (to.meta as any)?.permission
