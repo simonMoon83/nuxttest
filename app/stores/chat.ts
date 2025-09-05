@@ -141,22 +141,83 @@ export const useChatStore = defineStore('chat', () => {
     await markRead(chatId)
   }
 
-  async function uploadAttachments(chatId: number, files: File[], content?: string) {
-    const form = new FormData()
-    if (content) {
-      form.append('content', content)
-    }
-    for (const f of files) {
-      form.append('file', f, f.name)
-    }
-    const res = await $fetch<{ success: boolean, data: { message: ChatMessage } }>(`/api/chats/${chatId}/attach`, {
-      method: 'POST',
-      // FormData is supported by $fetch on the client
-      body: form as unknown as any,
+  async function uploadAttachments(
+    chatId: number,
+    files: File[],
+    content?: string,
+    onProgress?: (progress: { overallPercent: number; loaded: number; total: number; perFilePercent: number[] }) => void,
+  ) {
+    return new Promise((resolve, reject) => {
+      const form = new FormData()
+      if (content) {
+        form.append('content', content)
+      }
+      for (const f of files) {
+        form.append('file', f, f.name)
+      }
+      
+      const xhr = new XMLHttpRequest()
+      
+      // 업로드 진행률 추적 (파일별 진행률 계산 포함)
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable && onProgress) {
+          const overallPercent = Math.round((e.loaded / e.total) * 100)
+          const fileSizes = files.map(f => Number(f.size) || 0)
+          const totalFileBytes = fileSizes.reduce((sum, n) => sum + n, 0)
+          let perFilePercent: number[] = []
+          if (totalFileBytes > 0) {
+            // 멀티파트 오버헤드를 제거하기 위해 파일 총합 기준 추정 업로드 바이트를 계산
+            const estimatedUploaded = Math.max(0, Math.min(totalFileBytes, Math.round((e.loaded / e.total) * totalFileBytes)))
+            const prefix: number[] = []
+            let acc = 0
+            for (const s of fileSizes) { prefix.push(acc); acc += s }
+            perFilePercent = fileSizes.map((size, idx) => {
+              if (size <= 0) return 100
+              const base = prefix[idx] ?? 0
+              const uploadedForThis = Math.max(0, Math.min(size, estimatedUploaded - base))
+              return Math.round((uploadedForThis / size) * 100)
+            })
+          } else {
+            perFilePercent = files.map(() => overallPercent)
+          }
+          onProgress({ overallPercent, loaded: e.loaded, total: e.total, perFilePercent })
+        }
+      })
+      
+      xhr.addEventListener('load', async () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const res = JSON.parse(xhr.responseText)
+            appendMessageLocal(res.data.message)
+            updateConversationOnNewMessage(chatId, res.data.message)
+            await markRead(chatId)
+            resolve(res)
+          } catch (e) {
+            reject(new Error('응답 파싱 오류'))
+          }
+        } else {
+          // 에러 응답 파싱
+          let errorData
+          try {
+            errorData = JSON.parse(xhr.responseText)
+          } catch {
+            errorData = { message: xhr.statusText }
+          }
+          
+          const error = new Error(errorData.message || xhr.statusText) as any
+          error.statusCode = xhr.status
+          error.data = errorData
+          reject(error)
+        }
+      })
+      
+      xhr.addEventListener('error', () => {
+        reject(new Error('네트워크 오류가 발생했습니다.'))
+      })
+      
+      xhr.open('POST', `/api/chats/${chatId}/attach`)
+      xhr.send(form)
     })
-    appendMessageLocal(res.data.message)
-    updateConversationOnNewMessage(chatId, res.data.message)
-    await markRead(chatId)
   }
 
   async function leaveChat(chatId: number) {

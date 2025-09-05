@@ -297,7 +297,6 @@ async function removeAllUsersFromRole() {
 const orgTreeNodes = ref<any[]>([])
 const orgTreeSelection = ref<Record<string, any>>({})
 const orgTreeLoading = ref(false)
-const deptIncludeSub = ref(true)
 const orgNodeMap = ref<Record<string, any>>({})
 
 async function loadOrgTree() {
@@ -368,7 +367,7 @@ async function addSelectedDeptsToRole() {
   const expandDescendants = (deptId: number): number[] => {
     const key = `d-${deptId}`
     const node = orgNodeMap.value[key]
-    const acc: number[] = []
+    const acc: number[] = [deptId]
     const dfs = (n: any) => {
       if (!n) return
       if (typeof n.key === 'string' && n.key.startsWith('d-')) {
@@ -379,16 +378,12 @@ async function addSelectedDeptsToRole() {
       for (const c of (n.children || [])) dfs(c)
     }
     // include self and descendants
-    dfs(node)
+    if (node) dfs(node)
     return acc
   }
   const targetDeptIds = new Set<number>()
   for (const did of selectedDeptIds.value) {
-    if (deptIncludeSub.value) {
-      for (const x of expandDescendants(did)) targetDeptIds.add(x)
-    } else {
-      targetDeptIds.add(did)
-    }
+    for (const x of expandDescendants(did)) targetDeptIds.add(x)
   }
   for (const id of Array.from(targetDeptIds)) {
     await $fetch(`/api/departments/${id}/roles`, { method: 'POST', body: { role_id: roleId } })
@@ -552,9 +547,6 @@ watch(dialogVisible, async (v) => {
                 <span>부서 선택: {{ selectedDeptIds.length }}개</span>
                 <span class="mx-2">|</span>
                 <span>사용자 선택: {{ invitedUserIds.length }}명</span>
-                <span class="mx-2">|</span>
-                <Checkbox v-model="deptIncludeSub" :binary="true" inputId="inclSubAssign" />
-                <label for="inclSubAssign" class="ml-1">하위부서 포함</label>
               </div>
               <div class="flex gap-2">
                 <Button label="부서 추가" :disabled="!editTarget?.id || !selectedDeptIds.length" @click="addSelectedDeptsToRole" />

@@ -6,11 +6,16 @@ const emit = defineEmits<{ (e: 'update:visible', v: boolean): void }>()
 
 const chat = useChatStore()
 const auth = useAuthStore()
+const toast = useToast()
 
 const text = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
 const pendingFiles = ref<File[]>([])
 const messagesEl = ref<HTMLElement | null>(null)
+
+// 업로드 진행 상태
+const uploading = ref(false)
+const perFileProgress = ref<number[]>([])
 
 // Drag & drop visual state
 const dropActive = ref(false)
@@ -253,6 +258,7 @@ watch(() => props.visible, (vis) => {
       }
     }
   }
+  // no-op
 }, { immediate: true })
 
 onUnmounted(() => {
@@ -363,11 +369,45 @@ async function send() {
   const content = text.value.trim()
   if (!id) return
   if (pendingFiles.value.length) {
-    await chat.uploadAttachments(id, pendingFiles.value, content || undefined)
-    pendingFiles.value = []
-    if (fileInput.value) fileInput.value.value = ''
-    text.value = ''
-    if (props.visible) nextTick(() => scrollToBottom())
+    uploading.value = true
+    perFileProgress.value = pendingFiles.value.map(() => 0)
+    
+    try {
+      await chat.uploadAttachments(id, pendingFiles.value, content || undefined, (p) => {
+        perFileProgress.value = p.perFilePercent
+      })
+      pendingFiles.value = []
+      if (fileInput.value) fileInput.value.value = ''
+      text.value = ''
+      if (props.visible) nextTick(() => scrollToBottom())
+    } catch (error: any) {
+      // 에러 발생 시 pending files는 유지하여 사용자가 다시 시도할 수 있도록 함
+      console.error('File upload error:', error)
+      
+      // 에러 객체 전체 구조 확인
+      console.log('Full error object:', JSON.stringify(error, null, 2))
+      
+      // 다양한 경로에서 에러 메시지 추출 시도
+      const errorMessage = error.data?.message || 
+                          error.data?.statusMessage || 
+                          error.message || 
+                          error.statusMessage || 
+                          error.cause?.message ||
+                          '알 수 없는 오류가 발생했습니다.'
+      
+      console.log('Extracted error message:', errorMessage)
+      
+      if (error.statusCode === 415) {
+        toast.add({ severity: 'warn', summary: '파일 업로드 실패', detail: errorMessage, life: 4000 })
+      } else if (error.statusCode === 413) {
+        toast.add({ severity: 'warn', summary: '파일 업로드 실패', detail: errorMessage, life: 4000 })
+      } else {
+        toast.add({ severity: 'error', summary: '파일 업로드 실패', detail: errorMessage, life: 4000 })
+      }
+    } finally {
+      uploading.value = false
+      perFileProgress.value = []
+    }
     return
   }
   if (content) {
@@ -595,30 +635,49 @@ async function openMembers() {
       </div>
 
       <div class="flex-shrink-0 flex flex-col gap-2" :class="dropActive ? 'rounded-lg border border-dashed border-gray-300 bg-gray-50' : ''" @dragover="onDragOver" @dragleave="onDragLeave" @drop="onDrop">
-        <textarea v-model="text" rows="2" class="w-full p-inputtext p-inputtext-sm" placeholder="메시지를 입력하세요" @keydown.enter.exact.prevent="send"></textarea>
+        <textarea v-model="text" rows="2" class="w-full p-inputtext p-inputtext-sm" placeholder="메시지를 입력하세요" autofocus @keydown.enter.exact.prevent="send"></textarea>
         <div class="flex items-center justify-between gap-2">
           <div class="flex-1 min-w-0">
             <!-- Hidden file input -->
             <input ref="fileInput" type="file" class="hidden" multiple @change="onFileChange" />
-            <div class="flex items-center gap-2">
-              <Button size="small" outlined severity="secondary" icon="pi pi-paperclip" label="첨부" @click="triggerFilePicker" />
-              <div v-if="pendingFiles.length" class="flex flex-wrap items-center gap-1 text-xs text-gray-700 dark:text-gray-200">
-                <span class="mr-1 text-gray-500">첨부:</span>
-                <span v-for="(f, i) in pendingFiles" :key="i" class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-200 dark:bg-gray-700">
-                  <i class="pi pi-file text-gray-600 dark:text-gray-300"></i>
-                  <span class="truncate max-w-40">{{ f.name }}</span>
-                  <span class="opacity-70">· {{ formatSize(f.size) }}</span>
-                  <button class="ml-1 hover:text-red-600" @click="removeFile(i)">
-                    <i class="pi pi-times text-xs"></i>
-                  </button>
-                </span>
-                <button class="ml-1 underline hover:text-red-600" @click="clearPending">모두 지우기</button>
+            <div class="space-y-2">
+              <div class="flex items-center gap-2">
+                <Button size="small" outlined severity="secondary" icon="pi pi-paperclip" label="첨부" @click="triggerFilePicker" />
+                <div v-if="!pendingFiles.length" class="text-xs text-gray-500">파일을 드래그앤드롭 하거나 '첨부'를 클릭</div>
               </div>
-              <div v-else class="text-xs text-gray-500">파일을 드래그앤드롭 하거나 ‘첨부’를 클릭</div>
+              
+              <!-- 첨부된 파일 목록 -->
+              <div v-if="pendingFiles.length" class="space-y-1">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs text-gray-500">첨부된 파일 ({{ pendingFiles.length }}개)</span>
+                  <button class="text-xs underline hover:text-red-600" @click="clearPending" :disabled="uploading">모두 지우기</button>
+                </div>
+                <div class="max-h-24 overflow-y-auto space-y-1">
+                  <div v-for="(f, i) in pendingFiles" :key="i" class="relative overflow-hidden px-2 py-1.5 rounded bg-gray-100 dark:bg-gray-700 text-xs">
+                    <div v-if="uploading" class="absolute top-0 left-0 bottom-0 pointer-events-none" :style="{ width: (perFileProgress[i] || 0) + '%' }">
+                      <div class="h-full bg-blue-500/15"></div>
+                    </div>
+                    <div class="relative flex items-center gap-2">
+                      <i class="pi pi-file text-gray-600 dark:text-gray-300 flex-shrink-0"></i>
+                      <span class="truncate flex-1 min-w-0">{{ f.name }}</span>
+                      <span class="opacity-70 flex-shrink-0">{{ formatSize(f.size) }}</span>
+                      <button class="hover:text-red-600 flex-shrink-0" @click="removeFile(i)" :disabled="uploading">
+                        <i class="pi pi-times text-xs"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <Button label="보내기" size="small" @click="send" />
+            <Button 
+              :label="uploading ? '업로드중...' : '보내기'" 
+              size="small" 
+              @click="send" 
+              :disabled="uploading"
+              :loading="uploading"
+            />
           </div>
         </div>
       </div>
