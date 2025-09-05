@@ -783,8 +783,8 @@ packages:
   '@formkit/addons@1.6.9':
     resolution: {integrity: sha512-Qfq789kpQ5EYqFl6QPE32vMCs0qivbvR50NNRwUadC2hgfGcayKe8Gc43G8neW6HHPjmyzkHQHLknLxHrGni3Q==}
 
-  '@formkit/auto-animate@0.8.4':
-    resolution: {integrity: sha512-DHHC01EJ1p70Q0z/ZFRBIY8NDnmfKccQoyoM84Tgb6omLMat6jivCdf272Y8k3nf4Lzdin/Y4R9q8uFtU0GbnA==}
+  '@formkit/auto-animate@0.9.0':
+    resolution: {integrity: sha512-VhP4zEAacXS3dfTpJpJ88QdLqMTcabMg0jwpOSxZ/VzfQVfl3GkZSCZThhGC5uhq/TxPHPzW0dzr4H9Bb1OgKA==}
 
   '@formkit/core@1.6.9':
     resolution: {integrity: sha512-Zb5OkYKMf7Rp1pd4iUMv0TJQvfgl1PdKtRRQoGiTA0XIFLB/7tcRMr1wc5isA2JS+hllfxMTh3RWF8N+64fTMg==}
@@ -8046,12 +8046,12 @@ snapshots:
 
   '@formkit/addons@1.6.9':
     dependencies:
-      '@formkit/auto-animate': 0.8.4
+      '@formkit/auto-animate': 0.9.0
       '@formkit/core': 1.6.9
       '@formkit/inputs': 1.6.9
       '@formkit/utils': 1.6.9
 
-  '@formkit/auto-animate@0.8.4': {}
+  '@formkit/auto-animate@0.9.0': {}
 
   '@formkit/core@1.6.9':
     dependencies:

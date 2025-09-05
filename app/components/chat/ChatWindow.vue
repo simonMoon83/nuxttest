@@ -436,7 +436,14 @@ function triggerFilePicker() {
   fileInput.value?.click()
 }
 
-// (removed) keydown handler replaced by Vue key modifiers on the textarea
+function onTextareaKeydown(e: KeyboardEvent) {
+  // Ignore while IME is composing (macOS/Windows Korean/Japanese input)
+  if ((e as any).isComposing || (e as any).keyCode === 229) return
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    send()
+  }
+}
 
 function onDragOver(e: DragEvent) {
   e.preventDefault()
@@ -635,7 +642,7 @@ async function openMembers() {
       </div>
 
       <div class="flex-shrink-0 flex flex-col gap-2" :class="dropActive ? 'rounded-lg border border-dashed border-gray-300 bg-gray-50' : ''" @dragover="onDragOver" @dragleave="onDragLeave" @drop="onDrop">
-        <textarea v-model="text" rows="2" class="w-full p-inputtext p-inputtext-sm" placeholder="메시지를 입력하세요" autofocus @keydown.enter.exact.prevent="send"></textarea>
+        <textarea v-model="text" rows="2" class="w-full p-inputtext p-inputtext-sm" placeholder="메시지를 입력하세요" autofocus @keydown="onTextareaKeydown"></textarea>
         <div class="flex items-center justify-between gap-2">
           <div class="flex-1 min-w-0">
             <!-- Hidden file input -->
