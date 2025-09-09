@@ -37,6 +37,15 @@ export default defineEventHandler(async (event) => {
   }
 
   setHeader(event, 'Content-Type', getContentTypeByExt(absPath))
+  // 원본 파일명으로 다운로드되도록 Content-Disposition 제어 (query: name=원본명)
+  const q = getQuery(event) as Record<string, string | string[] | undefined>
+  const nameParam = q?.name
+  const filename = Array.isArray(nameParam) ? nameParam[0] : nameParam
+  if (filename && typeof filename === 'string') {
+    // RFC 5987 filename* 처리 (UTF-8 안전)
+    const encoded = encodeURIComponent(filename)
+    setHeader(event, 'Content-Disposition', `attachment; filename="${filename.replace(/"/g, '')}"; filename*=UTF-8''${encoded}`)
+  }
   return sendStream(event, createReadStream(absPath))
 })
 

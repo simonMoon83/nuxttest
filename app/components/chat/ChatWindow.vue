@@ -471,6 +471,41 @@ function fileUrl(att: ChatAttachment) {
   return att.file_path
 }
 
+function onTextareaPaste(e: ClipboardEvent) {
+  const dt = e.clipboardData
+  if (!dt) return
+  const items = Array.from(dt.items || [])
+  const images: File[] = []
+  for (const item of items) {
+    if (item.kind === 'file') {
+      const f = item.getAsFile()
+      if (f && (f.type || '').startsWith('image/')) {
+        const ext = (f.type && f.type.includes('/')) ? f.type.split('/')[1] : 'png'
+        const safeTs = new Date().toISOString().replace(/[:.]/g, '-')
+        const desiredName = (f.name && !/^blob$/i.test(f.name)) ? f.name : `pasted-${safeTs}.${ext}`
+        const named = (f.name && f.name === desiredName) ? f : new File([f], desiredName, { type: f.type })
+        images.push(named)
+      }
+    }
+  }
+  if (images.length) {
+    const hasText = !!dt.getData('text')
+    if (!hasText) {
+      e.preventDefault()
+    }
+    pendingFiles.value = [...pendingFiles.value, ...images]
+  }
+}
+
+function downloadUrl(att: ChatAttachment) {
+  const base = fileUrl(att)
+  const name = att.file_name
+  if (name && name.length) {
+    return `${base}?name=${encodeURIComponent(name)}`
+  }
+  return base
+}
+
 function formatTime(v: string) {
   try {
     const d = new Date(v)
@@ -611,7 +646,7 @@ async function openMembers() {
               </div>
               <!-- File cards -->
               <div class="mt-2 space-y-1" v-if="m.attachments.some(a => !isImage(a))">
-                <a v-for="att in m.attachments.filter(a => !isImage(a))" :key="att.id" :href="fileUrl(att)" target="_blank" download
+                <a v-for="att in m.attachments.filter(a => !isImage(a))" :key="att.id" :href="downloadUrl(att)" target="_blank" :download="att.file_name || ''"
                    class="w-full flex items-center gap-2 px-2 py-1 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-xs text-gray-900 dark:text-gray-100 focus:outline-none outline-none">
                   <i class="pi pi-file text-gray-700 dark:text-gray-300"></i>
                   <span class="truncate">{{ att.file_name }}</span>
@@ -642,7 +677,7 @@ async function openMembers() {
       </div>
 
       <div class="flex-shrink-0 flex flex-col gap-2" :class="dropActive ? 'rounded-lg border border-dashed border-gray-300 bg-gray-50' : ''" @dragover="onDragOver" @dragleave="onDragLeave" @drop="onDrop">
-        <textarea v-model="text" rows="2" class="w-full p-inputtext p-inputtext-sm" placeholder="메시지를 입력하세요" autofocus @keydown="onTextareaKeydown"></textarea>
+        <textarea v-model="text" rows="2" class="w-full p-inputtext p-inputtext-sm" placeholder="메시지를 입력하세요" autofocus @keydown="onTextareaKeydown" @paste="onTextareaPaste"></textarea>
         <div class="flex items-center justify-between gap-2">
           <div class="flex-1 min-w-0">
             <!-- Hidden file input -->
