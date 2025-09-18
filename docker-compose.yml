@@ -14,7 +14,7 @@ services:
       # Nitro 정적 경로에도 동일 폴더를 연결 (SSR 빌드 산출물 경로)
       - ./public/uploads:/app/.output/public/uploads
     environment:
-      DB_HOST: ${DB_HOST}
+      DB_HOST: ${DB_HOST:-infopath.iptime.org}
       DB_PORT: ${DB_PORT:-1433}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
