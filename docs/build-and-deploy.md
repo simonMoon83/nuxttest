@@ -88,6 +88,37 @@ docker run --rm --name nuxtapp -p 3000:3000 \
   nuxttest:latest
 ```
 
+### 2-3-1) ARM/멀티아키텍처 빌드 & 배포 (Oracle Cloud ARM 등)
+
+- 로컬(x86)에서 ARM64 이미지 빌드/푸시
+```bash
+docker buildx create --use   # 최초 1회
+docker login
+
+# ARM64 단일
+docker buildx build --platform linux/arm64 \
+  -t <REGISTRY>/<NAMESPACE>/nuxttest:arm64 -f Dockerfile . --push
+```
+
+- 멀티 아키텍처(amd64+arm64) 하나의 태그로 푸시
+```bash
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t <REGISTRY>/<NAMESPACE>/nuxttest:latest -f Dockerfile . --push
+```
+
+- ARM 서버(OCI A1)에서 직접 빌드
+```bash
+docker build -t <REGISTRY>/<NAMESPACE>/nuxttest:arm64 -f Dockerfile .
+```
+
+- 서버 실행(Compose prod)
+```bash
+docker compose --profile prod pull
+docker compose --profile prod up -d
+```
+
+요점: 멀티아키로 푸시하면 서버는 자신의 아키텍처에 맞는 이미지를 자동으로 가져옵니다.
+
 ---
 
 ### 2-2) docker-compose로 실행 (Docker Desktop 포함)
@@ -354,6 +385,40 @@ server {
   - `server/routes/uploads/[...file].get.ts` 라우트가 업로드 디렉터리에서 직접 파일을 서빙합니다.
   - `UPLOADS_DIR`과 볼륨 마운트가 일치하는지 확인하세요. (예: `UPLOADS_DIR=/uploads`, `-v D:/public/uploads:/uploads`)
   - Docker Desktop에서 호스트 폴더 공유가 허용되어 있는지 확인하세요.
+
+Windows 경로 주의 (로컬 Node 실행 시)
+- `.env`에서 `UPLOADS_DIR`이 `/`로 시작하면 절대경로로 인식되어 `C:\uploads` 등 루트에 저장됩니다.
+- 프로젝트 하위에 저장하려면 선행 슬래시 없이 설정하세요.
+  - 예: `UPLOADS_DIR=public/uploads` (또는 `UPLOADS_DIR=.\\public\\uploads`)
+  - 절대 경로를 원하면 `UPLOADS_DIR=C:\\uploads`처럼 명시하세요.
+
+---
+
+### 2-7) 의존성 재설치 없이 빠른 재빌드
+
+Docker 레이어 캐시를 활용하면 `package*.json`이 변경되지 않았을 때 패키지 설치 레이어를 재사용하여 빠르게 빌드됩니다.
+
+예시 명령:
+```bash
+# 일반 재빌드(캐시 사용)
+docker build -t nuxttest:latest -f Dockerfile .
+docker compose --profile prod up -d --build
+
+# buildx + 캐시 (ARM64 단일)
+docker buildx build --platform linux/arm64 \
+  -t <REGISTRY>/<NAMESPACE>/nuxttest:arm64 \
+  --cache-to=type=inline \
+  -f Dockerfile . --push
+
+# 멀티 아키텍처
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t <REGISTRY>/<NAMESPACE>/nuxttest:latest \
+  --cache-to=type=inline \
+  -f Dockerfile . --push
+```
+
+Dockerfile 팁:
+- `package*.json`만 먼저 복사 → 패키지 설치 → 이후 소스를 복사하는 순서여야 설치 레이어가 캐시됩니다.
 
 ---
 
