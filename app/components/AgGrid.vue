@@ -4,10 +4,17 @@
     <div class="flex items-center gap-2 mb-1">
       <h5 class="m-0">{{ title }}</h5>
              <!-- 트리 데이터가 있을 때만 펼치기/접기 버튼 표시 -->
-       <template v-if="props.treeData">
-         <Button icon="pi pi-angle-double-down" text size="small" v-tooltip.bottom="'전체 펼치기'" @click="expandAllGrid" />
-         <Button icon="pi pi-angle-double-up" text size="small" v-tooltip.bottom="'전체 접기'" @click="collapseAllGrid" />
-       </template>
+      <template v-if="props.treeData">
+        <Button icon="pi pi-angle-double-down" text size="small" v-tooltip.bottom="'전체 펼치기'" @click="expandAllGrid" />
+        <Button icon="pi pi-angle-double-up" text size="small" v-tooltip.bottom="'전체 접기'" @click="collapseAllGrid" />
+      </template>
+
+      <!-- 우측 액션 버튼: 엑셀, 행 추가/행 삭제 -->
+      <div class="ml-auto flex items-center gap-1">
+        <Button icon="pi pi-file-excel" label="엑셀" size="small" text severity="success" @click="exportExcel" />
+        <Button v-if="props.editable" icon="pi pi-plus" label="행추가" size="small" text severity="primary" @click="addRow" />
+        <Button v-if="props.editable" icon="pi pi-minus" label="행삭제" size="small" text severity="danger" @click="deleteSelectedRows" />
+      </div>
     </div>
 
     <!-- AG Grid 컨테이너 - 테마 클래스와 스타일 적용 -->
@@ -17,7 +24,7 @@
       <AgGridVue
          ref="agGrid"
          :row-data="rowData"
-         :column-defs="finalColumnDefs"
+         :column-defs="computedColumnDefs"
          :default-col-def="defaultColDef"
          :row-selection="props.rowSelect ? rowSelection : undefined"
          :tree-data="props.treeData"
@@ -32,6 +39,10 @@
          @cell-value-changed="onCellValueChanged"
          @row-editing-started="onRowEditingStarted"
          @row-editing-stopped="onRowEditingStopped"
+         @cell-focused="onCellFocused"
+         @row-clicked="onRowClicked"
+         @sort-changed="onSortOrFilterChanged"
+         @filter-changed="onSortOrFilterChanged"
        />
     </div>
   </div>
@@ -84,6 +95,8 @@ const emit = defineEmits<{
   'cell-value-changed': [event: any]    // 셀 값 변경 이벤트
   'row-editing-started': [event: any]   // 행 편집 시작 이벤트
   'row-editing-stopped': [event: any]   // 행 편집 종료 이벤트
+  'row-added': [row: any]
+  'rows-deleted': [rows: any[]]
 }>()
 
 // 메뉴 아이템 인터페이스 정의
@@ -113,6 +126,96 @@ const gridApi = shallowRef<any | null>(null)
 // 동적 컬럼 정보
 const dynamicColumnDefs = ref<any[]>([])
 
+// 값 변환 및 포맷 보조 함수들
+function coerceBooleanValue(value: any): boolean {
+  if (value === true || value === false) return value
+  const str = String(value ?? '').trim().toLowerCase()
+  if (str === 'y' || str === 'yes' || str === 'true' || str === '1' || str === 't') return true
+  if (str === 'n' || str === 'no' || str === 'false' || str === '0' || str === 'f' || str === '') return false
+  return Boolean(value)
+}
+
+function formatDateValue(input: any, kind: 'date' | 'datetime'): string {
+  if (input == null || input === '') return ''
+  if (input instanceof Date && !isNaN(input.getTime())) {
+    const y = input.getFullYear()
+    const m = String(input.getMonth() + 1).padStart(2, '0')
+    const d = String(input.getDate()).padStart(2, '0')
+    if (kind === 'datetime') {
+      const hh = String(input.getHours()).padStart(2, '0')
+      const mm = String(input.getMinutes()).padStart(2, '0')
+      return `${y}-${m}-${d} ${hh}:${mm}`
+    }
+    return `${y}-${m}-${d}`
+  }
+  const raw = String(input).trim()
+  // YYYYMMDD
+  if (/^\d{8}$/.test(raw)) {
+    const y = Number(raw.slice(0, 4))
+    const m = Number(raw.slice(4, 6)) - 1
+    const d = Number(raw.slice(6, 8))
+    const dt = new Date(y, m, d)
+    return isNaN(dt.getTime()) ? raw : formatDateValue(dt, kind)
+  }
+  // YYYYMMDDHHmmss
+  if (/^\d{14}$/.test(raw)) {
+    const y = Number(raw.slice(0, 4))
+    const m = Number(raw.slice(4, 6)) - 1
+    const d = Number(raw.slice(6, 8))
+    const hh = Number(raw.slice(8, 10))
+    const mm = Number(raw.slice(10, 12))
+    const ss = Number(raw.slice(12, 14))
+    const dt = new Date(y, m, d, hh, mm, ss)
+    return isNaN(dt.getTime()) ? raw : formatDateValue(dt, kind)
+  }
+  const tryDate = new Date(raw)
+  return isNaN(tryDate.getTime()) ? raw : formatDateValue(tryDate, kind)
+}
+
+// sp_grid_info 값 정규화 헬퍼들
+function toTrimmedString(value: any): string {
+  return String(value ?? '').trim()
+}
+function toLowerTrimmed(value: any): string {
+  return toTrimmedString(value).toLowerCase()
+}
+function toNumberOrUndefined(value: any): number | undefined {
+  const n = Number(value)
+  return isNaN(n) ? undefined : n
+}
+function toHideBoolean(value: any): boolean {
+  const n = Number(value)
+  return !isNaN(n) ? n === 1 : String(value ?? '').trim() === '1'
+}
+
+// 데이터 키 매칭 유틸 (대소문자/구분자 무시)
+function normalizeKey(input: any): string {
+  return String(input ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+function findMatchingKey(data: any, expectedField: string): string | null {
+  if (!data || typeof data !== 'object') return null
+  if (expectedField in data) return expectedField
+  const target = normalizeKey(expectedField)
+  const keys = Object.keys(data)
+  for (const k of keys) {
+    if (normalizeKey(k) === target) return k
+  }
+  return null
+}
+function smartGet(data: any, expectedField: string): any {
+  if (!data) return null
+  const key = findMatchingKey(data, expectedField)
+  if (key) return (data as any)[key]
+  return (data as any)[expectedField]
+}
+function smartSet(data: any, expectedField: string, newValue: any): boolean {
+  if (!data) return false
+  const key = findMatchingKey(data, expectedField)
+  if (key) { (data as any)[key] = newValue; return true }
+  if (expectedField) { (data as any)[expectedField] = newValue; return true }
+  return false
+}
+
 /**
  * 동적 컬럼 정보 조회 함수
  */
@@ -135,14 +238,161 @@ async function loadDynamicColumnDefs() {
     })
     
     if (result.success && result.data && Array.isArray(result.data)) {
-      // 컬럼 정보를 AG Grid 형식으로 변환
-      dynamicColumnDefs.value = result.data.map((col: any) => ({
-        field: col.col_id || '',
-        headerName: col.col_name || '',
-        width: col.col_width || 100,
-        hide: col.col_hide === 1,
-        flex: col.col_flex || undefined
-      }))
+      // 드롭다운 옵션 사전 로드용 맵
+      const dropdownPromises: Promise<void>[] = []
+      const tempDefs: any[] = result.data.map((col: any) => {
+        const def: any = {
+          field: toTrimmedString(col.col_id || ''),
+          headerName: toTrimmedString(col.col_name || ''),
+          width: toNumberOrUndefined(col.col_width) ?? 100,
+          hide: toHideBoolean(col.col_hide),
+          flex: toNumberOrUndefined(col.col_flex) ?? undefined,
+        }
+
+        const colType = toLowerTrimmed(col.col_type || '')
+        const editable = props.editable === true
+
+        if (colType === 'text' || colType === '' || !colType) {
+          if (editable) def.cellEditor = 'agTextCellEditor'
+          def.valueFormatter = (p: any) => (p.value == null ? '' : p.value)
+          def.valueGetter = (p: any) => smartGet(p?.data, def.field)
+          if (editable) def.valueSetter = (p: any) => smartSet(p?.data, def.field, p.newValue)
+        } else if (colType === 'number') {
+          def.filter = 'agNumberColumnFilter'
+          def.valueParser = (p: any) => {
+            const v = Number(p.newValue)
+            return isNaN(v) ? null : v
+          }
+          if (editable) def.cellEditor = 'agTextCellEditor'
+          def.valueFormatter = (p: any) => (p.value == null ? '' : p.value)
+          def.valueGetter = (p: any) => smartGet(p?.data, def.field)
+          if (editable) def.valueSetter = (p: any) => smartSet(p?.data, def.field, (p.newValue == null || p.newValue === '') ? null : Number(p.newValue))
+        } else if (colType === 'checkbox' || colType === 'bool' || colType === 'boolean') {
+          // 클릭으로 직접 토글되도록 실제 DOM 요소 렌더링
+          def.cellRenderer = (p: any) => {
+            const input = document.createElement('input')
+            input.type = 'checkbox'
+            input.checked = coerceBooleanValue(smartGet(p?.data, def.field))
+            input.disabled = !editable
+            input.addEventListener('click', (ev) => ev.stopPropagation())
+            input.addEventListener('change', () => {
+              const newVal = !!input.checked
+              smartSet(p.data, def.field, newVal)
+              try { p.node.setDataValue?.(def.field, newVal) } catch {}
+              try { p.api?.refreshCells({ force: true, columns: ['__rownum', def.field] }) } catch {}
+            })
+            return input
+          }
+          // 더블클릭 편집 경로 유지
+          if (editable) {
+            def.editable = true
+            def.cellEditor = (params: any) => {
+              const e = document.createElement('input')
+              e.type = 'checkbox'
+              e.checked = coerceBooleanValue(smartGet(params?.data, def.field))
+              e.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') params.stopEditing() })
+              return { getGui: () => e, afterGuiAttached: () => {}, getValue: () => e.checked, isPopup: () => false }
+            }
+            def.valueGetter = (p: any) => smartGet(p?.data, def.field)
+            def.valueSetter = (p: any) => smartSet(p?.data, def.field, coerceBooleanValue(p.newValue))
+          }
+        } else if (colType === 'date' || colType === 'datetime') {
+          def.filter = 'agDateColumnFilter'
+          def.valueFormatter = (p: any) => formatDateValue(p.value, colType === 'datetime' ? 'datetime' : 'date')
+          def.valueGetter = (p: any) => smartGet(p?.data, def.field)
+          if (editable) {
+            def.editable = true
+            def.cellEditorPopup = true
+            def.cellEditor = (params: any) => {
+              const input = document.createElement('input')
+              input.type = 'date'
+              const raw = smartGet(params?.data, def.field)
+              const val = raw ? new Date(raw) : null
+              if (val && !isNaN(val.getTime())) input.value = `${val.getFullYear()}-${String(val.getMonth()+1).padStart(2,'0')}-${String(val.getDate()).padStart(2,'0')}`
+              return {
+                getGui: () => input,
+                afterGuiAttached: () => { input.focus() },
+                getValue: () => input.value || null,
+                isPopup: () => true
+              }
+            }
+            def.valueSetter = (p: any) => smartSet(p?.data, def.field, p.newValue || null)
+          }
+        } else if (colType === 'select' || colType === 'dropdown') {
+          // 옵션 라벨 포맷팅 (옵션 로드 전/후 모두 동작)
+          def.valueFormatter = (p: any) => {
+            const v = smartGet(p?.data, def.field)
+            const opts = (p.colDef as any)?.__options
+            if (Array.isArray(opts)) {
+              const m = opts.find((o: any) => String(o.code) === String(v))
+              return m ? (m.code_name ?? m.name ?? m.text ?? v ?? '') : (v ?? '')
+            }
+            // 옵션이 아직 없으면 원시값 표시
+            return v ?? ''
+          }
+          def.valueGetter = (p: any) => smartGet(p?.data, def.field)
+          // 코드그룹이 있으면 옵션을 서버에서 로드해 __options에 저장
+          const codeGroup = toTrimmedString(col.col_code || '')
+          if (codeGroup) {
+            dropdownPromises.push((async () => {
+              try {
+                const codeResult = await $fetch<any>('/api/stored-procedure/execute', {
+                  method: 'POST',
+                  body: {
+                    procedureName: 'sp_code_info',
+                    parameters: { case: 'search', plant_code: '1000', code_grp: codeGroup }
+                  }
+                })
+                if (codeResult?.success && Array.isArray(codeResult.data)) {
+                  def.__options = codeResult.data
+                  // 값 -> 라벨 포맷팅
+                  def.valueFormatter = (p: any) => {
+                    const v = smartGet(p?.data, def.field)
+                    const m = (def.__options || []).find((o: any) => String(o.code) === String(v))
+                    return m ? (m.code_name ?? m.name ?? m.text ?? v) : (v ?? '')
+                  }
+                } else {
+                  def.__options = []
+                }
+              } catch {
+                def.__options = []
+              }
+            })())
+          }
+          if (editable) {
+            def.editable = true
+            def.cellEditorPopup = true
+            def.cellEditor = (params: any) => {
+              const select = document.createElement('select')
+              const options = (params.colDef as any).__options || []
+              const placeholder = document.createElement('option')
+              placeholder.value = ''
+              placeholder.text = '-- 선택 --'
+              select.appendChild(placeholder)
+              options.forEach((opt: any) => {
+                const o = document.createElement('option')
+                o.value = String(opt.code)
+                o.text = String(opt.code_name ?? opt.name ?? opt.text ?? opt.code)
+                const cur = smartGet(params?.data, def.field)
+                if (String(cur) === String(o.value)) o.selected = true
+                select.appendChild(o)
+              })
+              return {
+                getGui: () => select,
+                afterGuiAttached: () => { select.focus() },
+                getValue: () => select.value || null,
+                isPopup: () => true
+              }
+            }
+            def.valueSetter = (p: any) => smartSet(p?.data, def.field, p.newValue || null)
+          }
+        }
+
+        return def
+      })
+      // 옵션 로드가 끝나면 일괄 반영
+      try { await Promise.allSettled(dropdownPromises) } catch {}
+      dynamicColumnDefs.value = tempDefs
     } else {
       console.warn('동적 컬럼 정보가 없거나 잘못된 형식입니다:', result)
     }
@@ -206,13 +456,47 @@ const autoGroupColumnDef = ref<any>({
   cellRendererParams: { suppressCount: true }, // 카운트 숨김
 })
 
-// 최종 컬럼 정의 (동적 컬럼 정보 우선, props 컬럼 정의는 fallback)
-const finalColumnDefs = computed(() => {
-  if (dynamicColumnDefs.value.length > 0) {
-    return dynamicColumnDefs.value
+// 고정 좌측 상태/행번호 컬럼
+const rowNumberStatusColDef = {
+  headerName: ' ',
+  field: '__rownum',
+  width: 80,
+  pinned: 'left' as const,
+  editable: false,
+  sortable: false,
+  filter: false,
+  suppressMenu: true,
+  cellClass: 'ag-rownum-cell',
+  valueGetter: (params: any) => (params?.node?.rowIndex != null ? params.node.rowIndex + 1 : ''),
+  cellRenderer: (params: any) => {
+    const no = params?.value ?? ''
+    const status = params?.data?.__status
+    let iconHtml = ''
+    if (status === 'N') iconHtml = '<i class="pi pi-plus" style="color:#2563eb;font-size:0.9rem"></i>'
+    else if (status === 'D') iconHtml = '<i class="pi pi-minus" style="color:#dc2626;font-size:0.9rem"></i>'
+    else if (status === 'M') iconHtml = '<i class="pi pi-pencil" style="color:#d97706;font-size:0.9rem"></i>'
+    return iconHtml ? `${iconHtml} <span>${no}</span>` : `<span>${no}</span>`
   }
-  return props.columnDefs
+}
+
+// 자동 컬럼 생성 (rowData 기반) - 동적/props 컬럼이 없을 때만 사용
+function buildAutoColumnDefsFromRow(sample: any): any[] {
+  if (!sample || typeof sample !== 'object') return []
+  const keys = Object.keys(sample).filter(k => k && k !== '__rownum' && k !== '__status')
+  return keys.map(k => ({ field: k, headerName: k }))
+}
+
+// 최종 컬럼 정의 (동적 컬럼 > props 컬럼 > rowData 자동 생성)
+const finalColumnDefs = computed(() => {
+  if (dynamicColumnDefs.value.length > 0) return dynamicColumnDefs.value
+  const propDefs = Array.isArray(props.columnDefs) ? props.columnDefs : []
+  if (propDefs.length > 0) return propDefs
+  const firstRow = Array.isArray(props.rowData) && props.rowData.length > 0 ? props.rowData[0] : null
+  return buildAutoColumnDefsFromRow(firstRow)
 })
+
+// 표시용 컬럼 정의: 상태/행번호 컬럼 + 실제 컬럼들
+const computedColumnDefs = computed(() => [rowNumberStatusColDef, ...finalColumnDefs.value])
 
 /**
  * AG Grid 준비 완료 이벤트 핸들러
@@ -239,6 +523,13 @@ function onCellDoubleClicked(event: any) {
  * @param event 값 변경 이벤트 객체
  */
 function onCellValueChanged(event: any) {
+  try {
+    const row = event?.data
+    if (row && row.__status !== 'N') {
+      row.__status = 'M'
+      refreshStatusCells()
+    }
+  } catch {}
   emit('cell-value-changed', event)
 }
 
@@ -256,6 +547,35 @@ function onRowEditingStarted(event: any) {
  */
 function onRowEditingStopped(event: any) {
   emit('row-editing-stopped', event)
+}
+
+// 다른 로우로 포커스 이동 시 편집 종료
+function tryStopEditingOnRowChange(newRowIndex: number | null | undefined) {
+  try {
+    const api = gridApi.value
+    if (!api) return
+    const editingCells = api.getEditingCells?.() || []
+    if (editingCells.length === 0) return
+    const currentRowIndex = editingCells[0]?.rowIndex
+    if (newRowIndex != null && currentRowIndex != null && newRowIndex !== currentRowIndex) {
+      api.stopEditing?.()
+    }
+  } catch {}
+}
+
+function onCellFocused(event: any) {
+  tryStopEditingOnRowChange(event?.rowIndex)
+}
+
+function onRowClicked(event: any) {
+  tryStopEditingOnRowChange(event?.rowIndex)
+}
+
+/**
+ * 정렬 또는 필터 변경 시 호출되는 함수
+ */
+function onSortOrFilterChanged() {
+  refreshStatusCells()
 }
 
 /**
@@ -330,6 +650,27 @@ function exportExcel() {
   if (api) api.exportDataAsExcel({fileName: 'MenuList', sheetName: 'Menus' }) 
 }
 
+// 행 추가/삭제 동작
+function addRow() {
+  const fields = finalColumnDefs.value.map((c: any) => c?.field).filter((f: any) => f && f !== '__rownum')
+  const newRow: any = {}
+  fields.forEach((f: string) => { newRow[f] = null })
+  newRow.__status = 'N'
+  const api = gridApi.value
+  try {
+    if (api?.applyTransaction) {
+      api.applyTransaction({ add: [newRow] })
+    } else {
+      (props.rowData as any[]).push(newRow)
+    }
+    emit('row-added', newRow)
+    nextTick(() => refreshStatusCells())
+  } catch {
+    // fallback push
+    try { (props.rowData as any[]).push(newRow); emit('row-added', newRow); nextTick(() => refreshStatusCells()) } catch {}
+  }
+}
+
 // 외부에서 호출할 수 있는 메서드들을 expose
 const exposeMethods = {
   expandAll: expandAllGrid,         // 전체 펼치기
@@ -338,7 +679,17 @@ const exposeMethods = {
   applyFilter: applyExternalFilter, // 필터 적용
   getGridApi: () => gridApi.value,  // Grid API 반환
   loadDynamicColumnDefs,            // 동적 컬럼 정보 로드
-  getDynamicColumnDefs: () => dynamicColumnDefs.value  // 동적 컬럼 정보 반환
+  getDynamicColumnDefs: () => dynamicColumnDefs.value,  // 동적 컬럼 정보 반환
+  markDeleted: (row: any) => { if (row) { row.__status = 'D'; refreshStatusCells() } },
+  clearStatuses: () => {
+    try {
+      const rows = Array.isArray(props.rowData) ? props.rowData : []
+      rows.forEach((r: any) => { if (r && r.__status) delete r.__status })
+      refreshStatusCells()
+    } catch {}
+  },
+  addRow,
+  deleteSelectedRows,
 }
 
 // 부모 컴포넌트에서 메서드 호출 가능하도록 expose
@@ -360,12 +711,72 @@ watch(() => props.rowData, () => {
   }
 }, { deep: true })
 
+// 행 추가 감지 및 상태 관리: 기존/신규 행 추적
+const seenRows = shallowRef<WeakSet<any>>(new WeakSet<any>())
+
+// 배열 레퍼런스가 바뀌면(조회/재조회 등) 현재 데이터는 기준선으로 간주: 상태 제거 및 베이스라인 등록
+watch(() => props.rowData, (newRows) => {
+  const rows = Array.isArray(newRows) ? newRows : []
+  try { rows.forEach(r => { if (r && typeof r === 'object' && r.__status) delete r.__status }) } catch {}
+  seenRows.value = new WeakSet<any>()
+  rows.forEach(r => { if (r && typeof r === 'object') seenRows.value.add(r) })
+  refreshStatusCells()
+}, { immediate: true })
+
+// push 등으로 기존 배열에 추가된 새 객체만 N 표기
+watch(() => props.rowData, (newRows) => {
+  const rows = Array.isArray(newRows) ? newRows : []
+  let marked = false
+  rows.forEach(r => {
+    if (r && typeof r === 'object' && !seenRows.value.has(r)) {
+      seenRows.value.add(r)
+      if (!r.__status) r.__status = 'N'
+      marked = true
+    }
+  })
+  if (marked) refreshStatusCells()
+}, { deep: true })
+
 // grid_id 변경 시 동적 컬럼 정보 다시 로드
 watch(() => props.gridId, async (newGridId, oldGridId) => {
   if (newGridId && newGridId !== oldGridId) {
     await loadDynamicColumnDefs()
   }
 })
+
+function refreshStatusCells() {
+  const api = gridApi.value
+  try { api?.refreshCells({ force: true, columns: ['__rownum'] }) } catch {}
+}
+
+function deleteSelectedRows() {
+  const api = gridApi.value
+  if (!api) return
+  let rows = api.getSelectedRows?.() || []
+  // 선택이 없으면 포커스된 셀의 행으로 대체
+  if (!rows.length && api.getFocusedCell) {
+    const focused = api.getFocusedCell()
+    if (focused && focused.rowIndex != null) {
+      const node = api.getDisplayedRowAtIndex?.(focused.rowIndex)
+      if (node?.data) rows = [node.data]
+    }
+  }
+  if (!rows.length) return
+  const toRemove: any[] = []
+  rows.forEach((r: any) => {
+    if (!r) return
+    if (r.__status === 'N') {
+      toRemove.push(r)
+    } else {
+      r.__status = 'D'
+    }
+  })
+  if (toRemove.length) {
+    try { api.applyTransaction?.({ remove: toRemove }) } catch {}
+  }
+  emit('rows-deleted', rows)
+  refreshStatusCells()
+}
 
 // 컴포넌트 마운트 시 초기화
 onMounted(async () => {
@@ -380,4 +791,9 @@ onMounted(async () => {
 
 <style scoped>
 .field { margin-bottom: 1rem; }
+
+/* 왼쪽 번호/상태 열 배경을 헤더와 유사하게 */
+:deep(.ag-rownum-cell) {
+  background-color: var(--ag-header-background-color, var(--p-surface-ground));
+}
 </style>

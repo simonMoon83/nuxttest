@@ -12,8 +12,8 @@
         <!-- 액션 버튼 영역 -->
         <div class="flex items-center gap-2">
           <Button label="검색" severity="secondary" size="small" @click="onSearch" v-if="showSearchButton" />
-          <Button label="저장" severity="secondary" size="small" @click="onSearch" v-if="showSaveButton" />
-          <Button label="등록" severity="secondary" size="small" @click="openCreateRoot" v-if="showCreateButton" />
+          <Button label="저장" severity="secondary" size="small" @click="onSave" v-if="showSaveButton" />
+          
           <Button label="초기화" outlined severity="secondary" size="small" @click="onReset" v-if="showResetButton" />
           <!--<Button label="엑셀" outlined severity="secondary" size="small" @click="exportExcel" />-->
         </div>
@@ -41,20 +41,7 @@
     <!-- AG Grid 영역 - 자식 컴포넌트에서 구현 -->
     <slot name="ag-grid" :row-data="rowData" :column-defs="columnDefs" :search-query="searchQuery" />
 
-    <!-- 등록/수정 다이얼로그 -->
-    <Dialog v-model:visible="dialogVisible" :header="editTarget ? '메뉴 수정' : '메뉴 추가'" :style="{ width: '620px' }" modal>
-      <div v-if="editTarget" class="w-full compact-form">
-        <!-- FormKit 편집 폼 -->
-        <FormKitDataEdit
-          v-model="editTarget"
-          :schema="editSchema"
-          :debug-schema="false"
-          :debug-data="false"
-          form-class="form-horizontal grid-12"
-          submit-label=""
-        />
-      </div>
-    </Dialog>
+    
     
   </div>
 </template>
@@ -76,6 +63,8 @@ interface Props {
   showSaveButton?: boolean     // 저장 버튼 표시 여부
   procedureName?: string       // 저장 프로시저 이름
   searchSchemaGridId?: string  // 검색 스키마 로드를 위한 grid_id
+  searchCase?: string       // 조회 호출 시 case 값
+  saveCase?: string         // 저장 호출 시 case 값
 }
 
 // Props 기본값 설정
@@ -90,12 +79,13 @@ const props = withDefaults(defineProps<Props>(), {
   showResetButton: false,
   showCreateButton: false,
   showSearchButton: true,
-  showSaveButton: true
+  showSaveButton: true,
+  searchCase: 'search',
+  saveCase: 'save'
 })
 
 // Composable 함수들 사용
-const { confirmAction } = useConfirmation()  // 확인 다이얼로그
-const toast = useToast()                     // 토스트 메시지
+ 
 const route = useRoute()                     // 현재 라우트 정보
 
 // 메뉴 아이템 인터페이스 정의
@@ -246,10 +236,6 @@ const hideGlobalTitle = computed(() => {
 
 // 상태 관리 변수들
 const loading = ref(false)          // 로딩 상태
-const saving = ref(false)           // 저장 중 상태
-const deleting = ref(false)         // 삭제 중 상태
-const dialogVisible = ref(false)    // 다이얼로그 표시 상태
-const editTarget = ref<MenuItem | null>(null)  // 편집 대상 아이템
 
 // 검색 폼 - props에서 받은 schema 사용
 const filters = ref<any>(props.filters)
@@ -275,6 +261,7 @@ const emit = defineEmits<{
   'grid-ready': [params: any]           // 그리드 준비 완료 이벤트
   'cell-double-clicked': [event: any]   // 셀 더블클릭 이벤트
   'search': [result: any]               // 검색 완료 이벤트
+  'save': [result: any]                 // 저장 완료 이벤트
 }>()
 
 /**
@@ -304,35 +291,9 @@ function exportExcel() {
 // 메뉴 데이터 관리
 const menuData = ref<MenuItem[]>([])
 
-/**
- * 트리 구조 빌드 함수 (사용하지 않음 - 저장 프로시저로 대체)
- * @param list 메뉴 아이템 리스트
- */
-// function buildTree(list: MenuItem[]) {
-//   const map = new Map<number, MenuItem>()
-//   list.forEach(i => map.set(i.id, i))
-//   rowData.value = list.map(i => ({ ...i, orgHierarchy: computePath(i, map) }))
-// }
+ 
 
-/**
- * 아이템의 경로 계산 함수 (사용하지 않음 - 저장 프로시저로 대체)
- * @param item 메뉴 아이템
- * @param all 모든 메뉴 아이템 맵
- * @returns 경로 배열
- */
-// function computePath(item: MenuItem, all: Map<number, MenuItem>): string[] {
-//   const path: string[] = []
-//   let cur: MenuItem | undefined = item
-//   const guard = new Set<number>()  // 무한 루프 방지
-//   
-//   while (cur) {
-//     if (guard.has(cur.id)) break
-//     guard.add(cur.id)
-//     path.unshift(cur.title || '')
-//     cur = cur.parent_id != null ? (all.get(cur.parent_id) || undefined) : undefined
-//   }
-//   return path
-// }
+ 
 
 /**
  * 동적 검색 스키마 로드 함수
@@ -468,42 +429,7 @@ async function loadDynamicSearchSchema() {
    
 }
 
-/**
- * 메뉴 데이터 로드 함수 (사용하지 않음 - 저장 프로시저로 대체)
- * API에서 메뉴 데이터를 가져와서 필터링하고 트리 구조로 변환
- */
-// async function loadMenu() {
-//   try {
-//     loading.value = true
-//     const res = await $fetch<{ success: boolean; data: MenuItem[] }>(props.apiEndpoint)
-//     if (res?.success) {
-//       let rows = res.data || []
-//       const f = filters.value
-//       
-//       // 동적 필터 적용
-//       Object.entries(f).forEach(([key, value]) => {
-//         if (value !== null && value !== undefined && value !== '') {
-//           if (key === 'title') {
-//             rows = rows.filter(r => r.title?.toLowerCase?.().includes?.(value.toString().toLowerCase()))
-//           } else if (key === 'href') {
-//             rows = rows.filter(r => r.href?.toLowerCase?.().includes?.(value.toString().toLowerCase()))
-//           } else if (key === 'activeOnly') {
-//             rows = rows.filter(r => r.is_active === value)
-//           } else {
-//             // 기타 필드에 대한 필터링 (필요시 확장)
-//             console.log(`필터 적용: ${key} = ${value}`)
-//           }
-//         }
-//       })
-//       
-//       menuData.value = rows as any
-//       buildTree(menuData.value)
-//       // AG Grid 필터 적용은 AgGrid 컴포넌트 내부에서 자동으로 처리됨
-//     }
-//   } finally { 
-//     loading.value = false 
-//   }
-// }
+ 
 
 /**
  * 검색 실행 함수
@@ -512,16 +438,16 @@ async function onSearch() {
   try {
     console.log('검색 시작 - 필터 값:', filters.value)
     
-         // 동적 프로시저 호출
-     const requestBody = {
-       procedureName: props.procedureName,
-       parameters: {
-         case: 'search',
-         menu_name: filters.value.title || null,
-         menu_url: filters.value.href || null,
-         use_yn: filters.value.activeOnly || null
-       }
-     }
+    // 동적 프로시저 호출
+    const requestBody = {
+      procedureName: props.procedureName,
+      parameters: {
+       case: props.searchCase,
+        menu_name: filters.value.title || null,
+        menu_url: filters.value.href || null,
+        use_yn: filters.value.activeOnly || null
+      }
+    }
     
     console.log('프로시저 호출 요청:', requestBody)
     
@@ -531,24 +457,29 @@ async function onSearch() {
     })
     
     console.log('프로시저 응답:', result)
-    
-    if (result.success && result.data) {
-      console.log('메뉴 검색 결과:', result.data)
-      // 검색 결과를 rowData에 설정
-      rowData.value = result.data
-      // 부모에게 검색 완료 이벤트 전달
+
+    // 그리드 데이터 먼저 초기화하여 이전 결과가 남지 않도록 함
+    rowData.value = []
+    await nextTick()
+
+    // 결과 정규화: data, recordset, recordsets[0] 우선순위로 사용
+    let rows: any[] = []
+    if (Array.isArray(result?.data)) rows = result.data
+    else if (Array.isArray(result?.recordset)) rows = result.recordset
+    else if (Array.isArray(result?.recordsets?.[0])) rows = result.recordsets[0]
+
+    if (result.success && Array.isArray(rows)) {
+      rowData.value = [...rows]
       emit('search', {
-        data: result.data,
+        data: rows,
         filters: filters.value
       })
     } else {
-      console.error('메뉴 검색 실패:', result)
       rowData.value = []
-      // 에러 처리
       emit('search', {
         data: [],
         filters: filters.value,
-        error: result.error || result.message || '검색에 실패했습니다.'
+        error: result?.error || result?.message || '검색에 실패했습니다.'
       })
     }
   } catch (error) {
@@ -564,6 +495,51 @@ async function onSearch() {
       data: [],
       filters: filters.value,
       error: error instanceof Error ? error.message : '검색 중 오류가 발생했습니다.'
+    })
+  }
+}
+
+/**
+ * 저장 실행 함수
+ * onSearch와 동일 로직으로 호출하되 case만 저장용 값 사용
+ */
+async function onSave() { 
+  try {
+    console.log('저장 시작 - 필터 값:', filters.value)
+    const requestBody = {
+      procedureName: props.procedureName,
+      parameters: {
+        case: props.saveCase,
+        menu_name: filters.value.title || null,
+        menu_url: filters.value.href || null,
+        use_yn: filters.value.activeOnly || null
+      }
+    }
+    console.log('프로시저 저장 요청:', requestBody)
+    const result = await $fetch<any>('/api/stored-procedure/execute', {
+      method: 'POST',
+      body: requestBody
+    })
+    console.log('프로시저 저장 응답:', result)
+    // 저장은 그리드 데이터(rowData)를 변경하지 않음
+    if (result.success) {
+      emit('save', {
+        data: result.data ?? null,
+        filters: filters.value
+      })
+    } else {
+      emit('save', {
+        data: null,
+        filters: filters.value,
+        error: result.error || result.message || '저장에 실패했습니다.'
+      })
+    }
+  } catch (error) {
+    console.error('저장 중 오류 발생:', error)
+    emit('save', {
+      data: null,
+      filters: filters.value,
+      error: error instanceof Error ? error.message : '저장 중 오류가 발생했습니다.'
     })
   }
 }
@@ -596,183 +572,45 @@ function onReset() {
 /**
  * 최상위 메뉴 생성 함수
  */
-function openCreateRoot() { 
-  openCreateWithParent(null) 
-}
-
-/**
- * 하위 메뉴 생성 함수
- * @param parent 부모 메뉴 아이템
- */
-function openCreateChild(parent: MenuItem) { 
-  openCreateWithParent(parent.id) 
-}
-
-/**
- * 부모 ID를 지정하여 메뉴 생성 함수
- * @param parentId 부모 메뉴 ID
- */
-function openCreateWithParent(parentId: number | null) {
-  editTarget.value = { 
-    id: 0 as any, 
-    title: '', 
-    href: '', 
-    icon: '', 
-    parent_id: parentId, 
-    sort_order: getNextSortOrder(parentId), 
-    is_separator: false, 
-    is_active: true 
-  }
-  dialogVisible.value = true
-}
+ 
 
 /**
  * 메뉴 편집 함수
  * @param row 편집할 메뉴 아이템
  */
-function openEdit(row: MenuItem) { 
-  editTarget.value = { ...row }; 
-  dialogVisible.value = true 
-}
+ 
 
 /**
  * 다이얼로그 닫기 함수
  */
-function closeDialog() { 
-  dialogVisible.value = false; 
-  editTarget.value = null 
-}
+ 
 
 /**
  * 다음 정렬 순서 계산 함수
  * @param parentId 부모 메뉴 ID
  * @returns 다음 정렬 순서
  */
-function getNextSortOrder(parentId: number | null): number { 
-  const s = menuData.value.filter(m => m.parent_id === parentId); 
-  return s.length > 0 ? Math.max(...s.map(x => x.sort_order)) + 1 : 1 
-}
+ 
 
 // 상위 메뉴 옵션 계산 (Computed)
-const parentMenuOptions = computed(() => [
-  { label: '최상위 메뉴', value: null }, 
-  ...menuData.value.filter(m => !m.is_separator && m.parent_id === null).map(m => ({ label: m.title, value: m.id }))
-])
+ 
 
 // 편집 스키마 정의
-const editSchema = ref<any>(props.editSchema.length > 0 ? props.editSchema : [
-  { $formkit: 'hidden', name: 'id' },
-  { $formkit: 'primeCheckbox', name: 'is_separator', label: '구분선', outerClass: 'col-12' },
-  { $formkit: 'primeInputText', name: 'title', label: '메뉴명', outerClass: 'col-6', validation: 'required', if: "$value.is_separator !== true" },
-  { $formkit: 'primeInputText', name: 'href', label: '링크', outerClass: 'col-6', help: '예: /path/to/page', if: "$value.is_separator !== true" },
-  { $formkit: 'primeInputText', name: 'icon', label: '아이콘', help: '예: pi pi-home', outerClass: 'col-6', if: "$value.is_separator !== true" },
-  { $formkit: 'primeSelect', name: 'parent_id', label: '상위 메뉴', outerClass: 'col-6', options: parentMenuOptions, optionLabel: 'label', optionValue: 'value', placeholder: '상위 메뉴 선택', showClear: true, filter: true, if: "$value.is_separator !== true" },
-  { $formkit: 'primeInputNumber', name: 'sort_order', label: '정렬 순서', outerClass: 'col-6', min: 0 },
-  { $formkit: 'primeCheckbox', name: 'is_active', label: '활성', outerClass: 'col-6', if: "$value.is_separator !== true" },
-  {
-    $el: 'div',
-    attrs: { class: 'col-12 w-full flex justify-end items-center gap-x-2 mt-2' },
-    children: [
-      { $cmp: 'Button', if: '$id', props: { label: '삭제', severity: 'danger', loading: deleting.value, onClick: () => deleteInDialog() } },
-      { $cmp: 'Button', props: { label: '취소', severity: 'secondary', onClick: () => closeDialog() } },
-      { $cmp: 'Button', props: { label: '저장', loading: saving.value, onClick: () => saveMenu() } },
-    ],
-  },
-])
+ 
 
 /**
  * 메뉴 저장 함수
  * 유효성 검사 후 API 호출하여 메뉴 저장
  */
-async function saveMenu() {
-  try {
-    saving.value = true
-    const body = { ...(editTarget.value as any) }
-    
-    // 기본 유효성 검사
-    const isSeparator = Boolean(body?.is_separator)
-    const title = (body?.title ?? '').toString().trim()
-    const parentId = body?.parent_id ?? null
-    
-    if (!isSeparator && !title) {
-      toast.add({ severity: 'warn', summary: '유효성 오류', detail: '메뉴명은 필수입니다.', life: 2500 })
-      saving.value = false
-      return
-    }
-    
-    // 동일 부모 내 중복 메뉴명 방지(수정 시 자기 자신 제외)
-    const dup = menuData.value.some(m => 
-      (m.parent_id ?? null) === parentId && 
-      (m.title ?? '').trim().toLowerCase() === title.toLowerCase() && 
-      m.id !== (body?.id ?? 0)
-    )
-    if (!isSeparator && dup) {
-      toast.add({ severity: 'warn', summary: '중복 메뉴명', detail: '같은 상위 메뉴에 동일한 이름이 있습니다.', life: 2500 })
-      saving.value = false
-      return
-    }
-    
-    // href 형식(선택 입력): 입력 시 /로 시작 권장
-    const href = (body?.href ?? '').toString().trim()
-    if (!isSeparator && href && !href.startsWith('/')) {
-      toast.add({ severity: 'warn', summary: '유효성 안내', detail: '링크는 /로 시작하는 경로 형식을 권장합니다.', life: 2500 })
-      saving.value = false
-      return
-    }
-
-    // API 호출 (수정 또는 생성)
-    if ((editTarget.value as any)?.id && (editTarget.value as any).id !== 0) {
-      await $fetch(`/api/menu/${(editTarget.value as any).id}`, { method: 'PUT', body })
-    } else {
-      await $fetch('/api/menu/create', { method: 'POST', body })
-    }
-    
-    dialogVisible.value = false
-    await refreshMenuData()
-  } finally { 
-    saving.value = false 
-  }
-}
+ 
 
 /**
  * 다이얼로그에서 삭제 함수
  * 확인 후 메뉴 삭제
  */
-function deleteInDialog() {
-  const currentId = (editTarget.value as any)?.id
-  if (!currentId) return
-  
-  confirmAction(async () => {
-    try {
-      deleting.value = true
-      await $fetch(`/api/menu/${currentId}`, { method: 'DELETE' })
-      dialogVisible.value = false
-      await refreshMenuData()
-    } finally {
-      deleting.value = false
-    }
-  }, '삭제 완료', '메뉴를 삭제했습니다.', '삭제 확인', '해당 메뉴를 삭제하시겠습니까?', { 
-    compact: true, 
-    acceptLabel: '삭제', 
-    rejectLabel: '취소', 
-    icon: 'pi pi-exclamation-triangle' 
-  })
-}
+ 
 
-/**
- * 메뉴 활성/비활성 토글 함수
- * @param menu 메뉴 아이템
- * @param nextValue 다음 상태값
- */
-async function onToggleActive(menu: MenuItem, nextValue: boolean) { 
-  const prev = menu.is_active; 
-  menu.is_active = nextValue; 
-  try { 
-    await $fetch(`/api/menu/${menu.id}`, { method: 'PUT', body: { is_active: nextValue } }) 
-  } catch { 
-    menu.is_active = prev 
-  } 
-}
+ 
 
 /**
  * 메뉴 데이터 새로고침 함수
@@ -790,7 +628,6 @@ const exposeMethods = {
   collapseAllGrid: () => {},         // 전체 접기 (자식에서 구현)
   applyGridFilter: () => {},         // 필터 적용 (자식에서 구현)
   exportExcel: () => {},             // 엑셀 내보내기 (자식에서 구현)
-  openEdit,                          // 편집 함수
   getRowData: () => rowData.value,   // 행 데이터 반환
   getColumnDefs: () => columnDefs.value,  // 컬럼 정의 반환
   getSearchQuery: () => searchQuery.value  // 검색 쿼리 반환
