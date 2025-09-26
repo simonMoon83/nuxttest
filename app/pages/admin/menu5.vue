@@ -1,5 +1,6 @@
 <script setup lang='ts'>
 import AgGrid from '~/components/AgGrid.vue'
+import RowDetailDialog from '~/components/RowDetailDialog.vue'
 
 definePageMeta({ layout: 'default', middleware: 'auth' })
 
@@ -30,6 +31,9 @@ const searchSchemaGridId = ref('menu5_search')
 // DefaultPage와 AgGrid 참조
 const defaultPageRef = ref()
 const agGridRef = ref()
+// 상세 다이얼로그 상태
+const detailVisible = ref(false)
+const detailRow = ref<any | null>(null)
 
 // AG Grid 이벤트 핸들러
 function onGridReady(params: any) {
@@ -43,10 +47,8 @@ function onGridReady(params: any) {
 }
 
 function onCellDoubleClicked(event: any) {
-  // DefaultPage의 openEdit 메서드 호출
-  if (defaultPageRef.value) {
-    defaultPageRef.value.openEdit(event.data)
-  }
+  detailRow.value = event?.data || null
+  detailVisible.value = true
 }
 
 // 편집 관련 이벤트 핸들러들
@@ -141,10 +143,12 @@ onMounted(() => {
          :editable="true"
          edit-mode="doubleClick"
          @grid-ready="onGridReady"
+         @cell-double-clicked="onCellDoubleClicked"
          @cell-value-changed="onCellValueChanged"
          @row-editing-started="onRowEditingStarted"
          @row-editing-stopped="onRowEditingStopped"
        />
+      <RowDetailDialog v-model="detailVisible" :row="detailRow" :title="`상세: ${detailRow?.title ?? ''}`" />
        <!--@cell-double-clicked="onCellDoubleClicked"
          주석처리함-->
     </template>

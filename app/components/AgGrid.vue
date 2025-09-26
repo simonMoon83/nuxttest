@@ -430,6 +430,7 @@ const gridOptions = computed(() => {
     ...(props.editable && {
       editType: 'fullRow' as const,   // 전체 행 편집 모드
       stopEditingWhenCellsLoseFocus: true,  // 포커스 잃을 때 편집 종료
+      singleClickEdit: false,              // 클릭으로 편집 시작 방지
     })
   }
   
@@ -516,6 +517,7 @@ function onGridReady(params: any) {
  * @param event 더블클릭 이벤트 객체
  */
 function onCellDoubleClicked(event: any) { 
+  try { gridApi.value?.stopEditing?.() } catch {}
   emit('cell-double-clicked', event) // 부모에게 이벤트 전달
 }
 
