@@ -22,7 +22,7 @@ const editSchema = ref<any>([])
 const showGlobalTitle = ref(true)
 
 // 사용할 저장 프로시저 이름
-const procedureName = ref('sp_menu_info2')
+const procedureName = ref('sp_menu_info999')
 
 // 검색 스키마 grid_id (DefaultPage로 전달)
 const searchSchemaGridId = ref('menu5_search')
@@ -103,6 +103,14 @@ onMounted(() => {
       defaultPageRef.value.collapseAllGrid = collapseAllGrid
       defaultPageRef.value.applyGridFilter = applyGridFilter
       defaultPageRef.value.exportExcel = exportExcel
+      // 변경분 전달 훅 연결: DefaultPage가 저장 시 AgGrid 변경분을 직접 사용
+      defaultPageRef.value.setChangedRowsProvider?.(() => {
+        try {
+          return agGridRef.value?.getChangedRows?.() || { added: [], modified: [], deleted: [] }
+        } catch {
+          return { added: [], modified: [], deleted: [] }
+        }
+      })
     }
   })
 })

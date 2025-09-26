@@ -664,11 +664,17 @@ function addRow() {
     } else {
       (props.rowData as any[]).push(newRow)
     }
+    try { newlyAddedRows.value.add(newRow) } catch {}
     emit('row-added', newRow)
     nextTick(() => refreshStatusCells())
   } catch {
     // fallback push
-    try { (props.rowData as any[]).push(newRow); emit('row-added', newRow); nextTick(() => refreshStatusCells()) } catch {}
+    try {
+      (props.rowData as any[]).push(newRow)
+      try { newlyAddedRows.value.add(newRow) } catch {}
+      emit('row-added', newRow)
+      nextTick(() => refreshStatusCells())
+    } catch {}
   }
 }
 
@@ -691,6 +697,35 @@ const exposeMethods = {
   },
   addRow,
   deleteSelectedRows,
+  stopEditing: () => { try { gridApi.value?.stopEditing?.() } catch {} },
+  // 현재 그리드의 모든 행 데이터 반환 (필터/소트 무시, 내부 스토어 기준)
+  getAllRows: (): any[] => {
+    const api = gridApi.value
+    const out: any[] = []
+    try {
+      if (api?.forEachNode) {
+        api.forEachNode((node: any) => { if (node?.data) out.push(node.data) })
+      } else if (api?.getDisplayedRowCount && api?.getDisplayedRowAtIndex) {
+        const n = api.getDisplayedRowCount()
+        for (let i = 0; i < n; i++) {
+          const node = api.getDisplayedRowAtIndex(i)
+          if (node?.data) out.push(node.data)
+        }
+      }
+    } catch {}
+    return out
+  },
+  // 변경된 행들만 반환
+  getChangedRows: (): { added: any[]; modified: any[]; deleted: any[] } => {
+    const all = (exposeMethods as any).getAllRows?.() as any[] || []
+    const addedSet = new Set<any>()
+    try { newlyAddedRows.value.forEach((r: any) => { if (r && r.__status !== 'D') addedSet.add(r) }) } catch {}
+    all.forEach((r: any) => { if (r && r.__status === 'N') addedSet.add(r) })
+    const added = Array.from(addedSet)
+    const modified = all.filter((r: any) => r && r.__status === 'M')
+    const deleted = all.filter((r: any) => r && r.__status === 'D')
+    return { added, modified, deleted }
+  },
 }
 
 // 부모 컴포넌트에서 메서드 호출 가능하도록 expose
@@ -714,6 +749,8 @@ watch(() => props.rowData, () => {
 
 // 행 추가 감지 및 상태 관리: 기존/신규 행 추적
 const seenRows = shallowRef<WeakSet<any>>(new WeakSet<any>())
+// 신규 추가 행들을 별도로 추적하여 저장 시 누락 방지
+const newlyAddedRows = shallowRef<Set<any>>(new Set<any>())
 
 // 배열 레퍼런스가 바뀌면(조회/재조회 등) 현재 데이터는 기준선으로 간주: 상태 제거 및 베이스라인 등록
 watch(() => props.rowData, (newRows) => {
@@ -786,6 +823,7 @@ function deleteSelectedRows() {
     if (!r) return
     if (r.__status === 'N') {
       toRemove.push(r)
+      try { newlyAddedRows.value.delete(r) } catch {}
     } else {
       r.__status = 'D'
     }

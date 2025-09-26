@@ -65,6 +65,8 @@ interface Props {
   searchSchemaGridId?: string  // 검색 스키마 로드를 위한 grid_id
   searchCase?: string       // 조회 호출 시 case 값
   saveCase?: string         // 저장 호출 시 case 값
+  updateCase?: string       // 수정 호출 시 case 값
+  deleteCase?: string       // 삭제 호출 시 case 값
 }
 
 // Props 기본값 설정
@@ -81,7 +83,9 @@ const props = withDefaults(defineProps<Props>(), {
   showSearchButton: true,
   showSaveButton: true,
   searchCase: 'search',
-  saveCase: 'save'
+  saveCase: 'save',
+  updateCase: 'save',
+  deleteCase: 'delete'
 })
 
 // Composable 함수들 사용
@@ -263,6 +267,10 @@ const emit = defineEmits<{
   'search': [result: any]               // 검색 완료 이벤트
   'save': [result: any]                 // 저장 완료 이벤트
 }>()
+
+// 자식(AgGrid)에서 변경 행을 제공받기 위한 provider
+type ChangedRows = { added: any[]; modified: any[]; deleted: any[] }
+const changedRowsProvider = ref<() => ChangedRows>(() => ({ added: [], modified: [], deleted: [] }))
 
 /**
  * AG Grid 준비 완료 이벤트 핸들러
@@ -506,32 +514,76 @@ async function onSearch() {
 async function onSave() { 
   try {
     console.log('저장 시작 - 필터 값:', filters.value)
-    const requestBody = {
-      procedureName: props.procedureName,
-      parameters: {
-        case: props.saveCase,
-        menu_name: filters.value.title || null,
-        menu_url: filters.value.href || null,
-        use_yn: filters.value.activeOnly || null
+    // 1) 변경분 수집: provider 우선 사용
+    let added: any[] = []
+    let modified: any[] = []
+    let deleted: any[] = []
+    try {
+      const changed = changedRowsProvider.value?.()
+      if (changed) {
+        added = Array.isArray(changed.added) ? changed.added : []
+        modified = Array.isArray(changed.modified) ? changed.modified : []
+        deleted = Array.isArray(changed.deleted) ? changed.deleted : []
       }
+    } catch {}
+    // fallback: rowData에서 상태 기준으로 수집
+    if (!added.length || !modified.length || !deleted.length) {
+      const rows = Array.isArray(rowData.value) ? rowData.value : []
+      if (!added.length) added = rows.filter((r: any) => r && r.__status === 'N')
+      if (!modified.length) modified = rows.filter((r: any) => r && r.__status === 'M')
+      if (!deleted.length) deleted = rows.filter((r: any) => r && r.__status === 'D')
     }
-    console.log('프로시저 저장 요청:', requestBody)
+
+    // 2) 각 상태별로 procedures 구성
+    const procName = props.procedureName ?? ''
+    if (!procName) {
+      emit('save', { data: null, filters: filters.value, error: 'procedureName이 설정되지 않았습니다.' })
+      return
+    }
+    const procedures: Array<{ name: string; parameters: Record<string, any> }> = []
+    const pushRows = (rows: any[], opCase: string) => {
+      rows.forEach((r: any) => {
+        const params: Record<string, any> = { case: opCase }
+        try {
+          Object.entries(r).forEach(([k, v]) => {
+            if (k === '__status' || k === '__rownum') return
+            params[k] = v
+          })
+        } catch {}
+        procedures.push({ name: procName, parameters: params })
+      })
+    }
+    pushRows(added, props.saveCase ?? 'save')
+    pushRows(modified, props.updateCase ?? props.saveCase ?? 'save')
+    pushRows(deleted, props.deleteCase ?? 'delete')
+
+    if (procedures.length === 0) {
+      // 변경 내역이 없으면 성공으로 간주하고 반환
+      emit('save', { data: null, filters: filters.value })
+      return
+    }
+
+    console.log('프로시저 저장 요청 (multiple, A/U/D):', procedures)
     const result = await $fetch<any>('/api/stored-procedure/execute', {
       method: 'POST',
-      body: requestBody
+      body: { action: 'multiple', parameters: procedures }
     })
-    console.log('프로시저 저장 응답:', result)
-    // 저장은 그리드 데이터(rowData)를 변경하지 않음
-    if (result.success) {
+    console.log('프로시저 저장 응답 (multiple, A/U/D):', result)
+
+    if (result?.success) {
       emit('save', {
-        data: result.data ?? null,
+        data: result.results ?? null,
+        totalCount: result.totalCount,
+        successCount: result.successCount,
         filters: filters.value
       })
+      // 저장/수정/삭제 완료 후 최신 데이터로 재조회
+      await onSearch()
     } else {
       emit('save', {
         data: null,
         filters: filters.value,
-        error: result.error || result.message || '저장에 실패했습니다.'
+        error: result?.error || result?.message || '저장에 실패했습니다.'
       })
     }
   } catch (error) {
@@ -630,7 +682,9 @@ const exposeMethods = {
   exportExcel: () => {},             // 엑셀 내보내기 (자식에서 구현)
   getRowData: () => rowData.value,   // 행 데이터 반환
   getColumnDefs: () => columnDefs.value,  // 컬럼 정의 반환
-  getSearchQuery: () => searchQuery.value  // 검색 쿼리 반환
+  getSearchQuery: () => searchQuery.value,  // 검색 쿼리 반환
+  // 부모(menu5)에서 AgGrid의 변경분 provider를 주입
+  setChangedRowsProvider: (fn: () => ChangedRows) => { changedRowsProvider.value = fn }
 }
 
 // 부모 컴포넌트에서 메서드 호출 가능하도록 expose
