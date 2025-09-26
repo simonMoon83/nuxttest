@@ -425,6 +425,7 @@ const gridOptions = computed(() => {
     enableRangeSelection: true,       // 범위 선택 활성화
     enableRangeHandle: true,          // 범위 핸들 활성화
     clipboardDelimiter: '\t',         // 클립보드 구분자
+    suppressScrollOnNewData: true,    // 데이터 변경 시 자동 스크롤 방지
     // 편집 관련 설정
     ...(props.editable && {
       editType: 'fullRow' as const,   // 전체 행 편집 모드
@@ -752,6 +753,24 @@ function refreshStatusCells() {
 function deleteSelectedRows() {
   const api = gridApi.value
   if (!api) return
+  // 삭제 전 포커스/스크롤 위치 보존
+  const focusedCell = api.getFocusedCell?.()
+  let prevRowIndex: number | null = focusedCell?.rowIndex ?? null
+  let prevColId: any = null
+  try {
+    prevColId = focusedCell?.column?.getColId ? focusedCell.column.getColId() : (focusedCell?.column || focusedCell?.colId)
+  } catch {
+    prevColId = focusedCell?.colId
+  }
+  // 현재 스크롤 위치 및 첫 표시 행 저장 (포커스가 없을 때 복원용)
+  let prevScrollTop: number | null = null
+  let firstDisplayedRow: number | null = null
+  try {
+    const host = (agGrid as any)?.value?.$el as HTMLElement | undefined
+    const viewport = host?.querySelector?.('.ag-body-viewport') as HTMLElement | undefined
+    if (viewport) prevScrollTop = viewport.scrollTop
+  } catch {}
+  try { firstDisplayedRow = typeof api.getFirstDisplayedRow === 'function' ? api.getFirstDisplayedRow() : null } catch {}
   let rows = api.getSelectedRows?.() || []
   // 선택이 없으면 포커스된 셀의 행으로 대체
   if (!rows.length && api.getFocusedCell) {
@@ -776,6 +795,34 @@ function deleteSelectedRows() {
   }
   emit('rows-deleted', rows)
   refreshStatusCells()
+  // 삭제 후 포커스/스크롤 복원
+  nextTick(() => {
+    try {
+      // 1) 스크롤이 있었으면 정확히 스크롤만 복원 (포커스 없어도 동작)
+      const host = (agGrid as any)?.value?.$el as HTMLElement | undefined
+      const viewport = host?.querySelector?.('.ag-body-viewport') as HTMLElement | undefined
+      if (viewport && prevScrollTop != null) {
+        viewport.scrollTop = prevScrollTop
+      }
+
+      // 2) 포커스가 있었던 경우에만 포커스/가시영역 보정 수행
+      const hadFocus = typeof prevRowIndex === 'number'
+      const rowCount = api.getDisplayedRowCount?.() ?? 0
+      if (rowCount <= 0) return
+      if (hadFocus) {
+        let targetRowIndex = prevRowIndex as number
+        if (targetRowIndex >= rowCount) targetRowIndex = rowCount - 1
+        api.ensureIndexVisible?.(targetRowIndex)
+        const colId = typeof prevColId === 'string' ? prevColId : (prevColId?.colId || prevColId)
+        if (colId != null) api.setFocusedCell?.(targetRowIndex, colId)
+      } else if (firstDisplayedRow != null) {
+        // 포커스가 없었다면 기존 첫 표시 행을 그대로 유지
+        let target = firstDisplayedRow
+        if (target >= rowCount) target = rowCount - 1
+        api.ensureIndexVisible?.(target)
+      }
+    } catch {}
+  })
 }
 
 // 컴포넌트 마운트 시 초기화
