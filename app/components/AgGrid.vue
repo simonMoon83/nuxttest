@@ -413,6 +413,7 @@ const defaultColDef = ref<any>({
   ...(props.editable && {
     cellEditor: 'agTextCellEditor',  // 기본 텍스트 편집기
     cellEditorPopup: false,          // 팝업 편집기 비활성화
+    singleClickEdit: props.editMode === 'singleClick',  // 편집 모드에 따른 설정
   })
 })
 
@@ -428,9 +429,9 @@ const gridOptions = computed(() => {
     suppressScrollOnNewData: true,    // 데이터 변경 시 자동 스크롤 방지
     // 편집 관련 설정
     ...(props.editable && {
-      editType: 'fullRow' as const,   // 전체 행 편집 모드
+      editType: 'singleCell' as const,   // 개별 셀 편집 모드
       stopEditingWhenCellsLoseFocus: true,  // 포커스 잃을 때 편집 종료
-      singleClickEdit: false,              // 클릭으로 편집 시작 방지
+      singleClickEdit: props.editMode === 'singleClick',  // 편집 모드에 따른 설정
     })
   }
   
@@ -488,11 +489,37 @@ function buildAutoColumnDefsFromRow(sample: any): any[] {
   return keys.map(k => ({ field: k, headerName: k }))
 }
 
-// 최종 컬럼 정의 (동적 컬럼 > props 컬럼 > rowData 자동 생성)
+// 최종 컬럼 정의 (동적 컬럼 + props 컬럼 병합 > rowData 자동 생성)
 const finalColumnDefs = computed(() => {
-  if (dynamicColumnDefs.value.length > 0) return dynamicColumnDefs.value
+  const dynamicDefs = dynamicColumnDefs.value || []
   const propDefs = Array.isArray(props.columnDefs) ? props.columnDefs : []
-  if (propDefs.length > 0) return propDefs
+  
+  console.log('AgGrid - 동적 컬럼:', dynamicDefs)
+  console.log('AgGrid - Props 컬럼:', propDefs)
+  
+  // 동적 컬럼과 props 컬럼을 병합
+  if (dynamicDefs.length > 0 || propDefs.length > 0) {
+    const mergedDefs = [...dynamicDefs]
+    
+    // props 컬럼을 동적 컬럼과 병합 (같은 field가 있으면 props 컬럼으로 덮어쓰기)
+    propDefs.forEach(propDef => {
+      const existingIndex = mergedDefs.findIndex(def => def.field === propDef.field)
+      if (existingIndex >= 0) {
+        // 기존 컬럼을 props 컬럼으로 교체
+        console.log(`AgGrid - 컬럼 교체: ${propDef.field}`, propDef)
+        mergedDefs[existingIndex] = propDef
+      } else {
+        // 새로운 컬럼 추가
+        console.log(`AgGrid - 컬럼 추가: ${propDef.field}`, propDef)
+        mergedDefs.push(propDef)
+      }
+    })
+    
+    console.log('AgGrid - 병합된 컬럼:', mergedDefs)
+    return mergedDefs
+  }
+  
+  // 자동 생성
   const firstRow = Array.isArray(props.rowData) && props.rowData.length > 0 ? props.rowData[0] : null
   return buildAutoColumnDefsFromRow(firstRow)
 })
@@ -517,7 +544,18 @@ function onGridReady(params: any) {
  * @param event 더블클릭 이벤트 객체
  */
 function onCellDoubleClicked(event: any) { 
-  try { gridApi.value?.stopEditing?.() } catch {}
+  try { 
+    // 편집 가능한 셀인 경우 편집 시작
+    if (props.editable && event.column && event.column.getColDef().editable !== false) {
+      console.log('AgGrid - 더블클릭 편집 시작:', event.column.getColId(), event.column.getColDef())
+      gridApi.value?.startEditingCell({
+        rowIndex: event.rowIndex,
+        colKey: event.column.getColId()
+      })
+    }
+  } catch (error) {
+    console.error('AgGrid - 더블클릭 편집 시작 실패:', error)
+  }
   emit('cell-double-clicked', event) // 부모에게 이벤트 전달
 }
 
@@ -541,6 +579,9 @@ function onCellValueChanged(event: any) {
  * @param event 편집 시작 이벤트 객체
  */
 function onRowEditingStarted(event: any) {
+  console.log('AgGrid - 행 편집 시작:', event)
+  console.log('AgGrid - 편집 시작 컬럼:', event.column?.getColId())
+  console.log('AgGrid - 편집 시작 컬럼 정의:', event.column?.getColDef())
   emit('row-editing-started', event)
 }
 
@@ -549,6 +590,7 @@ function onRowEditingStarted(event: any) {
  * @param event 편집 종료 이벤트 객체
  */
 function onRowEditingStopped(event: any) {
+  console.log('AgGrid - 행 편집 종료:', event)
   emit('row-editing-stopped', event)
 }
 

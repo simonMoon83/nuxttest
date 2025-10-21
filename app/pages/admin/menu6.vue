@@ -8,7 +8,7 @@ definePageMeta({ layout: 'default', middleware: 'auth' })
 const filters = ref<any>({})
 
 // 페이지 제목
-const title = ref('메뉴  ')
+const title = ref('메뉴(테스트)')
 
 // API 엔드포인트
 const apiEndpoint = ref('/api/menu/admin')
@@ -19,8 +19,6 @@ const schema = ref<any>([])
 // 편집 스키마 (기본값 사용)
 const editSchema = ref<any>([])
 
-// 글로벌 타이틀 표시 여부
-const showGlobalTitle = ref(true)
 
 // 사용할 저장 프로시저 이름
 const procedureName = ref('sp_menu_info2')
@@ -117,7 +115,6 @@ onMounted(() => {
   :title="title"
   :api-endpoint="apiEndpoint"
   :edit-schema="editSchema"
-  :show-global-title="showGlobalTitle"
   :procedure-name="procedureName"
   :search-schema-grid-id="searchSchemaGridId"
   @grid-ready="onGridReady"

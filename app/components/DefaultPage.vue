@@ -1,19 +1,12 @@
 
 <template>
   <div class="card flex flex-wrap gap-6">
-    <!-- 글로벌 타이틀과 액션 버튼 영역 -->
-    <div v-if="showGlobalTitle && !hideGlobalTitle" class="w-full mt-1 mb-2 border-b-1 border-gray-400 dark:border-gray-700">
-      <div class="flex items-center justify-between">
-        <!-- 페이지 제목 영역 - 아이콘과 브레드크럼 제목 -->
-        <div class="flex items-center gap-1">
-          <i :class="pageIcon" class="text-primary"></i>
-          <h2 class="text-xl font-semibold text-primary">{{ breadcrumbTitle }}</h2>
-        </div>
-        <!-- 액션 버튼 영역 -->
+    <!-- 액션 버튼 영역 -->
+    <div class="w-full mt-1 mb-2 border-b-1 border-gray-400 dark:border-gray-700">
+      <div class="flex items-center justify-end">
         <div class="flex items-center gap-2">
           <Button label="검색" severity="secondary" size="small" @click="onSearch" v-if="showSearchButton" />
           <Button label="저장" severity="secondary" size="small" @click="onSave" v-if="showSaveButton" />
-          
           <Button label="초기화" outlined severity="secondary" size="small" @click="onReset" v-if="showResetButton" />
           <!--<Button label="엑셀" outlined severity="secondary" size="small" @click="exportExcel" />-->
         </div>
@@ -56,7 +49,6 @@ interface Props {
   apiEndpoint?: string  // API 엔드포인트
   columnDefs?: any[]    // AG Grid 컬럼 정의
   editSchema?: any[]    // 편집 폼 스키마
-  showGlobalTitle?: boolean    // 글로벌 타이틀 표시 여부
   showResetButton?: boolean    // 초기화 버튼 표시 여부
   showCreateButton?: boolean   // 등록 버튼 표시 여부
   showSearchButton?: boolean   // 검색 버튼 표시 여부
@@ -77,7 +69,6 @@ const props = withDefaults(defineProps<Props>(), {
   apiEndpoint: '/api/menu/admin',
   columnDefs: () => [],
   editSchema: () => [],
-  showGlobalTitle: true,
   showResetButton: false,
   showCreateButton: false,
   showSearchButton: true,

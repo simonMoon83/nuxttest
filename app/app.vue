@@ -134,7 +134,7 @@ const hideGlobalTitle = computed(() => {
       <div class="flex items-center gap-2 h-7 overflow-hidden select-none">
         <span class="w-1 h-4 bg-gray-900 dark:bg-gray-100 rounded-sm"></span>
         <i :class="pageIcon" class="text-black dark:text-gray-200 text-sm leading-none inline-flex items-center translate-y-[1px]"></i>
-        <h2 class="m-0 text-sm font-semibold text-gray-900 dark:text-gray-100 leading-none tracking-tight truncate min-w-0 flex-1 antialiased">{{ pageTitle }}</h2>
+        <h2 class="m-0 text-xl font-semibold text-primary leading-none tracking-tight truncate min-w-0 flex-1 antialiased">{{ pageTitle }}</h2>
       </div>
     </div>
     <NuxtPage keepalive />
