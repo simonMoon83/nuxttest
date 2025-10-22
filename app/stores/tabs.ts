@@ -23,7 +23,10 @@ type SidebarItem = {
 }
 
 function buildTabKey(route: ReturnType<typeof useRoute>): string {
-  return route.fullPath
+  const pMenuId = (route.params as any)?.menuId
+  if (pMenuId !== undefined && pMenuId !== null && String(pMenuId).length > 0)
+    return `${route.path}`
+  return route.fullPath || route.path
 }
 
 function normalizePath(input: string | undefined): string | undefined {

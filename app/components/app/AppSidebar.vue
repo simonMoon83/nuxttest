@@ -167,6 +167,8 @@ onUnmounted(() => {
       v-else
       v-model:collapsed="collapsed"
       link-component-name="nuxt-sidebar-link"
+      :exact="true"
+      :exact-path="true"
       :menu="menu"
       :show-one-child="true"
       :hide-toggle="true"

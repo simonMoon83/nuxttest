@@ -192,6 +192,25 @@ const pageTitle = computed(() => {
     const t = leaf ? extractItemTitle(leaf) : ''
     if (t) return t
   } catch {}
+  // 동적 라우트로 매칭 실패 시 menu_id로 보조 매칭
+  try {
+    const idParam = (route.params as any)?.menuId || (route.query as any)?.menuId
+    if (idParam && Array.isArray(menu.value)) {
+      const targetId = String(idParam)
+      const stack: any[] = []
+      let found: any
+      const visit = (nodes: any[]) => {
+        for (const node of nodes) {
+          if (String((node as any)?.menu_id ?? '') === targetId) { found = node; return }
+          if (node.child?.length) visit(node.child)
+          if (found) return
+        }
+      }
+      visit(menu.value)
+      const t2 = found ? extractItemTitle(found) : ''
+      if (t2) return t2
+    }
+  } catch {}
   const metaName = route.meta?.name
   if (metaName && metaName.length > 0) return metaName
   const seg = route.path.replace(/\/$/, '').split('/').filter(Boolean).pop()

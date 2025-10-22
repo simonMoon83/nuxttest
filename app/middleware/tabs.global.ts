@@ -71,11 +71,12 @@ export default defineNuxtRouteMiddleware(async (to) => {
         return
     }
   }
-  catch {
+  catch (err) {
+    console.warn('탭 허용 경로 계산 중 경고:', err)
     // 무시: 탭 생성을 막지 않음
   }
 
-  // 동적 라우팅 포함한 전체 경로 기준으로 탭 관리
+  // 동적 라우팅 + menuId를 포함한 키로 탭 관리되도록 보장
   tabsStore.ensureTabForRoute(to as unknown as ReturnType<typeof useRoute>)
 })
 

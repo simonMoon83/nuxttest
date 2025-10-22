@@ -60,10 +60,13 @@ export function useNavigationMenu() {
               const acc: MenuItem[] = []
               for (const current of items) {
                 const children = Array.isArray(current.child) ? prune(current.child) : undefined
-                // href가 명시되어 있으면(빈 문자열 포함) 일단 노출. 미지정(undefined)인 경우만 라우터 확인
-                const selfValid = (current.href !== undefined) ? true : routeExists(current.href)
+                // href가 유효 문자열이면 통과. undefined/null/empty는 라우터 확인 필요
+                const hasHref = typeof (current as any)?.href === 'string' && (current as any).href.trim().length > 0
+                const selfValid = hasHref ? true : routeExists(current.href)
                 if ((current as any).component || selfValid || (children && children.length > 0)) {
                   acc.push({ ...current, child: children })
+                } else {
+                  
                 }
               }
               return acc
@@ -85,16 +88,18 @@ export function useNavigationMenu() {
                   const okSelf = key ? auth.hasPermission(key, 'read') : true
                   if (okSelf || (children && children.length > 0)) {
                     acc.push({ ...current, child: children })
+                  } else {
+                    try { console.debug('[menu/perm] hidden by perm:', { title: (current as any)?.title, href: (current as any)?.href, key }) } catch {}
                   }
                 }
                 return acc
               }
               finalMenu = byPerm(finalMenu)
-            } catch (e2) {
-              console.warn('메뉴 권한 필터링 경고:', e2)
-            }
+              } catch (e2) {
+                console.warn('메뉴 권한 필터링 경고:', e2)
+              }
           } catch (e) {
-            console.warn('메뉴 라우트 필터링 중 경고:', e)
+            console.warn('메뉴 라우트 필터링 경고:', e)
           }
         } else {
           finalMenu = buildPrunedMenu(rawMenu)
@@ -179,6 +184,7 @@ export function useNavigationMenu() {
         const acc: MenuItem[] = []
         for (const current of items) {
           const key = mapKey(current as any)
+          // permission_key 가 없는 항목은 공개로 간주 (동적 템플릿 외 일반 정적 메뉴 표시 보장)
           const okSelf = key ? auth.hasPermission(key, 'read') : true
           // 상위메뉴 권한이 없으면 하위도 표시하지 않음
           if (!okSelf) continue
@@ -204,6 +210,6 @@ export function useNavigationMenu() {
     isLoading,
     error,
     fetchMenuData,
-    refreshMenu: fetchMenuData
+    refreshMenu
   }
 }
