@@ -1,7 +1,7 @@
 <script setup lang='ts'>
-import { AgGridVue } from 'ag-grid-vue3'
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
-import { TreeDataModule, ExcelExportModule, CellSelectionModule, ClipboardModule } from 'ag-grid-enterprise'
+import { CellSelectionModule, ClipboardModule, ExcelExportModule, TreeDataModule } from 'ag-grid-enterprise'
+import { AgGridVue } from 'ag-grid-vue3'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
 
@@ -20,7 +20,7 @@ interface MenuItem {
   is_active: boolean
 }
 
-interface TreeNode { key: string; data: MenuItem; children?: TreeNode[] }
+interface TreeNode { key: string, data: MenuItem, children?: TreeNode[] }
 
 definePageMeta({
   layout: 'default',
@@ -42,14 +42,11 @@ const filters = ref<any>({ title: '', href: '', activeOnly: null })
 const schema = ref<any>([
   { $formkit: 'primeInputText', name: 'title', label: '메뉴명', outerClass: 'col-4' },
   { $formkit: 'primeInputText', name: 'href', label: '링크', outerClass: 'col-4' },
-  { $formkit: 'primeSelect', name: 'activeOnly', label: '활성여부', outerClass: 'col-4',
-    optionLabel: 'label', optionValue: 'value', placeholder: '전체', showClear: true,
-    options: [
+  { $formkit: 'primeSelect', name: 'activeOnly', label: '활성여부', outerClass: 'col-4', optionLabel: 'label', optionValue: 'value', placeholder: '전체', showClear: true, options: [
       { label: '전체', value: null },
       { label: '활성', value: true },
       { label: '비활성', value: false },
-    ],
-  },
+    ], },
   { $el: 'div', attrs: { class: 'col-12 w-full flex justify-end items-center gap-x-2 mt-1' }, children: [
     { $cmp: 'Button', props: { label: '검색', severity: 'primary', onClick: () => onSearch() } },
     { $cmp: 'Button', props: { label: '초기화', outlined: true, severity: 'secondary', type: 'reset', onClick: () => onReset() } },
@@ -93,7 +90,7 @@ function updateGridTheme() { if (import.meta.client) { const div = document.quer
 watch(() => colorMode.value, () => updateGridTheme())
 function applyGridFilter() { if (!gridApi.value) return; const q = searchQuery.value.toLowerCase().trim(); gridApi.value.setGridOption('quickFilterText', q) }
 watch(searchQuery, () => applyGridFilter())
-function exportExcel() { const api = gridApi.value; if (api) api.exportDataAsExcel({fileName: 'MenuList', sheetName: 'Menus' }) }
+function exportExcel() { const api = gridApi.value; if (api) api.exportDataAsExcel({ fileName: 'MenuList', sheetName: 'Menus' }) }
 
 // 메뉴 데이터
 const menuData = ref<MenuItem[]>([])
@@ -119,7 +116,7 @@ function computePath(item: MenuItem, all: Map<number, MenuItem>): string[] {
 async function loadMenu() {
   try {
     loading.value = true
-    const res = await $fetch<{ success: boolean; data: MenuItem[] }>('/api/menu/admin')
+    const res = await $fetch<{ success: boolean, data: MenuItem[] }>('/api/menu/admin')
     if (res?.success) {
       let rows = res.data || []
       const f = filters.value
@@ -153,12 +150,12 @@ const parentMenuOptions = computed(() => [{ label: '최상위 메뉴', value: nu
 const editSchema = ref<any>([
   { $formkit: 'hidden', name: 'id' },
   { $formkit: 'primeCheckbox', name: 'is_separator', label: '구분선', outerClass: 'col-12' },
-  { $formkit: 'primeInputText', name: 'title', label: '메뉴명', outerClass: 'col-6', validation: 'required', if: "$value.is_separator !== true" },
-  { $formkit: 'primeInputText', name: 'href', label: '링크', outerClass: 'col-6', help: '예: /path/to/page', if: "$value.is_separator !== true" },
-  { $formkit: 'primeInputText', name: 'icon', label: '아이콘', help: '예: pi pi-home', outerClass: 'col-6', if: "$value.is_separator !== true" },
-  { $formkit: 'primeSelect', name: 'parent_id', label: '상위 메뉴', outerClass: 'col-6', options: parentMenuOptions, optionLabel: 'label', optionValue: 'value', placeholder: '상위 메뉴 선택', showClear: true, filter: true, if: "$value.is_separator !== true" },
+  { $formkit: 'primeInputText', name: 'title', label: '메뉴명', outerClass: 'col-6', validation: 'required', if: '$value.is_separator !== true' },
+  { $formkit: 'primeInputText', name: 'href', label: '링크', outerClass: 'col-6', help: '예: /path/to/page', if: '$value.is_separator !== true' },
+  { $formkit: 'primeInputText', name: 'icon', label: '아이콘', help: '예: pi pi-home', outerClass: 'col-6', if: '$value.is_separator !== true' },
+  { $formkit: 'primeSelect', name: 'parent_id', label: '상위 메뉴', outerClass: 'col-6', options: parentMenuOptions, optionLabel: 'label', optionValue: 'value', placeholder: '상위 메뉴 선택', showClear: true, filter: true, if: '$value.is_separator !== true' },
   { $formkit: 'primeInputNumber', name: 'sort_order', label: '정렬 순서', outerClass: 'col-6', min: 0 },
-  { $formkit: 'primeCheckbox', name: 'is_active', label: '활성', outerClass: 'col-6', if: "$value.is_separator !== true" },
+  { $formkit: 'primeCheckbox', name: 'is_active', label: '활성', outerClass: 'col-6', if: '$value.is_separator !== true' },
   {
     $el: 'div',
     attrs: { class: 'col-12 w-full flex justify-end items-center gap-x-2 mt-2' },
@@ -229,10 +226,6 @@ async function refreshMenuData() { await loadMenu(); const { refreshMenu } = use
 onMounted(() => { loadMenu() })
 </script>
 
-<style scoped>
-.field { margin-bottom: 1rem; }
-</style>
-
 <template>
   <div class="card flex flex-wrap gap-6">
     <!-- 검색 영역 (departments 디자인 차용) -->
@@ -296,3 +289,8 @@ onMounted(() => { loadMenu() })
   </div>
 </template>
 
+<style scoped>
+.field {
+  margin-bottom: 1rem;
+}
+</style>

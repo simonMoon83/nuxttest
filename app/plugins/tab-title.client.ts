@@ -1,7 +1,7 @@
 export default defineNuxtPlugin((nuxtApp) => {
   const router = useRouter()
 
-  type SidebarItem = {
+  interface SidebarItem {
     href?: string
     to?: string
     path?: string
@@ -33,7 +33,7 @@ export default defineNuxtPlugin((nuxtApp) => {
     if (!items || items.length === 0)
       return undefined
     const target = normalizePath(currentPath)
-    let bestMatch: { score: number; title: string } | undefined
+    let bestMatch: { score: number, title: string } | undefined
     const visit = (nodes: SidebarItem[]) => {
       for (const node of nodes) {
         const nodePath = extractItemPath(node)
@@ -87,5 +87,3 @@ export default defineNuxtPlugin((nuxtApp) => {
   }
   catch {}
 })
-
-

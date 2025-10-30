@@ -145,7 +145,7 @@ export const useChatStore = defineStore('chat', () => {
     chatId: number,
     files: File[],
     content?: string,
-    onProgress?: (progress: { overallPercent: number; loaded: number; total: number; perFilePercent: number[] }) => void,
+    onProgress?: (progress: { overallPercent: number, loaded: number, total: number, perFilePercent: number[] }) => void,
   ) {
     return new Promise((resolve, reject) => {
       const form = new FormData()
@@ -155,9 +155,9 @@ export const useChatStore = defineStore('chat', () => {
       for (const f of files) {
         form.append('file', f, f.name)
       }
-      
+
       const xhr = new XMLHttpRequest()
-      
+
       // 업로드 진행률 추적 (파일별 진행률 계산 포함)
       xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable && onProgress) {
@@ -172,18 +172,20 @@ export const useChatStore = defineStore('chat', () => {
             let acc = 0
             for (const s of fileSizes) { prefix.push(acc); acc += s }
             perFilePercent = fileSizes.map((size, idx) => {
-              if (size <= 0) return 100
+              if (size <= 0)
+                return 100
               const base = prefix[idx] ?? 0
               const uploadedForThis = Math.max(0, Math.min(size, estimatedUploaded - base))
               return Math.round((uploadedForThis / size) * 100)
             })
-          } else {
+          }
+          else {
             perFilePercent = files.map(() => overallPercent)
           }
           onProgress({ overallPercent, loaded: e.loaded, total: e.total, perFilePercent })
         }
       })
-      
+
       xhr.addEventListener('load', async () => {
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
@@ -192,29 +194,32 @@ export const useChatStore = defineStore('chat', () => {
             updateConversationOnNewMessage(chatId, res.data.message)
             await markRead(chatId)
             resolve(res)
-          } catch (e) {
+          }
+          catch (e) {
             reject(new Error('응답 파싱 오류'))
           }
-        } else {
+        }
+        else {
           // 에러 응답 파싱
           let errorData
           try {
             errorData = JSON.parse(xhr.responseText)
-          } catch {
+          }
+          catch {
             errorData = { message: xhr.statusText }
           }
-          
+
           const error = new Error(errorData.message || xhr.statusText) as any
           error.statusCode = xhr.status
           error.data = errorData
           reject(error)
         }
       })
-      
+
       xhr.addEventListener('error', () => {
         reject(new Error('네트워크 오류가 발생했습니다.'))
       })
-      
+
       xhr.open('POST', `/api/chats/${chatId}/attach`)
       xhr.send(form)
     })

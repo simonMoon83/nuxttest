@@ -1,7 +1,7 @@
 <script setup>
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
 import { AgGridVue } from 'ag-grid-vue3'
-import { ref, computed, watch, onMounted } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
 
@@ -146,7 +146,7 @@ onMounted(() => {
           // 초기 테마 적용
           updateGridTheme()
         },
-        onCellClicked: onCellClicked,
+        onCellClicked,
         onSelectionChanged: () => {
           if (gridApi.value) {
             const selectedRows = gridApi.value.getSelectedRows()
@@ -204,7 +204,8 @@ onMounted(() => {
         <div 
           id="myGrid" 
           :class="agGridThemeClass"
-          class="ag-grid-container">
+          class="ag-grid-container"
+>
         </div>
       </template>
     </Card>

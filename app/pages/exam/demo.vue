@@ -1,7 +1,7 @@
 <script setup lang='ts'>
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
 import { AgGridVue } from 'ag-grid-vue3'
-import { onMounted, ref, computed, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 // Legacy 테마 사용 시 필요한 CSS 파일들 임포트
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-quartz.css'

@@ -1,7 +1,7 @@
 <script setup lang='ts'>
 definePageMeta({ middleware: 'auth', name: 'Dashboard5' })
 
-import { ref, onMounted, computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 const apiBase = ref<string>(import.meta.client ? (localStorage.getItem('influxApiBase') || 'http://127.0.0.1:8000') : 'http://127.0.0.1:8000')
 const isLoading = ref(false)
@@ -55,7 +55,7 @@ function updateViews() {
       const found = rows.find(rr => new Date(rr._time).toLocaleString() === t)
       return found ? Number(found._value) : null
     })
-    return { label: tag, data: values, borderColor: color, backgroundColor: color + '33', tension: 0.2, spanGaps: true }
+    return { label: tag, data: values, borderColor: color, backgroundColor: `${color}33`, tension: 0.2, spanGaps: true }
   })
   testChartData.value = { labels: uniqueTimes, datasets }
 
@@ -70,7 +70,7 @@ function updateViews() {
     label,
     data: specRows.value.map(r => Number(r[key])),
     borderColor: color,
-    backgroundColor: color + '33',
+    backgroundColor: `${color}33`,
     tension: 0.2,
     spanGaps: true,
   })
@@ -96,8 +96,8 @@ async function fetchAll() {
   try {
     const urlTest = buildUrl(apiBase.value, '/gettest', { tag: 'A', bucket: 'testspc', window: '1d', measurement: 'TESTSPC' })
     const urlSpec = buildUrl(apiBase.value, '/getspectest', { tag: 'A', bucket: 'testspecspc', window: '4h', measurement: 'TESTSPECSPC' })
-    const [r1, r2] = await Promise.all([ fetch(urlTest), fetch(urlSpec) ])
-    const [j1, j2] = await Promise.all([ r1.json(), r2.json() ])
+    const [r1, r2] = await Promise.all([fetch(urlTest), fetch(urlSpec)])
+    const [j1, j2] = await Promise.all([r1.json(), r2.json()])
     testRows.value = j1?.data || []
     specRows.value = j2?.data || []
     updateViews()
@@ -130,7 +130,7 @@ onMounted(async () => {
         </ClientOnly>
         <div class="mt-3">
           <ClientOnly>
-            <DataTable :value="testTableRows" size="small" stripedRows paginator :rows="10" :rowsPerPageOptions="[10,20,50]">
+            <DataTable :value="testTableRows" size="small" stripedRows paginator :rows="10" :rowsPerPageOptions="[10, 20, 50]">
               <Column field="time" header="Time" style="width: 40%">
                 <template #body="{ data }">
                   <code class="text-xs">{{ data.time }}</code>
@@ -154,7 +154,7 @@ onMounted(async () => {
         </ClientOnly>
         <div class="mt-3">
           <ClientOnly>
-            <DataTable :value="specTableRows" size="small" stripedRows paginator :rows="10" :rowsPerPageOptions="[10,20,50]">
+            <DataTable :value="specTableRows" size="small" stripedRows paginator :rows="10" :rowsPerPageOptions="[10, 20, 50]">
               <Column field="time" header="Time" style="width: 30%">
                 <template #body="{ data }">
                   <code class="text-xs">{{ data.time }}</code>
@@ -175,5 +175,3 @@ onMounted(async () => {
 
 <style scoped>
 </style>
-
-

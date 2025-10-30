@@ -1,36 +1,3 @@
-<template>
-  <div class="card">
-    <h2>Stored Procedure 테스트 - sp_code_info</h2>
-    
-    <div class="mb-4">
-      <h3>sp_code_info 테스트</h3>
-      <div class="flex gap-2 mb-2">
-        <InputText v-model="testParams.plant_code" placeholder="plant_code" />
-        <InputText v-model="testParams.code_grp" placeholder="code_grp" />
-        <Button @click="testSpCodeInfo" :loading="testing">테스트 실행</Button>
-      </div>
-      
-      <div v-if="testResult" class="p-3 border rounded">
-        <h4>테스트 결과:</h4>
-        <pre>{{ JSON.stringify(testResult, null, 2) }}</pre>
-      </div>
-    </div>
-    
-    <div class="mb-4">
-      <h3>sp_grid_info 테스트</h3>
-      <div class="flex gap-2 mb-2">
-        <InputText v-model="gridParams.grid_id" placeholder="grid_id" />
-        <Button @click="testSpGridInfo" :loading="testingGrid">테스트 실행</Button>
-      </div>
-      
-      <div v-if="gridResult" class="p-3 border rounded">
-        <h4>테스트 결과:</h4>
-        <pre>{{ JSON.stringify(gridResult, null, 2) }}</pre>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
 const testParams = ref({
   plant_code: '1000',
@@ -95,3 +62,36 @@ async function testSpGridInfo() {
   }
 }
 </script>
+
+<template>
+  <div class="card">
+    <h2>Stored Procedure 테스트 - sp_code_info</h2>
+    
+    <div class="mb-4">
+      <h3>sp_code_info 테스트</h3>
+      <div class="flex gap-2 mb-2">
+        <InputText v-model="testParams.plant_code" placeholder="plant_code" />
+        <InputText v-model="testParams.code_grp" placeholder="code_grp" />
+        <Button @click="testSpCodeInfo" :loading="testing">테스트 실행</Button>
+      </div>
+      
+      <div v-if="testResult" class="p-3 border rounded">
+        <h4>테스트 결과:</h4>
+        <pre>{{ JSON.stringify(testResult, null, 2) }}</pre>
+      </div>
+    </div>
+    
+    <div class="mb-4">
+      <h3>sp_grid_info 테스트</h3>
+      <div class="flex gap-2 mb-2">
+        <InputText v-model="gridParams.grid_id" placeholder="grid_id" />
+        <Button @click="testSpGridInfo" :loading="testingGrid">테스트 실행</Button>
+      </div>
+      
+      <div v-if="gridResult" class="p-3 border rounded">
+        <h4>테스트 결과:</h4>
+        <pre>{{ JSON.stringify(gridResult, null, 2) }}</pre>
+      </div>
+    </div>
+  </div>
+</template>

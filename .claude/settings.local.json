@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm add:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm lint:fix:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm test:unit:*)",
+      "Bash(del \"c:\\Project\\nuxttest\\server\\middleware\\security-headers.ts\")",
+      "Bash(pnpm dev)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

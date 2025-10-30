@@ -2,13 +2,18 @@ import sql from 'mssql'
 import { getDbConnection } from '../../../utils/db'
 import { getCurrentUserId } from '../../../utils/auth'
 import { emitToUsers } from '../../../utils/chatBus'
+import { sanitizePlainText } from '../../../utils/sanitize'
 
-export default defineEventHandler( async (event) => {
+export default defineEventHandler(async (event) => {
   const senderId = getCurrentUserId(event)
   const chatId = Number(getRouterParam(event, 'id') || 0)
-  if (!chatId) throw createError({ statusCode: 400, message: '잘못된 chat id' })
+  if (!chatId)
+    throw createError({ statusCode: 400, message: '잘못된 chat id' })
   const body = await readBody(event) as { content?: string }
-  const content = (body?.content || '').toString().slice(0, 2000)
+  const rawContent = (body?.content || '').toString().slice(0, 2000)
+
+  // XSS 방어 - HTML 태그 제거
+  const content = sanitizePlainText(rawContent)
 
   const connection = await getDbConnection()
 

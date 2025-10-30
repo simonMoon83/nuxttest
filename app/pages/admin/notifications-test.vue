@@ -15,7 +15,7 @@ const isCreating = ref(false)
 const selectedIds = ref<number[]>([])
 // 발송 대상 선택
 const isBroadcast = ref(false)
-const selectedUsers = ref<Array<{ id: number; label: string }>>([])
+const selectedUsers = ref<Array<{ id: number, label: string }>>([])
 
 // 조직/사용자 트리 선택 (채팅 그룹 만들기와 동일)
 const orgTreeNodes = ref<any[]>([])
@@ -219,11 +219,11 @@ async function deleteAll() {
     </div>
     <div class="mb-3 flex items-center gap-2">
       <Button label="새로고침" @click="refresh" :loading="notificationStore.isLoading" />
-      <Button label="선택 읽음" severity="secondary" :disabled="!selectedIds.length || mode==='sent'" @click="markSelectedRead" />
+      <Button label="선택 읽음" severity="secondary" :disabled="!selectedIds.length || mode === 'sent'" @click="markSelectedRead" />
       <Button label="선택 삭제" severity="danger" :disabled="!selectedIds.length" @click="deleteSelected" />
       <Button label="전체 삭제" severity="danger" outlined @click="deleteAll" />
-      <Button label="모두 읽음" severity="secondary" :disabled="mode==='sent' || !notificationStore.items.length || !notificationStore.hasUnread" @click="notificationStore.markAllRead" />
-      <div class="ml-auto text-sm text-gray-600 dark:text-gray-300" v-if="mode==='inbox'">미읽음: <span class="font-semibold">{{ notificationStore.unreadCount }}</span></div>
+      <Button label="모두 읽음" severity="secondary" :disabled="mode === 'sent' || !notificationStore.items.length || !notificationStore.hasUnread" @click="notificationStore.markAllRead" />
+      <div class="ml-auto text-sm text-gray-600 dark:text-gray-300" v-if="mode === 'inbox'">미읽음: <span class="font-semibold">{{ notificationStore.unreadCount }}</span></div>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -283,8 +283,8 @@ async function deleteAll() {
                   <div class="flex items-start justify-between gap-2">
                     <div class="flex-1 min-w-0 cursor-pointer" @click="fillFormFromNotification(n)">
                       <div class="flex items-start justify-between gap-2">
-                        <div :class="['font-medium', n.is_read ? 'text-gray-500' : 'text-gray-900 dark:text-gray-100']">{{ n.title }}</div>
-                        <div class="shrink-0 text-[11px] text-gray-500" v-if="mode==='sent'">보낸이: 나</div>
+                        <div class="font-medium" :class="[n.is_read ? 'text-gray-500' : 'text-gray-900 dark:text-gray-100']">{{ n.title }}</div>
+                        <div class="shrink-0 text-[11px] text-gray-500" v-if="mode === 'sent'">보낸이: 나</div>
                         <div class="shrink-0 text-[11px] text-gray-500" v-else-if="n.sender_name || n.sender_username">보낸이: {{ n.sender_name || n.sender_username }}</div>
                       </div>
                       <div class="text-gray-500 whitespace-pre-wrap break-words">{{ n.message }}</div>
@@ -294,8 +294,8 @@ async function deleteAll() {
                 <td class="py-2">
                   <div class="flex items-center justify-end gap-2">
                     <Button label="상세" text size="small" @click.stop="openDetail(n)" />
-                    <span v-if="mode==='inbox' && n.is_read" class="text-[12px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">읽음</span>
-                    <Button v-else-if="mode==='inbox'" icon="pi pi-check" text size="small" v-tooltip.bottom="'읽음 표시'" @click.stop="notificationStore.markRead([n.id])" />
+                    <span v-if="mode === 'inbox' && n.is_read" class="text-[12px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">읽음</span>
+                    <Button v-else-if="mode === 'inbox'" icon="pi pi-check" text size="small" v-tooltip.bottom="'읽음 표시'" @click.stop="notificationStore.markRead([n.id])" />
                     <Button icon="pi pi-trash" text size="small" severity="danger" v-tooltip.bottom="'삭제'" @click.stop="deleteOne(n.id)" />
                   </div>
                   <div class="mt-1 text-[11px] text-gray-400 text-right leading-tight">
@@ -323,6 +323,4 @@ async function deleteAll() {
       </template>
     </Dialog>
   </div>
-  
 </template>
-

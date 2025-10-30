@@ -21,7 +21,7 @@ const perFileProgress = ref<number[]>([])
 const dropActive = ref(false)
 
 // Preserve previous inline styles to restore later
-const prevWorkspaceStyle = ref<{ overflow: string; height: string } | null>(null)
+const prevWorkspaceStyle = ref<{ overflow: string, height: string } | null>(null)
 const prevHtmlOverflow = ref<string | null>(null)
 const prevHtmlOverscroll = ref<string | null>(null)
 const prevBodyMargin = ref<string | null>(null)
@@ -121,9 +121,6 @@ const searchResults = ref<any[]>([])
 const searching = ref(false)
 const resultOffset = ref(0)
 const hasMoreResults = ref(false)
- 
-
- 
 
 async function runSearch(reset = true) {
   const id = props.chatId
@@ -211,7 +208,7 @@ function goToBottom() {
 
 // Lock body scroll when dialog is visible
 watch(() => props.visible, (vis) => {
-  if (process.client) {
+  if (import.meta.client) {
     const b = document.body
     if (b) {
       b.style.overflow = vis ? 'hidden' : ''
@@ -262,7 +259,7 @@ watch(() => props.visible, (vis) => {
 }, { immediate: true })
 
 onUnmounted(() => {
-  if (process.client) {
+  if (import.meta.client) {
     const b = document.body
     if (b) {
       b.style.overflow = ''
@@ -388,12 +385,12 @@ async function send() {
       console.log('Full error object:', JSON.stringify(error, null, 2))
       
       // 다양한 경로에서 에러 메시지 추출 시도
-      const errorMessage = error.data?.message || 
-                          error.data?.statusMessage || 
-                          error.message || 
-                          error.statusMessage || 
-                          error.cause?.message ||
-                          '알 수 없는 오류가 발생했습니다.'
+      const errorMessage = error.data?.message 
+        || error.data?.statusMessage 
+        || error.message 
+        || error.statusMessage 
+        || error.cause?.message
+        || '알 수 없는 오류가 발생했습니다.'
       
       console.log('Extracted error message:', errorMessage)
       
@@ -542,7 +539,7 @@ function onAttachmentImageLoad() {
 
 // Participants dialog state & actions
 const showMembers = ref(false)
-const members = ref<Array<{ id: number; name: string; username: string; is_active: boolean }>>([])
+const members = ref<Array<{ id: number, name: string, username: string, is_active: boolean }>>([])
 const membersLoading = ref(false)
 
 async function openMembers() {
@@ -568,10 +565,12 @@ async function openMembers() {
         <div class="flex items-center gap-2">
           <i class="pi pi-comments"></i>
           <span class="font-semibold">{{ chatTitle }}</span>
-          <button v-if="currentConversation && currentConversation.is_group && currentConversation.member_count"
+          <button
+v-if="currentConversation && currentConversation.is_group && currentConversation.member_count"
                   class="text-xs text-gray-500 hover:text-gray-700 underline-offset-2 hover:underline"
                   type="button"
-                  @click.stop="openMembers">
+                  @click.stop="openMembers"
+>
             ({{ currentConversation.member_count }})
           </button>
         </div>
@@ -591,11 +590,13 @@ async function openMembers() {
     <div class="flex flex-col gap-3 h-[70vh] max-h-[70vh]">
       <!-- Search Bar -->
       <div class="flex items-center gap-2 mb-2">
-        <input v-model="searchQuery"
+        <input
+v-model="searchQuery"
                class="p-inputtext p-inputtext-sm flex-1"
                placeholder="채팅 내 검색"
                @input="onSearchInput"
-               @keydown.enter="runSearch(true)" />
+               @keydown.enter="runSearch(true)"
+/>
         <Button size="small" icon="pi pi-search" label="검색" @click="runSearch(true)" />
         <Button v-if="searchQuery" size="small" text label="지우기" @click="clearSearch" />
       </div>
@@ -616,38 +617,44 @@ async function openMembers() {
       </div>
 
       <div ref="messagesEl" class="flex-1 min-h-0 overflow-auto p-2 pb-10 bg-gray-50 dark:bg-gray-800/30 rounded border border-gray-200 dark:border-gray-700" @scroll="onMessagesScroll">
-        <div v-for="m in messages" :key="m.id" :id="`msg-${m.id}`"
-             :class="['mb-3 transition-colors', highlightMessageId === m.id ? 'bg-amber-50 dark:bg-amber-900/20 rounded' : '']">
+        <div
+v-for="m in messages" :key="m.id" :id="`msg-${m.id}`"
+             class="mb-3 transition-colors" :class="[highlightMessageId === m.id ? 'bg-amber-50 dark:bg-amber-900/20 rounded' : '']"
+>
           <!-- System message (e.g., left/joined) -->
           <div v-if="m.sender_id === 0 && m.content" class="text-center text-[12px] text-gray-500 my-2">
             {{ m.content }}
           </div>
           <template v-else>
           <!-- Sender name (group chats, non-self) -->
-          <div v-if="currentConversation && currentConversation.is_group && m.sender_id !== meId"
-               class="text-[11px] text-gray-500 mb-0.5 text-left">
+          <div
+v-if="currentConversation && currentConversation.is_group && m.sender_id !== meId"
+               class="text-[11px] text-gray-500 mb-0.5 text-left"
+>
             {{ m.sender_name || '알 수 없음' }}
           </div>
           <!-- Text bubble (only if content exists) -->
-          <div :class="['flex', m.sender_id === meId ? 'justify-end' : 'justify-start']" v-if="m.content">
+          <div class="flex" :class="[m.sender_id === meId ? 'justify-end' : 'justify-start']" v-if="m.content">
             <div class="max-w-[85%] rounded px-3 py-2 shadow text-sm whitespace-pre-wrap break-words bg-white dark:bg-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700">
               <div>{{ m.content }}</div>
             </div>
           </div>
 
           <!-- Attachments rendered outside of blue bubble for clean layout -->
-          <div v-if="m.attachments?.length" :class="['flex mt-1', m.sender_id === meId ? 'justify-end' : 'justify-start']">
+          <div v-if="m.attachments?.length" class="flex mt-1" :class="[m.sender_id === meId ? 'justify-end' : 'justify-start']">
             <div class="max-w-[85%]">
               <!-- Image thumbnails -->
-              <div :class="['grid gap-2', (m.attachments.filter(a => isImage(a)).length > 1) ? 'grid-cols-2' : 'grid-cols-1']" v-if="m.attachments.some(a => isImage(a))">
+              <div class="grid gap-2" :class="[(m.attachments.filter(a => isImage(a)).length > 1) ? 'grid-cols-2' : 'grid-cols-1']" v-if="m.attachments.some(a => isImage(a))">
                 <a v-for="att in m.attachments.filter(a => isImage(a))" :key="att.id" :href="fileUrl(att)" target="_blank" class="block group focus:outline-none outline-none">
                   <img :src="fileUrl(att)" class="w-auto max-w-full h-auto max-h-60 object-contain rounded-md border border-gray-200 dark:border-gray-700 bg-white" @load="onAttachmentImageLoad" />
                 </a>
               </div>
               <!-- File cards -->
               <div class="mt-2 space-y-1" v-if="m.attachments.some(a => !isImage(a))">
-                <a v-for="att in m.attachments.filter(a => !isImage(a))" :key="att.id" :href="downloadUrl(att)" target="_blank" :download="att.file_name || ''"
-                   class="w-full flex items-center gap-2 px-2 py-1 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-xs text-gray-900 dark:text-gray-100 focus:outline-none outline-none">
+                <a
+v-for="att in m.attachments.filter(a => !isImage(a))" :key="att.id" :href="downloadUrl(att)" target="_blank" :download="att.file_name || ''"
+                   class="w-full flex items-center gap-2 px-2 py-1 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-xs text-gray-900 dark:text-gray-100 focus:outline-none outline-none"
+>
                   <i class="pi pi-file text-gray-700 dark:text-gray-300"></i>
                   <span class="truncate">{{ att.file_name }}</span>
                   <span class="opacity-70">· {{ formatSize(att.size) }}</span>
@@ -657,10 +664,12 @@ async function openMembers() {
             </div>
           </div>
 
-          <div :class="['text-[11px] text-gray-400 mt-0.5', m.sender_id === meId ? 'text-right' : 'text-left']">
+          <div class="text-[11px] text-gray-400 mt-0.5" :class="[m.sender_id === meId ? 'text-right' : 'text-left']">
             <span>{{ m.created_at_text || formatTime(m.created_at) }}</span>
-            <span v-if="(m.unread_count || 0) > 0"
-                  class="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-[10px] align-middle">
+            <span
+v-if="(m.unread_count || 0) > 0"
+                  class="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-[10px] align-middle"
+>
               {{ m.unread_count }}
             </span>
           </div>
@@ -696,7 +705,7 @@ async function openMembers() {
                 </div>
                 <div class="max-h-24 overflow-y-auto space-y-1">
                   <div v-for="(f, i) in pendingFiles" :key="i" class="relative overflow-hidden px-2 py-1.5 rounded bg-gray-100 dark:bg-gray-700 text-xs">
-                    <div v-if="uploading" class="absolute top-0 left-0 bottom-0 pointer-events-none" :style="{ width: (perFileProgress[i] || 0) + '%' }">
+                    <div v-if="uploading" class="absolute top-0 left-0 bottom-0 pointer-events-none" :style="{ width: `${perFileProgress[i] || 0}%` }">
                       <div class="h-full bg-blue-500/15"></div>
                     </div>
                     <div class="relative flex items-center gap-2">
@@ -748,8 +757,10 @@ async function openMembers() {
             </div>
             <div class="text-[11px] text-gray-400 truncate">@{{ m.username }}</div>
           </div>
-          <span class="text-[10px] px-1.5 py-0.5 rounded"
-                :class="m.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600'">
+          <span
+class="text-[10px] px-1.5 py-0.5 rounded"
+                :class="m.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600'"
+>
             {{ m.is_active ? '활성' : '비활성' }}
           </span>
         </li>
@@ -765,7 +776,8 @@ async function openMembers() {
         <label class="text-xs text-gray-500">조직/사용자 선택</label>
         <div class="mt-1 border rounded p-2 max-h-72 overflow-auto">
           <div v-if="orgTreeLoading" class="text-sm text-gray-500">로딩중...</div>
-          <Tree v-else
+          <Tree
+v-else
             :value="orgTreeNodes"
             selectionMode="checkbox"
             v-model:selectionKeys="orgTreeSelection"

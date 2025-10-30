@@ -1,55 +1,5 @@
-<template>
-  <div class="w-full" @wheel.passive="onWheel">
-    <div class="flex items-center justify-between mb-2">
-      <h5 class="m-0">{{ title }}</h5>
-      <div class="flex items-center gap-2 text-sm">
-        <span class="text-color-secondary">{{ currentIndex + 1 }} / {{ filteredItems.length }}</span>
-        <span class="text-color-secondary">(총 {{ filteredItems.length }}건)</span>
-        <Button icon="pi pi-chevron-left" text size="small" @click="prev" :disabled="!canNavigate" />
-        <Button icon="pi pi-chevron-right" text size="small" @click="next" :disabled="!canNavigate" />
-      </div>
-    </div>
-
-    <div v-if="currentItem" class="card p-0 overflow-hidden" @dblclick="onCardDblClick(currentItem)">
-      <div class="h-1.5 bg-gradient-to-r from-blue-500 to-purple-600" />
-      <div class="p-4">
-        <div class="flex items-start justify-between mb-3">
-          <div class="font-semibold text-lg truncate">{{ getTitle(currentItem) }}</div>
-          <div class="text-xs text-color-secondary">#{{ currentIndex + 1 }}</div>
-        </div>
-
-        <div class="rounded-md border border-gray-200 dark:border-gray-700 p-3 bg-white/70 dark:bg-gray-900/40">
-          <div class="grid grid-cols-2 gap-x-4 gap-y-2 items-center">
-            <template v-for="col in visibleColumns" :key="col.field">
-              <div class="text-xs uppercase tracking-wide text-color-secondary truncate">{{ col.headerName || col.field }}</div>
-              <div>
-                <input
-                  type="text"
-                  class="w-full text-sm px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-primary"
-                  :placeholder="col.headerName || col.field"
-                  :value="editableItem[col.field] ?? ''"
-                  @input="onInput($event, col.field)"
-                />
-              </div>
-            </template>
-          </div>
-        </div>
-      </div>
-      <div class="px-4 pb-3 flex items-center justify-between text-xs text-color-secondary">
-        <div>마우스 휠로 다음/이전 항목 보기</div>
-        <div>더블클릭으로 상세 이벤트</div>
-      </div>
-    </div>
-
-    <div v-else class="card p-6 text-center text-color-secondary">
-      데이터가 없습니다.
-    </div>
-  </div>
-  
-</template>
-
 <script setup lang="ts">
-interface ColumnDef { field: string; headerName?: string; hide?: boolean }
+interface ColumnDef { field: string, headerName?: string, hide?: boolean }
 
 interface Props {
   title?: string
@@ -166,7 +116,54 @@ function onWheel(e: WheelEvent) {
 defineExpose({ applyFilter, getItems, next, prev })
 </script>
 
+<template>
+  <div class="w-full" @wheel.passive="onWheel">
+    <div class="flex items-center justify-between mb-2">
+      <h5 class="m-0">{{ title }}</h5>
+      <div class="flex items-center gap-2 text-sm">
+        <span class="text-color-secondary">{{ currentIndex + 1 }} / {{ filteredItems.length }}</span>
+        <span class="text-color-secondary">(총 {{ filteredItems.length }}건)</span>
+        <Button icon="pi pi-chevron-left" text size="small" @click="prev" :disabled="!canNavigate" />
+        <Button icon="pi pi-chevron-right" text size="small" @click="next" :disabled="!canNavigate" />
+      </div>
+    </div>
+
+    <div v-if="currentItem" class="card p-0 overflow-hidden" @dblclick="onCardDblClick(currentItem)">
+      <div class="h-1.5 bg-gradient-to-r from-blue-500 to-purple-600" />
+      <div class="p-4">
+        <div class="flex items-start justify-between mb-3">
+          <div class="font-semibold text-lg truncate">{{ getTitle(currentItem) }}</div>
+          <div class="text-xs text-color-secondary">#{{ currentIndex + 1 }}</div>
+        </div>
+
+        <div class="rounded-md border border-gray-200 dark:border-gray-700 p-3 bg-white/70 dark:bg-gray-900/40">
+          <div class="grid grid-cols-2 gap-x-4 gap-y-2 items-center">
+            <template v-for="col in visibleColumns" :key="col.field">
+              <div class="text-xs uppercase tracking-wide text-color-secondary truncate">{{ col.headerName || col.field }}</div>
+              <div>
+                <input
+                  type="text"
+                  class="w-full text-sm px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-primary"
+                  :placeholder="col.headerName || col.field"
+                  :value="editableItem[col.field] ?? ''"
+                  @input="onInput($event, col.field)"
+                />
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+      <div class="px-4 pb-3 flex items-center justify-between text-xs text-color-secondary">
+        <div>마우스 휠로 다음/이전 항목 보기</div>
+        <div>더블클릭으로 상세 이벤트</div>
+      </div>
+    </div>
+
+    <div v-else class="card p-6 text-center text-color-secondary">
+      데이터가 없습니다.
+    </div>
+  </div>
+</template>
+
 <style scoped>
 </style>
-
-

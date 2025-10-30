@@ -27,7 +27,7 @@
 }
 
 // 다크 테마 지원
-[data-theme="dark"] .v-sidebar-menu,
+[data-theme='dark'] .v-sidebar-menu,
 .dark .v-sidebar-menu {
   --vsm-primary-color: #fff;
   --vsm-base-bg: #2a2a2e;
@@ -47,7 +47,7 @@
   --vsm-header-item-color: #adb5bd;
   --vsm-toggle-btn-color: #fff;
   --vsm-toggle-btn-bg: #2a2a2e;
-  
+
   hr {
     background-color: #495057;
   }
@@ -87,7 +87,7 @@
 }
 
 // 다크모드: 축소 플라이아웃(오버레이) 드롭다운도 확장 상태와 동일 스타일 강제
-[data-theme="dark"] .v-sidebar-menu,
+[data-theme='dark'] .v-sidebar-menu,
 .dark .v-sidebar-menu {
   // 다크 테마에서의 경계선 색상 조정
   border-right-color: #3f3f46;

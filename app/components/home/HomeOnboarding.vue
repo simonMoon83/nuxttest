@@ -31,5 +31,3 @@ function open(s: any) {
 </template>
 
 <style scoped></style>
-
-

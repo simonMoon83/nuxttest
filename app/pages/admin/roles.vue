@@ -1,6 +1,6 @@
 <script setup lang='ts'>
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
-import { TreeDataModule, ExcelExportModule, CellSelectionModule, ClipboardModule } from 'ag-grid-enterprise'
+import { CellSelectionModule, ClipboardModule, ExcelExportModule, TreeDataModule } from 'ag-grid-enterprise'
 import { AgGridVue } from 'ag-grid-vue3'
 import { computed, onMounted, ref, shallowRef, watch } from 'vue'
 import 'ag-grid-community/styles/ag-grid.css'
@@ -93,7 +93,7 @@ const editSchema = ref<any>([
     { $cmp: 'Button', if: '$id', props: { label: '삭제', severity: 'danger', loading: deleting.value, onClick: () => deleteInDialog() } },
     { $cmp: 'Button', props: { label: '취소', severity: 'secondary', onClick: () => { dialogVisible.value = false } } },
     { $cmp: 'Button', props: { label: '저장', onClick: () => saveRole() } },
-  ]},
+  ] },
 ])
 
 function openCreate() {
@@ -128,7 +128,6 @@ async function saveRole() {
       try { await loadRoles() } catch {}
       try { rebuildMenuRowData() } catch {}
     }
-    return
   } else {
     await $fetch(`/api/roles/${editTarget.value.id}`, { method: 'PUT', body })
     dialogVisible.value = false
@@ -147,7 +146,7 @@ function exportExcel() { const api = gridApi.value; if (api) api.exportDataAsExc
 function onGridReady(params: any) { gridApi.value = params.api }
 function onCellDoubleClicked(event: any) { openEdit(event.data) }
 
-interface MenuItem { id: number; title: string; href?: string | null; parent_id?: number | null; permission_key?: string | null }
+interface MenuItem { id: number, title: string, href?: string | null, parent_id?: number | null, permission_key?: string | null }
 const menuRows = ref<MenuItem[]>([])
 const menuRowData = ref<any[]>([])
 const menuLoading = ref(false)
@@ -170,7 +169,7 @@ const menuAutoGroupColumnDef = ref<any>({ headerName: '메뉴', minWidth: 220, c
 async function loadMenus() {
   menuLoading.value = true
   try {
-    const r = await $fetch<{ success: boolean; data: any[] }>('/api/menu/admin')
+    const r = await $fetch<{ success: boolean, data: any[] }>('/api/menu/admin')
     const list = (r.data || []).map(m => ({ id: m.id, title: m.title, href: m.href, parent_id: m.parent_id, permission_key: m.permission_key || (m.href ? `menu:${m.href}` : `menu:id:${m.id}`) }))
     menuRows.value = list
     rebuildMenuRowData()
@@ -264,7 +263,7 @@ const assignedUsersColDefs = ref<any[]>([
 const compactGridOpts = ref<any>({ rowHeight: 26, headerHeight: 28, rowSelection: 'multiple', defaultColDef: { filter: true } })
 //
 async function loadAssignedUsers(roleId: number) {
-  const res = await $fetch<any>('/api/roles/' + roleId + '/users')
+  const res = await $fetch<any>(`/api/roles/${roleId}/users`)
   assignedUsers.value = res?.success ? (res.data || []) : []
 }
 function onAssignedUsersGridReady(p: any) { assignedUsersGridApi.value = p.api }
@@ -398,7 +397,7 @@ const assignedDeptsColDefs = ref<any[]>([
   { headerName: '삭제', colId: 'remove', width: 90, valueGetter: () => '삭제', cellClass: 'action-cell danger' },
 ])
 async function loadAssignedDepts(roleId: number) {
-  const res = await $fetch<any>('/api/roles/' + roleId + '/departments')
+  const res = await $fetch<any>(`/api/roles/${roleId}/departments`)
   assignedDepts.value = res?.success ? (res.data || []) : []
 }
 function onAssignedDeptsGridReady(p: any) { assignedDeptsGridApi.value = p.api }
@@ -520,7 +519,12 @@ watch(dialogVisible, async (v) => {
             style="width: 100%; height: 100%;"
             @grid-ready="onMenuGridReady"
             @cell-value-changed="onMenuCellValueChanged"
-            @cell-clicked="(e:any)=>{ if(e?.column?.getColId?.()=='read'||e?.column?.getColId?.()=='write'){ try{ e.event?.stopPropagation?.() } catch{} } }"
+            @cell-clicked="(e:any) => {
+ if (e?.column?.getColId?.() == 'read' || e?.column?.getColId?.() == 'write'){
+ try { e.event?.stopPropagation?.() }
+ catch {} 
+} 
+}"
           />
         </div>
       </div>
@@ -532,7 +536,8 @@ watch(dialogVisible, async (v) => {
             <label class="text-xs text-gray-500">조직/사용자 선택</label>
             <div class="mt-1 border rounded p-2 max-h-72 overflow-auto">
               <div v-if="orgTreeLoading" class="text-sm text-gray-500">로딩중...</div>
-              <Tree v-else
+              <Tree
+v-else
                 :value="orgTreeNodes"
                 selectionMode="checkbox"
                 v-model:selectionKeys="orgTreeSelection"
@@ -554,7 +559,6 @@ watch(dialogVisible, async (v) => {
               </div>
             </div>
           </div>
-
 
         </div>
 
@@ -609,5 +613,3 @@ watch(dialogVisible, async (v) => {
   color: var(--p-red-500);
 }
 </style>
-
-

@@ -16,4 +16,4 @@ export default defineNuxtPlugin(async () => {
       // 오류가 발생해도 앱 로딩을 중단하지 않음
     }
   }
-}) 
+})

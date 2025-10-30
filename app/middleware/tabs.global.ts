@@ -1,4 +1,4 @@
-type SidebarItem = {
+interface SidebarItem {
   href?: string
   to?: string
   path?: string
@@ -79,5 +79,3 @@ export default defineNuxtRouteMiddleware(async (to) => {
   // 동적 라우팅 + menuId를 포함한 키로 탭 관리되도록 보장
   tabsStore.ensureTabForRoute(to as unknown as ReturnType<typeof useRoute>)
 })
-
-

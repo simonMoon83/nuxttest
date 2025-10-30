@@ -1,51 +1,3 @@
-<template>
-  <div class="card flex flex-col gap-4">
-    <!-- 상단 타이틀/액션 -->
-    <div class="w-full mt-1 mb-2 border-b-1 border-gray-400 dark:border-gray-700">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-1">
-          <i :class="pageIcon" class="text-primary"></i>
-          <h2 class="text-xl font-semibold text-primary">{{ breadcrumbTitle }}</h2>
-        </div>
-        <div class="flex items-center gap-2">
-          <Button label="검색" severity="secondary" size="small" v-if="showSearchButton" @click="onSearchHandled" />
-          <Button label="저장" severity="secondary" size="small" v-if="showSaveButton" @click="onSaveHandled" />
-        </div>
-      </div>
-    </div>
-
-    <!-- 검색 영역 -->
-    <div class="w-full pb-2 mb-2 border-b border-gray-200 dark:border-gray-700">
-      <div class="compact-form">
-        <FormKitDataEdit
-          v-if="finalSchema.length > 0"
-          :key="`schema-${finalSchema.length}`"
-          v-model="filters"
-          :schema="finalSchema"
-          :debug-schema="false"
-          :debug-data="false"
-          form-class="form-horizontal grid-12"
-          submit-label=""
-          @data-saved="onSearchHandled"
-        />
-      </div>
-    </div>
-
-    <!-- 컨텐츠 블록 -->
-    <div class="w-full flex flex-col gap-4">
-      <component
-        v-for="block in resolvedBlocks"
-        :key="block.key"
-        :is="block.component"
-        v-bind="block.props"
-        @grid-ready="block.onGridReady"
-        @cell-double-clicked="block.onCellDblClick"
-        @card-double-clicked="block.onCardDblClick"
-      />
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
 // DynamicPage1: 현재 라우트 또는 탭의 메뉴 id를 기반으로 s_menu_display를 조회하여
 // contents_type(grid|card)에 따라 AgGrid 또는 CardGrid를 순서대로 렌더링한다.
@@ -57,7 +9,7 @@ const { menu, fetchMenuData, refreshMenu } = useNavigationMenu()
 import AgGrid from '@/components/AgGrid.vue'
 import CardGrid from '@/components/CardGrid.vue'
 
-type DisplayRow = {
+interface DisplayRow {
   menu_id: string
   contents_seq: number
   contents_type: 'grid' | 'card' | string
@@ -158,9 +110,12 @@ function onSearchHandled() {
           parameters: { case: searchCase, ...cleanFilters }
         }
       })
-      const rowsOut = Array.isArray(result?.data) ? result.data
-        : Array.isArray(result?.recordset) ? result.recordset
-        : Array.isArray(result?.recordsets?.[0]) ? result.recordsets[0]
+      const rowsOut = Array.isArray(result?.data)
+? result.data
+        : Array.isArray(result?.recordset)
+? result.recordset
+        : Array.isArray(result?.recordsets?.[0])
+? result.recordsets[0]
         : []
       contentData.value = rowsOut
     } catch (err) {
@@ -368,8 +323,10 @@ async function loadDynamicSearchSchema() {
                   parameters: { case: 'search', plant_code: '1000', code_grp: colCode }
                 }
               })
-              let optionsData = Array.isArray(codes?.data) ? codes.data
-                : Array.isArray(codes?.recordset) ? codes.recordset
+              let optionsData = Array.isArray(codes?.data)
+? codes.data
+                : Array.isArray(codes?.recordset)
+? codes.recordset
                 : []
               item.options = [{ code_name: '전체', code: null }, ...optionsData]
             } catch {
@@ -456,8 +413,57 @@ const resolvedBlocks = computed(() => {
 })
 </script>
 
+<template>
+  <div class="card flex flex-col gap-4">
+    <!-- 상단 타이틀/액션 -->
+    <div class="w-full mt-1 mb-2 border-b-1 border-gray-400 dark:border-gray-700">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-1">
+          <i :class="pageIcon" class="text-primary"></i>
+          <h2 class="text-xl font-semibold text-primary">{{ breadcrumbTitle }}</h2>
+        </div>
+        <div class="flex items-center gap-2">
+          <Button label="검색" severity="secondary" size="small" v-if="showSearchButton" @click="onSearchHandled" />
+          <Button label="저장" severity="secondary" size="small" v-if="showSaveButton" @click="onSaveHandled" />
+        </div>
+      </div>
+    </div>
+
+    <!-- 검색 영역 -->
+    <div class="w-full pb-2 mb-2 border-b border-gray-200 dark:border-gray-700">
+      <div class="compact-form">
+        <FormKitDataEdit
+          v-if="finalSchema.length > 0"
+          :key="`schema-${finalSchema.length}`"
+          v-model="filters"
+          :schema="finalSchema"
+          :debug-schema="false"
+          :debug-data="false"
+          form-class="form-horizontal grid-12"
+          submit-label=""
+          @data-saved="onSearchHandled"
+        />
+      </div>
+    </div>
+
+    <!-- 컨텐츠 블록 -->
+    <div class="w-full flex flex-col gap-4">
+      <component
+        v-for="block in resolvedBlocks"
+        :key="block.key"
+        :is="block.component"
+        v-bind="block.props"
+        @grid-ready="block.onGridReady"
+        @cell-double-clicked="block.onCellDblClick"
+        @card-double-clicked="block.onCardDblClick"
+      />
+    </div>
+  </div>
+</template>
+
 <style scoped>
-.loading { opacity: 0.6; pointer-events: none; }
+.loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
 </style>
-
-

@@ -1,33 +1,3 @@
-<template>
-  <Dialog
-    v-model:visible="visible"
-    modal
-    :draggable="false"
-    :style="{ width: '720px', maxWidth: '95vw' }"
-    :header="title"
-  >
-    <table class="detail-table w-full">
-      <tbody>
-        <tr v-for="([key, val], idx) in displayEntries" :key="String(key)" class="detail-row">
-          <td class="detail-label">{{ key }}</td>
-          <td class="detail-value">
-            <template v-if="isYN(val)">
-              <Checkbox :binary="true" :model-value="toBool(localRow[key])" @update:modelValue="(v:boolean) => onToggleYN(key, v)" />
-            </template>
-            <template v-else>
-              <InputText v-model.trim="localRow[key]" class="detail-input p-inputtext-sm" />
-            </template>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-
-    <template #footer>
-      <Button label="닫기" @click="close" />
-    </template>
-  </Dialog>
-</template>
-
 <script setup lang='ts'>
 interface Props {
   modelValue?: boolean
@@ -96,10 +66,55 @@ function onToggleYN(key: string, checked: boolean) {
 }
 </script>
 
+<template>
+  <Dialog
+    v-model:visible="visible"
+    modal
+    :draggable="false"
+    :style="{ width: '720px', maxWidth: '95vw' }"
+    :header="title"
+  >
+    <table class="detail-table w-full">
+      <tbody>
+        <tr v-for="([key, val], idx) in displayEntries" :key="String(key)" class="detail-row">
+          <td class="detail-label">{{ key }}</td>
+          <td class="detail-value">
+            <template v-if="isYN(val)">
+              <Checkbox :binary="true" :model-value="toBool(localRow[key])" @update:modelValue="(v:boolean) => onToggleYN(key, v)" />
+            </template>
+            <template v-else>
+              <InputText v-model.trim="localRow[key]" class="detail-input p-inputtext-sm" />
+            </template>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <template #footer>
+      <Button label="닫기" @click="close" />
+    </template>
+  </Dialog>
+</template>
+
 <style scoped>
-.detail-table { border-collapse: collapse; width: 100%; }
-.detail-row { border-bottom: 1px solid var(--p-content-border-color, #e5e7eb); }
-.detail-label { width: 200px; padding: 8px 12px; text-align: right; color: var(--p-text-color-secondary, #6b7280); vertical-align: top; }
-.detail-value { padding: 8px 12px; }
-.detail-input { width: 100%; }
+.detail-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.detail-row {
+  border-bottom: 1px solid var(--p-content-border-color, #e5e7eb);
+}
+.detail-label {
+  width: 200px;
+  padding: 8px 12px;
+  text-align: right;
+  color: var(--p-text-color-secondary, #6b7280);
+  vertical-align: top;
+}
+.detail-value {
+  padding: 8px 12px;
+}
+.detail-input {
+  width: 100%;
+}
 </style>

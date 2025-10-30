@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import type { ChatConversation } from '../../stores/chat'
 
+const emit = defineEmits<{ (e: 'open', chatId: number): void, (e: 'start'): void }>()
 const chat = useChatStore()
-const emit = defineEmits<{ (e: 'open', chatId: number): void; (e: 'start'): void }>()
-
 const q = ref('')
 const items = computed(() => {
   const keyword = q.value.trim().toLowerCase()
@@ -76,7 +75,7 @@ onMounted(() => {
       <ul class="divide-y divide-gray-200 dark:divide-gray-700">
         <li v-for="c in items" :key="c.id" class="py-2 px-1 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded">
           <div class="relative w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center shrink-0">
-            <i :class="['text-sm', c.is_group ? 'pi pi-users' : 'pi pi-user']"></i>
+            <i class="text-sm" :class="[c.is_group ? 'pi pi-users' : 'pi pi-user']"></i>
             <span v-if="c.unread_count > 0" class="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] leading-none rounded-full px-1.5 py-0.5 shadow">
               {{ c.unread_count }}
             </span>

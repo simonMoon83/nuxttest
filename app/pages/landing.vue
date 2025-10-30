@@ -110,7 +110,7 @@ async function submit() {
             <div class="p-4">
               <div class="font-medium" v-if="g.title">{{ g.title }}</div>
               <div class="text-sm text-gray-600" v-if="g.subtitle">{{ g.subtitle }}</div>
-              <span v-if="g.link" class="inline-flex items-center gap-1 text-xs text-blue-600 group-hover:underline">자세히 보기 <i class="pi pi-arrow-right"/></span>
+              <span v-if="g.link" class="inline-flex items-center gap-1 text-xs text-blue-600 group-hover:underline">자세히 보기 <i class="pi pi-arrow-right" /></span>
             </div>
           </a>
         </div>
@@ -146,10 +146,7 @@ async function submit() {
       </div>
     </section>
   </div>
-  
 </template>
 
 <style scoped>
 </style>
-
-

@@ -19,16 +19,47 @@ export interface StoredProcedureResult {
 }
 
 /**
+ * Infer SQL type from JavaScript value
+ * Prevents SQL injection through type confusion attacks
+ */
+function inferSqlType(value: any): any {
+  if (value === null || value === undefined)
+    return sql.NVarChar
+  if (typeof value === 'number') {
+    return Number.isInteger(value) ? sql.Int : sql.Float
+  }
+  if (typeof value === 'boolean')
+    return sql.Bit
+  if (value instanceof Date)
+    return sql.DateTime2
+  if (typeof value === 'string')
+    return sql.NVarChar
+  return sql.NVarChar
+}
+
+/**
  * Stored Procedure를 호출하는 서비스
  * @param procedureName 프로시저명
  * @param parameters 프로시저 파라미터 (JSON 형태)
  * @returns 실행 결과 (JSON 형태)
  */
 export async function executeStoredProcedure(
-  procedureName: string, 
-  parameters: StoredProcedureParams = {}
+  procedureName: string,
+  parameters: StoredProcedureParams = {},
 ): Promise<StoredProcedureResult> {
   const startTime = Date.now()
+
+  // Validate procedure name - prevent SQL injection
+  if (!/^[a-zA-Z0-9_]+$/.test(procedureName)) {
+    return {
+      success: false,
+      error: 'Invalid procedure name: only alphanumeric and underscore allowed',
+      executionTime: 0,
+      procedureName,
+      parameters,
+    }
+  }
+
   const commandSql = buildExecCommand(procedureName, parameters)
 
   try {
@@ -36,11 +67,11 @@ export async function executeStoredProcedure(
 
     // 프로시저 존재 여부 확인
     const checkRequest = connection.request()
-    checkRequest.input('procedureName', procedureName)
+    checkRequest.input('procedureName', sql.NVarChar, procedureName)
 
     const checkProcedure = await checkRequest.query(`
-      SELECT COUNT(*) as count 
-      FROM information_schema.routines 
+      SELECT COUNT(*) as count
+      FROM information_schema.routines
       WHERE routine_name = @procedureName
     `)
 
@@ -51,16 +82,17 @@ export async function executeStoredProcedure(
         error: `Stored procedure '${procedureName}' not found`,
         executionTime: Date.now() - startTime,
         procedureName,
-        parameters
+        parameters,
       }
     }
 
     // 프로시저 호출을 위한 request 생성
     const request = connection.request()
-    
-    // 파라미터를 request에 추가
+
+    // 파라미터를 request에 추가 (타입 명시)
     Object.entries(parameters).forEach(([key, value]) => {
-      request.input(key, value)
+      const sqlType = inferSqlType(value)
+      request.input(key, sqlType, value)
     })
 
     // 프로시저 실행

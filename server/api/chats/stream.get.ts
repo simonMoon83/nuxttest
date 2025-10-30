@@ -1,6 +1,9 @@
 import { onUser } from '../../utils/chatBus'
 import { getCurrentUserId } from '../../utils/auth'
 
+// SSE connection timeout: 1 hour
+const TIMEOUT_MS = 60 * 60 * 1000
+
 export default defineEventHandler(async (event) => {
   const userId = getCurrentUserId(event)
 
@@ -23,8 +26,17 @@ export default defineEventHandler(async (event) => {
     write({ type: 'ping', t: Date.now() })
   }, 25000)
 
+  // Timeout after 1 hour to prevent memory leaks
+  const timeout = setTimeout(() => {
+    write({ type: 'timeout', message: 'Connection timed out after 1 hour' })
+    clearInterval(ping)
+    off()
+    res.end()
+  }, TIMEOUT_MS)
+
   event.node.req.on('close', () => {
     clearInterval(ping)
+    clearTimeout(timeout)
     off()
   })
 

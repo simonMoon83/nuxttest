@@ -103,7 +103,7 @@ async function submitHandler() {
       :schema="schema"
       :debug-schema="false" 
       :debug-data="true"
-      :submit-label="'저장'"
+      submit-label="저장"
       @data-saved="submitHandler"
     />
   </div>

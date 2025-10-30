@@ -1,12 +1,13 @@
-export const useFavicon = () => {
+export function useFavicon() {
   // Favicon 설정 함수 (개선된 버전)
   const setFavicon = (href: string) => {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined')
+      return
 
     // 캐시 버스팅을 위한 타임스탬프 추가
     const timestamp = new Date().getTime()
-    const cacheBustedHref = href.includes('?') 
-      ? `${href}&t=${timestamp}` 
+    const cacheBustedHref = href.includes('?')
+      ? `${href}&t=${timestamp}`
       : `${href}?t=${timestamp}`
 
     // 기존 favicon 태그들 모두 제거
@@ -21,15 +22,15 @@ export const useFavicon = () => {
     const iconTypes = [
       { rel: 'icon', type: getIconMimeType(href) },
       { rel: 'shortcut icon', type: getIconMimeType(href) },
-      { rel: 'apple-touch-icon', type: getIconMimeType(href) }
+      { rel: 'apple-touch-icon', type: getIconMimeType(href) },
     ]
 
-    iconTypes.forEach(iconType => {
+    iconTypes.forEach((iconType) => {
       const iconLink = document.createElement('link')
       iconLink.rel = iconType.rel
       iconLink.href = cacheBustedHref
       iconLink.type = iconType.type
-      
+
       // 크기 속성 추가 (PNG/SVG의 경우)
       if (href.toLowerCase().includes('.png') || href.toLowerCase().includes('.svg')) {
         iconLink.setAttribute('sizes', '32x32')
@@ -51,7 +52,7 @@ export const useFavicon = () => {
     setTimeout(() => {
       // 브라우저 탭 제목을 잠시 변경했다가 복원하여 favicon 업데이트 강제
       const originalTitle = document.title
-      document.title = originalTitle + ' '
+      document.title = `${originalTitle} `
       setTimeout(() => {
         document.title = originalTitle
       }, 100)
@@ -91,17 +92,18 @@ export const useFavicon = () => {
   // 설정에서 favicon 로드
   const loadFaviconFromSettings = async () => {
     try {
-      const response = await $fetch('/api/settings') as { success: boolean; data: any }
+      const response = await $fetch('/api/settings') as { success: boolean, data: any }
       if (response?.success && response?.data?.favicon) {
         setFavicon(response.data.favicon)
       }
-    } catch (error) {
+    }
+    catch (error) {
       console.warn('Failed to load favicon from settings:', error)
     }
   }
 
   return {
     setFavicon,
-    loadFaviconFromSettings
+    loadFaviconFromSettings,
   }
-} 
+}

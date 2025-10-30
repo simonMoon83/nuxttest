@@ -18,5 +18,3 @@ function go(path: string) { router.push(path) }
 </template>
 
 <style scoped></style>
-
-

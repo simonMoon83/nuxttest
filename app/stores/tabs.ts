@@ -9,7 +9,7 @@ export interface TabItem {
   params?: Record<string, any>
 }
 
-type SidebarItem = {
+interface SidebarItem {
   href?: string
   to?: string
   path?: string
@@ -56,7 +56,7 @@ function findMenuTitleByPath(items: SidebarItem[] | undefined, currentPath: stri
     return undefined
 
   const target = normalizePath(currentPath)
-  let bestMatch: { score: number; title: string } | undefined
+  let bestMatch: { score: number, title: string } | undefined
 
   const visit = (nodes: SidebarItem[], depth: number) => {
     for (const node of nodes) {
@@ -107,7 +107,7 @@ function buildTabTitle(route: ReturnType<typeof useRoute>): string {
 
   const path = route.path.replace(/\/$/, '')
   const seg = path.split('/').filter(Boolean).pop()
-  return seg ? seg : 'home'
+  return seg || 'home'
 }
 
 export const useTabsStore = defineStore('tabs', () => {
@@ -115,7 +115,7 @@ export const useTabsStore = defineStore('tabs', () => {
   const tabs = ref<TabItem[]>([])
   const activeKey = ref<string>('')
   const pendingTitleByPath = ref<Record<string, string>>({})
-  
+
   // 기존 탭 제목 대량 교정은 비활성화.
   // - 생성 시점에 메뉴명/대기제목/메타/경로로 결정하고,
   // - 라우트 완료 훅(plugin)에서 활성 탭만 보정합니다.
@@ -205,5 +205,3 @@ export const useTabsStore = defineStore('tabs', () => {
     closeAll,
   }
 })
-
-

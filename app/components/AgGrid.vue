@@ -1,76 +1,26 @@
-<template>
-  <div class="w-full">
-    <!-- AG Grid 헤더 영역 - 제목과 컨트롤 버튼들 -->
-    <div class="flex items-center gap-2 mb-1">
-      <h5 class="m-0">{{ title }}</h5>
-             <!-- 트리 데이터가 있을 때만 펼치기/접기 버튼 표시 -->
-      <template v-if="props.treeData">
-        <Button icon="pi pi-angle-double-down" text size="small" v-tooltip.bottom="'전체 펼치기'" @click="expandAllGrid" />
-        <Button icon="pi pi-angle-double-up" text size="small" v-tooltip.bottom="'전체 접기'" @click="collapseAllGrid" />
-      </template>
-
-      <!-- 우측 액션 버튼: 엑셀, 행 추가/행 삭제 -->
-      <div class="ml-auto flex items-center gap-1">
-        <Button icon="pi pi-file-excel" label="엑셀" size="small" text severity="success" @click="exportExcel" />
-        <Button v-if="props.editable" icon="pi pi-plus" label="행추가" size="small" text severity="primary" @click="addRow" />
-        <Button v-if="props.editable" icon="pi pi-minus" label="행삭제" size="small" text severity="danger" @click="deleteSelectedRows" />
-      </div>
-    </div>
-
-    <!-- AG Grid 컨테이너 - 테마 클래스와 스타일 적용 -->
-    <div :class="agGridThemeClass" class="ag-grid-menu4" style="height: 550px; width: 100%;">
-      <div class="datatable-header"></div>
-      <!-- AG Grid Vue 컴포넌트 -->
-      <AgGridVue
-         ref="agGrid"
-         :row-data="rowData"
-         :column-defs="computedColumnDefs"
-         :default-col-def="defaultColDef"
-         :row-selection="props.rowSelect ? rowSelection : undefined"
-         :tree-data="props.treeData"
-         :get-data-path="props.treeData ? getDataPath : undefined"
-         :auto-group-column-def="props.treeData ? autoGroupColumnDef : undefined"
-         :grid-options="gridOptions"
-         :animate-rows="true"
-         theme="legacy"
-         style="width: 100%; height: calc(100% - 8px);"
-         @grid-ready="onGridReady"
-         @cell-double-clicked="onCellDoubleClicked"
-         @cell-value-changed="onCellValueChanged"
-         @row-editing-started="onRowEditingStarted"
-         @row-editing-stopped="onRowEditingStopped"
-         @cell-focused="onCellFocused"
-         @row-clicked="onRowClicked"
-         @sort-changed="onSortOrFilterChanged"
-         @filter-changed="onSortOrFilterChanged"
-       />
-    </div>
-  </div>
-</template>
-
 <script setup lang='ts'>
-// AG Grid Vue 3 컴포넌트 import
-import { AgGridVue } from 'ag-grid-vue3'
 // AG Grid Community 모듈들 import
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
 // AG Grid Enterprise 모듈들 import (트리 데이터, 엑셀 내보내기, 셀 선택, 클립보드)
-import { TreeDataModule, ExcelExportModule, CellSelectionModule, ClipboardModule } from 'ag-grid-enterprise'
+import { CellSelectionModule, ClipboardModule, ExcelExportModule, TreeDataModule } from 'ag-grid-enterprise'
+// AG Grid Vue 3 컴포넌트 import
+import { AgGridVue } from 'ag-grid-vue3'
 // AG Grid CSS 스타일 import
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
 
 // Props 인터페이스 정의
 interface Props {
-  title?: string        // 그리드 제목
-  columnDefs?: any[]    // 컬럼 정의 배열
-  rowData?: any[]       // 행 데이터 배열
-  searchQuery?: string  // 검색 쿼리 문자열
-  gridId?: string       // 그리드 ID (동적 컬럼 정보 조회용)
-  treeData?: boolean    // 트리 데이터 사용 여부
-  autoGroupColumnName?: string  // 자동 그룹 컬럼 헤더 이름
-  editable?: boolean    // 편집 가능 여부
-  editMode?: 'singleClick' | 'doubleClick' | 'enterKey'  // 편집 모드
-  rowSelect?: boolean   // 행 선택 기능 사용 여부
+  title?: string // 그리드 제목
+  columnDefs?: any[] // 컬럼 정의 배열
+  rowData?: any[] // 행 데이터 배열
+  searchQuery?: string // 검색 쿼리 문자열
+  gridId?: string // 그리드 ID (동적 컬럼 정보 조회용)
+  treeData?: boolean // 트리 데이터 사용 여부
+  autoGroupColumnName?: string // 자동 그룹 컬럼 헤더 이름
+  editable?: boolean // 편집 가능 여부
+  editMode?: 'singleClick' | 'doubleClick' | 'enterKey' // 편집 모드
+  rowSelect?: boolean // 행 선택 기능 사용 여부
 }
 
 // Props 기본값 설정
@@ -88,13 +38,13 @@ const props = withDefaults(defineProps<Props>(), {
 
 // Emits 정의 - 부모 컴포넌트로 이벤트 전달
 const emit = defineEmits<{
-  'grid-ready': [params: any]           // 그리드 준비 완료 이벤트
-  'cell-double-clicked': [event: any]   // 셀 더블클릭 이벤트
-  'expand-all': []                      // 전체 펼치기 이벤트
-  'collapse-all': []                    // 전체 접기 이벤트
-  'cell-value-changed': [event: any]    // 셀 값 변경 이벤트
-  'row-editing-started': [event: any]   // 행 편집 시작 이벤트
-  'row-editing-stopped': [event: any]   // 행 편집 종료 이벤트
+  'grid-ready': [params: any] // 그리드 준비 완료 이벤트
+  'cell-double-clicked': [event: any] // 셀 더블클릭 이벤트
+  'expand-all': [] // 전체 펼치기 이벤트
+  'collapse-all': [] // 전체 접기 이벤트
+  'cell-value-changed': [event: any] // 셀 값 변경 이벤트
+  'row-editing-started': [event: any] // 행 편집 시작 이벤트
+  'row-editing-stopped': [event: any] // 행 편집 종료 이벤트
   'row-added': [row: any]
   'rows-deleted': [rows: any[]]
 }>()
@@ -308,7 +258,7 @@ async function loadDynamicColumnDefs() {
               input.type = 'date'
               const raw = smartGet(params?.data, def.field)
               const val = raw ? new Date(raw) : null
-              if (val && !isNaN(val.getTime())) input.value = `${val.getFullYear()}-${String(val.getMonth()+1).padStart(2,'0')}-${String(val.getDate()).padStart(2,'0')}`
+              if (val && !isNaN(val.getTime())) input.value = `${val.getFullYear()}-${String(val.getMonth() + 1).padStart(2, '0')}-${String(val.getDate()).padStart(2, '0')}`
               return {
                 getGui: () => input,
                 afterGuiAttached: () => { input.focus() },
@@ -405,33 +355,33 @@ async function loadDynamicColumnDefs() {
 
 // 기본 컬럼 정의 - 모든 컬럼에 적용되는 기본 설정
 const defaultColDef = ref<any>({ 
-  resizable: true,    // 컬럼 크기 조절 가능
-  sortable: true,     // 정렬 가능
-  filter: true,       // 필터링 가능
-  editable: props.editable,  // 편집 가능 여부
+  resizable: true, // 컬럼 크기 조절 가능
+  sortable: true, // 정렬 가능
+  filter: true, // 필터링 가능
+  editable: props.editable, // 편집 가능 여부
   // 편집 모드에 따른 설정
   ...(props.editable && {
-    cellEditor: 'agTextCellEditor',  // 기본 텍스트 편집기
-    cellEditorPopup: false,          // 팝업 편집기 비활성화
-    singleClickEdit: props.editMode === 'singleClick',  // 편집 모드에 따른 설정
+    cellEditor: 'agTextCellEditor', // 기본 텍스트 편집기
+    cellEditorPopup: false, // 팝업 편집기 비활성화
+    singleClickEdit: props.editMode === 'singleClick', // 편집 모드에 따른 설정
   })
 })
 
 // AG Grid 옵션 설정 (트리 데이터가 있을 때만 그룹 관련 설정 적용)
 const gridOptions = computed(() => {
   const baseOptions = {
-    rowHeight: 28,                    // 행 높이
-    headerHeight: 32,                 // 헤더 높이
-    animateRows: true,                // 행 애니메이션 활성화
-    enableRangeSelection: true,       // 범위 선택 활성화
-    enableRangeHandle: true,          // 범위 핸들 활성화
-    clipboardDelimiter: '\t',         // 클립보드 구분자
-    suppressScrollOnNewData: true,    // 데이터 변경 시 자동 스크롤 방지
+    rowHeight: 28, // 행 높이
+    headerHeight: 32, // 헤더 높이
+    animateRows: true, // 행 애니메이션 활성화
+    enableRangeSelection: true, // 범위 선택 활성화
+    enableRangeHandle: true, // 범위 핸들 활성화
+    clipboardDelimiter: '\t', // 클립보드 구분자
+    suppressScrollOnNewData: true, // 데이터 변경 시 자동 스크롤 방지
     // 편집 관련 설정
     ...(props.editable && {
-      editType: 'singleCell' as const,   // 개별 셀 편집 모드
-      stopEditingWhenCellsLoseFocus: true,  // 포커스 잃을 때 편집 종료
-      singleClickEdit: props.editMode === 'singleClick',  // 편집 모드에 따른 설정
+      editType: 'singleCell' as const, // 개별 셀 편집 모드
+      stopEditingWhenCellsLoseFocus: true, // 포커스 잃을 때 편집 종료
+      singleClickEdit: props.editMode === 'singleClick', // 편집 모드에 따른 설정
     })
   }
   
@@ -439,7 +389,7 @@ const gridOptions = computed(() => {
   if (props.treeData) {
     return {
       ...baseOptions,
-      groupDefaultExpanded: 1,        // 기본적으로 1레벨까지 펼쳐짐
+      groupDefaultExpanded: 1, // 기본적으로 1레벨까지 펼쳐짐
     }
   }
   
@@ -448,14 +398,14 @@ const gridOptions = computed(() => {
 
 // 행 선택 설정
 const rowSelection = ref({ 
-  mode: 'multiRow' as const,        // 다중 행 선택 모드
-  checkboxes: true,                 // 체크박스 표시
-  headerCheckbox: true              // 헤더 체크박스 표시
+  mode: 'multiRow' as const, // 다중 행 선택 모드
+  checkboxes: true, // 체크박스 표시
+  headerCheckbox: true // 헤더 체크박스 표시
 })
 
 // 자동 그룹 컬럼 정의 (트리 데이터용)
 const autoGroupColumnDef = ref<any>({
-  headerName: props.autoGroupColumnName || '메뉴명',  // 동적으로 받아온 이름 또는 기본값
+  headerName: props.autoGroupColumnName || '메뉴명', // 동적으로 받아온 이름 또는 기본값
   cellRendererParams: { suppressCount: true }, // 카운트 숨김
 })
 
@@ -532,11 +482,11 @@ const computedColumnDefs = computed(() => [rowNumberStatusColDef, ...finalColumn
  * @param params AG Grid API 파라미터
  */
 function onGridReady(params: any) { 
-  gridApi.value = params.api        // Grid API 저장
-  applyGridFilter()                 // 초기 필터 적용
-  updateGridTheme()                 // 테마 업데이트
+  gridApi.value = params.api // Grid API 저장
+  applyGridFilter() // 초기 필터 적용
+  updateGridTheme() // 테마 업데이트
   
-  emit('grid-ready', params)        // 부모에게 이벤트 전달
+  emit('grid-ready', params) // 부모에게 이벤트 전달
 }
 
 /**
@@ -692,7 +642,7 @@ function applyExternalFilter() {
  */
 function exportExcel() { 
   const api = gridApi.value
-  if (api) api.exportDataAsExcel({fileName: 'MenuList', sheetName: 'Menus' }) 
+  if (api) api.exportDataAsExcel({ fileName: 'MenuList', sheetName: 'Menus' }) 
 }
 
 // 행 추가/삭제 동작
@@ -724,13 +674,13 @@ function addRow() {
 
 // 외부에서 호출할 수 있는 메서드들을 expose
 const exposeMethods = {
-  expandAll: expandAllGrid,         // 전체 펼치기
-  collapseAll: collapseAllGrid,     // 전체 접기
-  exportExcel,                      // 엑셀 내보내기
+  expandAll: expandAllGrid, // 전체 펼치기
+  collapseAll: collapseAllGrid, // 전체 접기
+  exportExcel, // 엑셀 내보내기
   applyFilter: applyExternalFilter, // 필터 적용
-  getGridApi: () => gridApi.value,  // Grid API 반환
-  loadDynamicColumnDefs,            // 동적 컬럼 정보 로드
-  getDynamicColumnDefs: () => dynamicColumnDefs.value,  // 동적 컬럼 정보 반환
+  getGridApi: () => gridApi.value, // Grid API 반환
+  loadDynamicColumnDefs, // 동적 컬럼 정보 로드
+  getDynamicColumnDefs: () => dynamicColumnDefs.value, // 동적 컬럼 정보 반환
   markDeleted: (row: any) => { if (row) { row.__status = 'D'; refreshStatusCells() } },
   clearStatuses: () => {
     try {
@@ -760,7 +710,7 @@ const exposeMethods = {
     return out
   },
   // 변경된 행들만 반환
-  getChangedRows: (): { added: any[]; modified: any[]; deleted: any[] } => {
+  getChangedRows: (): { added: any[], modified: any[], deleted: any[] } => {
     const all = (exposeMethods as any).getAllRows?.() as any[] || []
     const addedSet = new Set<any>()
     try { newlyAddedRows.value.forEach((r: any) => { if (r && r.__status !== 'D') addedSet.add(r) }) } catch {}
@@ -918,8 +868,60 @@ onMounted(async () => {
 })
 </script>
 
+<template>
+  <div class="w-full">
+    <!-- AG Grid 헤더 영역 - 제목과 컨트롤 버튼들 -->
+    <div class="flex items-center gap-2 mb-1">
+      <h5 class="m-0">{{ title }}</h5>
+             <!-- 트리 데이터가 있을 때만 펼치기/접기 버튼 표시 -->
+      <template v-if="props.treeData">
+        <Button icon="pi pi-angle-double-down" text size="small" v-tooltip.bottom="'전체 펼치기'" @click="expandAllGrid" />
+        <Button icon="pi pi-angle-double-up" text size="small" v-tooltip.bottom="'전체 접기'" @click="collapseAllGrid" />
+      </template>
+
+      <!-- 우측 액션 버튼: 엑셀, 행 추가/행 삭제 -->
+      <div class="ml-auto flex items-center gap-1">
+        <Button icon="pi pi-file-excel" label="엑셀" size="small" text severity="success" @click="exportExcel" />
+        <Button v-if="props.editable" icon="pi pi-plus" label="행추가" size="small" text severity="primary" @click="addRow" />
+        <Button v-if="props.editable" icon="pi pi-minus" label="행삭제" size="small" text severity="danger" @click="deleteSelectedRows" />
+      </div>
+    </div>
+
+    <!-- AG Grid 컨테이너 - 테마 클래스와 스타일 적용 -->
+    <div :class="agGridThemeClass" class="ag-grid-menu4" style="height: 550px; width: 100%;">
+      <div class="datatable-header"></div>
+      <!-- AG Grid Vue 컴포넌트 -->
+      <AgGridVue
+         ref="agGrid"
+         :row-data="rowData"
+         :column-defs="computedColumnDefs"
+         :default-col-def="defaultColDef"
+         :row-selection="props.rowSelect ? rowSelection : undefined"
+         :tree-data="props.treeData"
+         :get-data-path="props.treeData ? getDataPath : undefined"
+         :auto-group-column-def="props.treeData ? autoGroupColumnDef : undefined"
+         :grid-options="gridOptions"
+         :animate-rows="true"
+         theme="legacy"
+         style="width: 100%; height: calc(100% - 8px);"
+         @grid-ready="onGridReady"
+         @cell-double-clicked="onCellDoubleClicked"
+         @cell-value-changed="onCellValueChanged"
+         @row-editing-started="onRowEditingStarted"
+         @row-editing-stopped="onRowEditingStopped"
+         @cell-focused="onCellFocused"
+         @row-clicked="onRowClicked"
+         @sort-changed="onSortOrFilterChanged"
+         @filter-changed="onSortOrFilterChanged"
+       />
+    </div>
+  </div>
+</template>
+
 <style scoped>
-.field { margin-bottom: 1rem; }
+.field {
+  margin-bottom: 1rem;
+}
 
 /* 왼쪽 번호/상태 열 배경을 헤더와 유사하게 */
 :deep(.ag-rownum-cell) {

@@ -31,5 +31,3 @@ function goQuick() {
 </template>
 
 <style scoped></style>
-
-

@@ -131,7 +131,6 @@ definePageMeta({
   noTab: true,
   hideTitle: true,
 })
-
 </script>
 
 <template>

@@ -7,6 +7,8 @@ import { getDbConnection } from '../../../utils/db'
 import { getCurrentUserId } from '../../../utils/auth'
 import { ensureUploadsDir } from '../../../utils/uploads'
 import { emitToUsers } from '../../../utils/chatBus'
+import { validateFile, validateFileSize } from '../../../utils/file-validator'
+import { checkUploadRateLimit } from '../../../utils/rate-limiter'
 
 export default defineEventHandler(async (event) => {
   // 업로드 제한 설정 (서버 측 검증) - nuxt runtimeConfig에서 단일 소스로 로드
@@ -16,7 +18,19 @@ export default defineEventHandler(async (event) => {
   const MAX_FILE_SIZE_BYTES = maxMb * 1024 * 1024 // 개별 파일 MB 제한
   const senderId = getCurrentUserId(event)
   const chatId = Number(getRouterParam(event, 'id') || 0)
-  if (!chatId) throw createError({ statusCode: 400, message: '잘못된 chat id' })
+  if (!chatId)
+    throw createError({ statusCode: 400, message: '잘못된 chat id' })
+
+  // Rate limiting for uploads
+  const ip = getRequestIP(event, { xForwardedFor: true }) || 'unknown'
+  const limit = checkUploadRateLimit(ip)
+
+  if (!limit.allowed) {
+    throw createError({
+      statusCode: 429,
+      message: `Too many upload requests. Try again in ${limit.retryAfter} seconds`,
+    })
+  }
 
   // formidable을 사용한 대용량 파일 파싱
   const form = formidable({
@@ -60,26 +74,27 @@ export default defineEventHandler(async (event) => {
     for (const file of fileArray) {
       if (!file.filepath || !file.originalFilename) continue
       
-      // 파일 크기 재검증
-      if (file.size > MAX_FILE_SIZE_BYTES) {
-        throw createError({ statusCode: 413, message: `파일이 너무 큽니다. 최대 ${maxMb}MB 까지 허용됩니다.` })
-      }
-
-      // 확장자 검증
-      const fname = file.originalFilename
-      const lower = fname.toLowerCase()
-      const ext = lower.includes('.') ? lower.slice(lower.lastIndexOf('.')) : ''
-      if (allowedExts.length && ext && !allowedExts.includes(ext)) {
-        throw createError({ statusCode: 415, message: `허용되지 않는 파일 형식입니다. (${ext})` })
+      // 파일 크기 검증
+      const sizeValidation = validateFileSize(file.size, MAX_FILE_SIZE_BYTES)
+      if (!sizeValidation.valid) {
+        throw createError({ statusCode: 413, message: sizeValidation.error })
       }
 
       // 임시 파일에서 데이터 읽기
       const data = await fs.readFile(file.filepath)
-      fileList.push({ 
-        filename: fname, 
-        data, 
-        mimetype: file.mimetype || undefined,
-        size: file.size 
+
+      // 보안 검증 - path traversal, MIME type spoofing, extension validation
+      const validation = await validateFile(data, file.originalFilename || '', allowedExts)
+
+      if (!validation.valid) {
+        throw createError({ statusCode: 415, message: validation.error })
+      }
+
+      fileList.push({
+        filename: validation.safeName,
+        data,
+        mimetype: validation.mimeType,
+        size: file.size,
       })
     }
   }
@@ -113,6 +128,12 @@ export default defineEventHandler(async (event) => {
       const ext = (f.filename.includes('.') ? f.filename.substring(f.filename.lastIndexOf('.')) : '')
       const unique = `chat-${randomUUID()}${ext}`
       const absPath = join(uploadDir, unique)
+
+      // Verify path is within uploadDir (prevent path traversal)
+      if (!absPath.startsWith(uploadDir)) {
+        throw new Error('Invalid file path')
+      }
+
       await fs.writeFile(absPath, f.data)
       const webPath = `/uploads/${unique}`
 

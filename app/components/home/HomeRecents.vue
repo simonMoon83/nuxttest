@@ -25,5 +25,3 @@ function open(path: string) {
 </template>
 
 <style scoped></style>
-
-

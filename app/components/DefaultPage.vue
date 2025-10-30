@@ -1,64 +1,22 @@
-
-<template>
-  <div class="card flex flex-wrap gap-6">
-    <!-- 액션 버튼 영역 -->
-    <div class="w-full mt-1 mb-2 border-b-1 border-gray-400 dark:border-gray-700">
-      <div class="flex items-center justify-end">
-        <div class="flex items-center gap-2">
-          <Button label="검색" severity="secondary" size="small" @click="onSearch" v-if="showSearchButton" />
-          <Button label="저장" severity="secondary" size="small" @click="onSave" v-if="showSaveButton" />
-          <Button label="초기화" outlined severity="secondary" size="small" @click="onReset" v-if="showResetButton" />
-          <!--<Button label="엑셀" outlined severity="secondary" size="small" @click="exportExcel" />-->
-        </div>
-      </div>
-    </div>
-
-    <!-- 검색 영역 (departments 디자인 차용) -->
-    <div class="w-full pb-2 mb-2 border-b border-gray-200 dark:border-gray-700">
-      <div class="compact-form">
-                                   <!-- FormKitDataEdit 사용 (menu4와 동일한 방식) -->
-                   <FormKitDataEdit
-            v-if="finalSchema.length > 0"
-            :key="`schema-${finalSchema.length}`"
-            v-model="filters"
-            :schema="finalSchema"
-            :debug-schema="false"
-            :debug-data="false"
-            form-class="form-horizontal grid-12"
-            submit-label=""
-            @data-saved="onSearch"
-          />
-      </div>
-    </div>
-
-    <!-- AG Grid 영역 - 자식 컴포넌트에서 구현 -->
-    <slot name="ag-grid" :row-data="rowData" :column-defs="columnDefs" :search-query="searchQuery" />
-
-    
-    
-  </div>
-</template>
-
 <script setup lang='ts'>
-
 // Props 인터페이스 정의
 interface Props {
-  schema?: any[]        // 검색 폼 스키마
-  filters?: any         // 필터 초기값
-  title?: string        // 페이지 제목
-  apiEndpoint?: string  // API 엔드포인트
-  columnDefs?: any[]    // AG Grid 컬럼 정의
-  editSchema?: any[]    // 편집 폼 스키마
-  showResetButton?: boolean    // 초기화 버튼 표시 여부
-  showCreateButton?: boolean   // 등록 버튼 표시 여부
-  showSearchButton?: boolean   // 검색 버튼 표시 여부
-  showSaveButton?: boolean     // 저장 버튼 표시 여부
-  procedureName?: string       // 저장 프로시저 이름
-  searchSchemaGridId?: string  // 검색 스키마 로드를 위한 grid_id
-  searchCase?: string       // 조회 호출 시 case 값
-  saveCase?: string         // 저장 호출 시 case 값
-  updateCase?: string       // 수정 호출 시 case 값
-  deleteCase?: string       // 삭제 호출 시 case 값
+  schema?: any[] // 검색 폼 스키마
+  filters?: any // 필터 초기값
+  title?: string // 페이지 제목
+  apiEndpoint?: string // API 엔드포인트
+  columnDefs?: any[] // AG Grid 컬럼 정의
+  editSchema?: any[] // 편집 폼 스키마
+  showResetButton?: boolean // 초기화 버튼 표시 여부
+  showCreateButton?: boolean // 등록 버튼 표시 여부
+  showSearchButton?: boolean // 검색 버튼 표시 여부
+  showSaveButton?: boolean // 저장 버튼 표시 여부
+  procedureName?: string // 저장 프로시저 이름
+  searchSchemaGridId?: string // 검색 스키마 로드를 위한 grid_id
+  searchCase?: string // 조회 호출 시 case 값
+  saveCase?: string // 저장 호출 시 case 값
+  updateCase?: string // 수정 호출 시 case 값
+  deleteCase?: string // 삭제 호출 시 case 값
 }
 
 // Props 기본값 설정
@@ -79,9 +37,17 @@ const props = withDefaults(defineProps<Props>(), {
   deleteCase: 'delete'
 })
 
-// Composable 함수들 사용
+// 컬럼 정의
+
+// AG Grid 관련 이벤트를 emit으로 전달
+const emit = defineEmits<{
+  'grid-ready': [params: any] // 그리드 준비 완료 이벤트
+  'cell-double-clicked': [event: any] // 셀 더블클릭 이벤트
+  'search': [result: any] // 검색 완료 이벤트
+  'save': [result: any] // 저장 완료 이벤트
+}>() // Composable 함수들 사용
  
-const route = useRoute()                     // 현재 라우트 정보
+const route = useRoute() // 현재 라우트 정보
 
 // 메뉴 아이템 인터페이스 정의
 interface MenuItem {
@@ -249,7 +215,7 @@ const hideGlobalTitle = computed(() => {
 })
 
 // 상태 관리 변수들
-const loading = ref(false)          // 로딩 상태
+const loading = ref(false) // 로딩 상태
 
 // 검색 폼 - props에서 받은 schema 사용
 const filters = ref<any>(props.filters)
@@ -266,20 +232,10 @@ const finalSchema = computed(() => {
 })
 
 // AG Grid 관련 데이터
-const searchQuery = ref('')         // 검색 쿼리
-const rowData = ref<any[]>([])      // 행 데이터
-const columnDefs = ref<any[]>(props.columnDefs)  // 컬럼 정의
-
-// AG Grid 관련 이벤트를 emit으로 전달
-const emit = defineEmits<{
-  'grid-ready': [params: any]           // 그리드 준비 완료 이벤트
-  'cell-double-clicked': [event: any]   // 셀 더블클릭 이벤트
-  'search': [result: any]               // 검색 완료 이벤트
-  'save': [result: any]                 // 저장 완료 이벤트
-}>()
-
-// 자식(AgGrid)에서 변경 행을 제공받기 위한 provider
-type ChangedRows = { added: any[]; modified: any[]; deleted: any[] }
+const searchQuery = ref('') // 검색 쿼리
+const rowData = ref<any[]>([]) // 행 데이터
+const columnDefs = ref<any[]>(props.columnDefs)// 자식(AgGrid)에서 변경 행을 제공받기 위한 provider
+interface ChangedRows { added: any[], modified: any[], deleted: any[] }
 const changedRowsProvider = ref<() => ChangedRows>(() => ({ added: [], modified: [], deleted: [] }))
 
 /**
@@ -309,10 +265,6 @@ function exportExcel() {
 // 메뉴 데이터 관리
 const menuData = ref<MenuItem[]>([])
 
- 
-
- 
-
 /**
  * 동적 검색 스키마 로드 함수
  * sp_grid_info를 호출하여 검색 조건 정보를 가져옴
@@ -339,8 +291,6 @@ async function loadDynamicSearchSchema() {
         }
       }
     })
-    
-    
     
     if (result.success && result.data && Array.isArray(result.data)) {
       const schemaItems = []
@@ -372,7 +322,6 @@ async function loadDynamicSearchSchema() {
                     // sp_code_info 호출하여 옵션 데이터 가져오기
           if (colCode && colCode.trim() !== '') {
                          try {
-              
                              const codeResult = await $fetch<any>('/api/stored-procedure/execute', {
                  method: 'POST',
                  body: {
@@ -384,8 +333,6 @@ async function loadDynamicSearchSchema() {
                    }
                  }
                })
-              
-              
                
                // data가 없어도 전체 응답에서 recordset이나 다른 필드 확인
                let optionsData = null
@@ -431,7 +378,6 @@ async function loadDynamicSearchSchema() {
          newFilters[item.name] = null
        })
        filters.value = { ...filters.value, ...newFilters }
-      
          } else {
        console.warn('동적 검색 스키마가 없거나 잘못된 형식입니다:', result)
        // 기본 스키마 사용
@@ -443,11 +389,7 @@ async function loadDynamicSearchSchema() {
    } finally {
      isLoadingSchema.value = false
    }
-   
-   
 }
-
- 
 
 /**
  * 검색 실행 함수
@@ -550,7 +492,7 @@ async function onSave() {
       emit('save', { data: null, filters: filters.value, error: 'procedureName이 설정되지 않았습니다.' })
       return
     }
-    const procedures: Array<{ name: string; parameters: Record<string, any> }> = []
+    const procedures: Array<{ name: string, parameters: Record<string, any> }> = []
     const pushRows = (rows: any[], opCase: string) => {
       rows.forEach((r: any) => {
         const params: Record<string, any> = { case: opCase }
@@ -617,7 +559,7 @@ function onReset() {
     resetFilters[key] = null
   })
   filters.value = resetFilters
-  searchQuery.value = ''; 
+  searchQuery.value = '' 
   
   // 그리드 데이터 초기화 (기존 API 호출하지 않음)
   rowData.value = []
@@ -634,45 +576,35 @@ function onReset() {
 /**
  * 최상위 메뉴 생성 함수
  */
- 
 
 /**
  * 메뉴 편집 함수
  * @param row 편집할 메뉴 아이템
  */
- 
 
 /**
  * 다이얼로그 닫기 함수
  */
- 
 
 /**
  * 다음 정렬 순서 계산 함수
  * @param parentId 부모 메뉴 ID
  * @returns 다음 정렬 순서
  */
- 
 
 // 상위 메뉴 옵션 계산 (Computed)
- 
 
 // 편집 스키마 정의
- 
 
 /**
  * 메뉴 저장 함수
  * 유효성 검사 후 API 호출하여 메뉴 저장
  */
- 
 
 /**
  * 다이얼로그에서 삭제 함수
  * 확인 후 메뉴 삭제
  */
- 
-
- 
 
 /**
  * 메뉴 데이터 새로고침 함수
@@ -680,19 +612,19 @@ function onReset() {
  */
 async function refreshMenuData() { 
   // await loadMenu(); // 저장 프로시저로 대체되었으므로 제거
-  const { refreshMenu } = useNavigationMenu(); 
+  const { refreshMenu } = useNavigationMenu() 
   await refreshMenu() 
 }
 
 // AG Grid 관련 메서드들을 expose
 const exposeMethods = {
-  expandAllGrid: () => {},           // 전체 펼치기 (자식에서 구현)
-  collapseAllGrid: () => {},         // 전체 접기 (자식에서 구현)
-  applyGridFilter: () => {},         // 필터 적용 (자식에서 구현)
-  exportExcel: () => {},             // 엑셀 내보내기 (자식에서 구현)
-  getRowData: () => rowData.value,   // 행 데이터 반환
-  getColumnDefs: () => columnDefs.value,  // 컬럼 정의 반환
-  getSearchQuery: () => searchQuery.value,  // 검색 쿼리 반환
+  expandAllGrid: () => {}, // 전체 펼치기 (자식에서 구현)
+  collapseAllGrid: () => {}, // 전체 접기 (자식에서 구현)
+  applyGridFilter: () => {}, // 필터 적용 (자식에서 구현)
+  exportExcel: () => {}, // 엑셀 내보내기 (자식에서 구현)
+  getRowData: () => rowData.value, // 행 데이터 반환
+  getColumnDefs: () => columnDefs.value, // 컬럼 정의 반환
+  getSearchQuery: () => searchQuery.value, // 검색 쿼리 반환
   // 부모(menu5)에서 AgGrid의 변경분 provider를 주입
   setChangedRowsProvider: (fn: () => ChangedRows) => { changedRowsProvider.value = fn }
 }
@@ -711,13 +643,53 @@ onMounted(async () => {
     console.error('컴포넌트 마운트 중 오류:', error)
   }
 })
-
-
 </script>
 
+<template>
+  <div class="card flex flex-wrap gap-6">
+    <!-- 액션 버튼 영역 -->
+    <div class="w-full mt-1 mb-2 border-b-1 border-gray-400 dark:border-gray-700">
+      <div class="flex items-center justify-end">
+        <div class="flex items-center gap-2">
+          <Button label="검색" severity="secondary" size="small" @click="onSearch" v-if="showSearchButton" />
+          <Button label="저장" severity="secondary" size="small" @click="onSave" v-if="showSaveButton" />
+          <Button label="초기화" outlined severity="secondary" size="small" @click="onReset" v-if="showResetButton" />
+          <!-- <Button label="엑셀" outlined severity="secondary" size="small" @click="exportExcel" /> -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 검색 영역 (departments 디자인 차용) -->
+    <div class="w-full pb-2 mb-2 border-b border-gray-200 dark:border-gray-700">
+      <div class="compact-form">
+                                   <!-- FormKitDataEdit 사용 (menu4와 동일한 방식) -->
+                   <FormKitDataEdit
+            v-if="finalSchema.length > 0"
+            :key="`schema-${finalSchema.length}`"
+            v-model="filters"
+            :schema="finalSchema"
+            :debug-schema="false"
+            :debug-data="false"
+            form-class="form-horizontal grid-12"
+            submit-label=""
+            @data-saved="onSearch"
+          />
+      </div>
+    </div>
+
+    <!-- AG Grid 영역 - 자식 컴포넌트에서 구현 -->
+    <slot name="ag-grid" :row-data="rowData" :column-defs="columnDefs" :search-query="searchQuery" />
+    
+  </div>
+</template>
+
 <style scoped>
-.field { margin-bottom: 1rem; }
+.field {
+  margin-bottom: 1rem;
+}
 
 /* 기본 필드 스타일 */
-.field { margin-bottom: 1rem; }
+.field {
+  margin-bottom: 1rem;
+}
 </style>

@@ -1,8 +1,8 @@
 <script setup lang='ts'>
 definePageMeta({ middleware: 'auth', name: 'Dashboard2 (ECharts)' })
 
-import { ref, onMounted, shallowRef, markRaw, computed, watch } from 'vue'
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
+import { computed, markRaw, onMounted, ref, shallowRef, watch } from 'vue'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
 
@@ -125,8 +125,8 @@ function parseTagsInput(input: string): string[] {
 
 function applyDateFilter(rows: any[], start: string, end: string) {
   if (!start && !end) return rows
-  const s = start ? new Date(start + 'T00:00:00').getTime() : -Infinity
-  const e = end ? new Date(end + 'T23:59:59.999').getTime() : Infinity
+  const s = start ? new Date(`${start}T00:00:00`).getTime() : -Infinity
+  const e = end ? new Date(`${end}T23:59:59.999`).getTime() : Infinity
   return rows.filter(r => {
     const t = new Date(r._time).getTime()
     return t >= s && t <= e

@@ -1,3 +1,11 @@
+<script setup lang="ts">
+const settings = ref<any>({})
+try {
+  const res: any = await $fetch('/api/settings')
+  settings.value = res?.data || {}
+} catch {}
+</script>
+
 <template>
   <div class="min-h-screen flex flex-col">
     <header class="border-b px-4 py-3 bg-white/80 backdrop-blur">
@@ -20,15 +28,5 @@
   </div>
 </template>
 
-<script setup lang="ts">
-const settings = ref<any>({})
-try {
-  const res: any = await $fetch('/api/settings')
-  settings.value = res?.data || {}
-} catch {}
-</script>
-
 <style scoped>
 </style>
-
-

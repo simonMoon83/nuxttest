@@ -28,9 +28,9 @@ export function useNavigationMenu() {
     try {
       isLoading.value = true
       error.value = null
-      
+
       const response = await $fetch<ApiResponse>('/api/menu')
-      
+
       if (response && response.success) {
         const rawMenu = response.data
 
@@ -50,8 +50,10 @@ export function useNavigationMenu() {
           try {
             const router = useRouter()
             const routeExists = (path?: string) => {
-              if (!path) return false
-              if (/^https?:\/\//i.test(path)) return true
+              if (!path)
+                return false
+              if (/^https?:\/\//i.test(path))
+                return true
               const resolved = router.resolve(path)
               return resolved.matched && resolved.matched.length > 0
             }
@@ -65,8 +67,9 @@ export function useNavigationMenu() {
                 const selfValid = hasHref ? true : routeExists(current.href)
                 if ((current as any).component || selfValid || (children && children.length > 0)) {
                   acc.push({ ...current, child: children })
-                } else {
-                  
+                }
+                else {
+
                 }
               }
               return acc
@@ -88,31 +91,38 @@ export function useNavigationMenu() {
                   const okSelf = key ? auth.hasPermission(key, 'read') : true
                   if (okSelf || (children && children.length > 0)) {
                     acc.push({ ...current, child: children })
-                  } else {
-                    try { console.debug('[menu/perm] hidden by perm:', { title: (current as any)?.title, href: (current as any)?.href, key }) } catch {}
+                  }
+                  else {
+                    try { console.debug('[menu/perm] hidden by perm:', { title: (current as any)?.title, href: (current as any)?.href, key }) }
+                    catch {}
                   }
                 }
                 return acc
               }
               finalMenu = byPerm(finalMenu)
-              } catch (e2) {
-                console.warn('메뉴 권한 필터링 경고:', e2)
-              }
-          } catch (e) {
+            }
+            catch (e2) {
+              console.warn('메뉴 권한 필터링 경고:', e2)
+            }
+          }
+          catch (e) {
             console.warn('메뉴 라우트 필터링 경고:', e)
           }
-        } else {
+        }
+        else {
           finalMenu = buildPrunedMenu(rawMenu)
         }
 
         menuData.value = finalMenu
-      } else {
+      }
+      else {
         throw new Error('메뉴 데이터 로드 실패')
       }
-    } catch (err) {
+    }
+    catch (err) {
       console.error('메뉴 데이터 조회 실패:', err)
       error.value = err as Error
-      
+
       // 에러 발생시 기본 메뉴로 폴백
       menuData.value = [
         {
@@ -167,7 +177,8 @@ export function useNavigationMenu() {
           ],
         },
       ]
-    } finally {
+    }
+    finally {
       isLoading.value = false
     }
 
@@ -187,14 +198,16 @@ export function useNavigationMenu() {
           // permission_key 가 없는 항목은 공개로 간주 (동적 템플릿 외 일반 정적 메뉴 표시 보장)
           const okSelf = key ? auth.hasPermission(key, 'read') : true
           // 상위메뉴 권한이 없으면 하위도 표시하지 않음
-          if (!okSelf) continue
+          if (!okSelf)
+            continue
           const children = Array.isArray(current.child) ? byPerm(current.child) : undefined
           acc.push({ ...current, child: children })
         }
         return acc
       }
       return byPerm(menuData.value)
-    } catch {
+    }
+    catch {
       return menuData.value
     }
   })
@@ -210,6 +223,6 @@ export function useNavigationMenu() {
     isLoading,
     error,
     fetchMenuData,
-    refreshMenu
+    refreshMenu,
   }
 }

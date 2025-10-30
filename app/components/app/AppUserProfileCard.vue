@@ -110,7 +110,7 @@ const profileCardSchema = computed(() => [
                   {
                     $el: 'i',
                     attrs: {
-                      class: 'pi pi-user text-xl text-white dark:text-white',
+                      'class': 'pi pi-user text-xl text-white dark:text-white',
                       'aria-hidden': 'true'
                     }
                   }
@@ -144,12 +144,12 @@ const profileCardSchema = computed(() => [
           {
             $cmp: 'Button',
             props: {
-              icon: 'pi pi-times',
-              size: 'small',
-              text: true,
-              rounded: true,
-              class: 'text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-white dark:hover:bg-opacity-20 flex-shrink-0 transition-all duration-200',
-              onClick: closeProfile,
+              'icon': 'pi pi-times',
+              'size': 'small',
+              'text': true,
+              'rounded': true,
+              'class': 'text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-white dark:hover:bg-opacity-20 flex-shrink-0 transition-all duration-200',
+              'onClick': closeProfile,
               'aria-label': '프로필 카드 닫기'
             }
           }

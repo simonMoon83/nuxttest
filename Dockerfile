@@ -31,6 +31,10 @@ RUN pnpm install -r --frozen-lockfile --prod=false \
 
 # 2) Runtime stage
 FROM node:20-bookworm-slim AS runner
+
+# Create non-root user
+RUN groupadd -r nuxtapp && useradd -r -g nuxtapp -s /bin/false nuxtapp
+
 WORKDIR /app
 
 ENV NODE_ENV=production \
@@ -38,7 +42,17 @@ ENV NODE_ENV=production \
     PORT=3000
 
 # Copy only the Nitro output
-COPY --from=builder /app/.output ./.output
+COPY --from=builder --chown=nuxtapp:nuxtapp /app/.output ./.output
+
+# Create uploads directory with proper permissions
+RUN mkdir -p /uploads && chown -R nuxtapp:nuxtapp /uploads
+
+# Switch to non-root user
+USER nuxtapp
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); })"
 
 EXPOSE 3000
 CMD ["node", ".output/server/index.mjs"]

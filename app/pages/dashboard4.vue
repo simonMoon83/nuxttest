@@ -1,7 +1,7 @@
 <script setup lang='ts'>
 definePageMeta({ middleware: 'auth', name: 'Dashboard4' })
 
-import { ref, onMounted, shallowRef, markRaw, computed, watch } from 'vue'
+import { computed, markRaw, onMounted, ref, shallowRef, watch } from 'vue'
 
 const colorMode = useColorMode()
 
@@ -29,17 +29,20 @@ const AgChartsComp = shallowRef<any>(null)
 const VChart = shallowRef<any>(null)
 const echartsReady = ref(false)
 const baseChartOptions = { 
-  tooltip: { trigger: 'axis' }, legend: { top: 0 }, grid: { left: 40, right: 20, top: 30, bottom: 40 },
+  tooltip: { trigger: 'axis' }, 
+legend: { top: 0 }, 
+grid: { left: 40, right: 20, top: 30, bottom: 40 },
   toolbox: { show: true, right: 10, feature: { dataZoom: { yAxisIndex: 'none', xAxisIndex: 'all' }, restore: {}, saveAsImage: {} } },
-  dataZoom: [ { type: 'inside', zoomOnMouseWheel: true, moveOnMouseWheel: true, moveOnMouseMove: false }, { type: 'slider' } ],
-  xAxis: { type: 'time' }, yAxis: { type: 'value' }
+  dataZoom: [{ type: 'inside', zoomOnMouseWheel: true, moveOnMouseWheel: true, moveOnMouseMove: false }, { type: 'slider' }],
+  xAxis: { type: 'time' }, 
+yAxis: { type: 'value' }
 }
 const testLineOptions = ref<any>({ title: { text: 'TEST (ECharts)' }, ...baseChartOptions, series: [] })
 const specLineOptions = ref<any>({ title: { text: 'SPEC (ECharts)' }, ...baseChartOptions, series: [] })
 
 // AG Charts 옵션
-const agTestOptions = ref<any>({ title: { text: 'TEST (AG Charts)' }, series: [], axes: [ { type: 'time', position: 'bottom' }, { type: 'number', position: 'left' } ], legend: { enabled: true } })
-const agSpecOptions = ref<any>({ title: { text: 'SPEC (AG Charts)' }, series: [], axes: [ { type: 'time', position: 'bottom' }, { type: 'number', position: 'left' } ], legend: { enabled: true } })
+const agTestOptions = ref<any>({ title: { text: 'TEST (AG Charts)' }, series: [], axes: [{ type: 'time', position: 'bottom' }, { type: 'number', position: 'left' }], legend: { enabled: true } })
+const agSpecOptions = ref<any>({ title: { text: 'SPEC (AG Charts)' }, series: [], axes: [{ type: 'time', position: 'bottom' }, { type: 'number', position: 'left' }], legend: { enabled: true } })
 
 function buildUrl(base: string, path: string, params: Record<string, string | string[] | undefined>) {
   const usp = new URLSearchParams()
@@ -57,20 +60,20 @@ function updateCharts() {
   const seriesTest = Array.from(map.entries()).map(([k, data]) => ({ name: k, type: 'line', showSymbol: false, data }))
   testLineOptions.value = { ...testLineOptions.value, series: seriesTest }
   // AG Charts: one series per TAGID
-  const agSeriesTest = Array.from(map.entries()).map(([k, arr]) => ({ type: 'line', data: arr.map(([x,y]) => ({ x, y })), xKey: 'x', yKey: 'y', yName: k, marker: { enabled: false } }))
+  const agSeriesTest = Array.from(map.entries()).map(([k, arr]) => ({ type: 'line', data: arr.map(([x, y]) => ({ x, y })), xKey: 'x', yKey: 'y', yName: k, marker: { enabled: false } }))
   agTestOptions.value = { ...agTestOptions.value, series: agSeriesTest }
 
   // SPEC chart (value + limits)
   const to = (key: string) => specRows.value.map(r => [new Date(r._time).getTime(), r[key]])
-  const seriesSpec = [ { name: 'VALUE', type: 'line', showSymbol: false, data: to('_value') }, { name: 'LSL', type: 'line', showSymbol: false, data: to('lsl') }, { name: 'USL', type: 'line', showSymbol: false, data: to('usl') }, { name: 'LCL', type: 'line', showSymbol: false, data: to('lcl') }, { name: 'UCL', type: 'line', showSymbol: false, data: to('ucl') } ]
+  const seriesSpec = [{ name: 'VALUE', type: 'line', showSymbol: false, data: to('_value') }, { name: 'LSL', type: 'line', showSymbol: false, data: to('lsl') }, { name: 'USL', type: 'line', showSymbol: false, data: to('usl') }, { name: 'LCL', type: 'line', showSymbol: false, data: to('lcl') }, { name: 'UCL', type: 'line', showSymbol: false, data: to('ucl') }]
   specLineOptions.value = { ...specLineOptions.value, series: seriesSpec }
   // AG Charts: five series
   agSpecOptions.value = { ...agSpecOptions.value, series: [
-    { type: 'line', data: to('_value').map(([x,y]) => ({ x, y })), xKey: 'x', yKey: 'y', yName: 'VALUE', marker: { enabled: false } },
-    { type: 'line', data: to('lsl').map(([x,y]) => ({ x, y })), xKey: 'x', yKey: 'y', yName: 'LSL', marker: { enabled: false } },
-    { type: 'line', data: to('usl').map(([x,y]) => ({ x, y })), xKey: 'x', yKey: 'y', yName: 'USL', marker: { enabled: false } },
-    { type: 'line', data: to('lcl').map(([x,y]) => ({ x, y })), xKey: 'x', yKey: 'y', yName: 'LCL', marker: { enabled: false } },
-    { type: 'line', data: to('ucl').map(([x,y]) => ({ x, y })), xKey: 'x', yKey: 'y', yName: 'UCL', marker: { enabled: false } },
+    { type: 'line', data: to('_value').map(([x, y]) => ({ x, y })), xKey: 'x', yKey: 'y', yName: 'VALUE', marker: { enabled: false } },
+    { type: 'line', data: to('lsl').map(([x, y]) => ({ x, y })), xKey: 'x', yKey: 'y', yName: 'LSL', marker: { enabled: false } },
+    { type: 'line', data: to('usl').map(([x, y]) => ({ x, y })), xKey: 'x', yKey: 'y', yName: 'USL', marker: { enabled: false } },
+    { type: 'line', data: to('lcl').map(([x, y]) => ({ x, y })), xKey: 'x', yKey: 'y', yName: 'LCL', marker: { enabled: false } },
+    { type: 'line', data: to('ucl').map(([x, y]) => ({ x, y })), xKey: 'x', yKey: 'y', yName: 'UCL', marker: { enabled: false } },
   ] }
 }
 
@@ -79,8 +82,8 @@ async function fetchAll() {
   try {
     const urlTest = buildUrl(apiBase.value, '/gettest', { tag: 'A', bucket: 'testspc', window: '1d', measurement: 'TESTSPC' })
     const urlSpec = buildUrl(apiBase.value, '/getspectest', { tag: 'A', bucket: 'testspecspc', window: '4h', measurement: 'TESTSPECSPC' })
-    const [r1, r2] = await Promise.all([ fetch(urlTest), fetch(urlSpec) ])
-    const [j1, j2] = await Promise.all([ r1.json(), r2.json() ])
+    const [r1, r2] = await Promise.all([fetch(urlTest), fetch(urlSpec)])
+    const [j1, j2] = await Promise.all([r1.json(), r2.json()])
     testRows.value = j1?.data || []
     specRows.value = j2?.data || []
     updateCharts()
@@ -178,5 +181,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.card :deep(.p-button.p-button-icon-only) { padding: 0.25rem; }
+.card :deep(.p-button.p-button-icon-only) {
+  padding: 0.25rem;
+}
 </style>

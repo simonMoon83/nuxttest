@@ -1,8 +1,8 @@
 <script setup lang='ts'>
 definePageMeta({ middleware: 'auth', name: 'Dashboard3 (FormKit + ECharts)' })
 
-import { ref, onMounted, shallowRef, markRaw, computed, watch } from 'vue'
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
+import { computed, markRaw, onMounted, ref, shallowRef, watch } from 'vue'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
 
@@ -149,10 +149,13 @@ const echartsReady = ref(false)
 
 // 공통 옵션(툴박스 + dataZoom)
 const baseChartOptions = { 
-  tooltip: { trigger: 'axis' }, legend: { top: 0 }, grid: { left: 40, right: 20, top: 40, bottom: 60 },
+  tooltip: { trigger: 'axis' }, 
+legend: { top: 0 }, 
+grid: { left: 40, right: 20, top: 40, bottom: 60 },
   toolbox: { show: true, right: 10, feature: { dataZoom: { yAxisIndex: 'none', xAxisIndex: 'all' }, restore: {}, saveAsImage: {} } },
-  dataZoom: [ { type: 'inside', zoomOnMouseWheel: true, moveOnMouseWheel: true, moveOnMouseMove: false }, { type: 'slider' } ],
-  xAxis: { type: 'time' }, yAxis: { type: 'value' }
+  dataZoom: [{ type: 'inside', zoomOnMouseWheel: true, moveOnMouseWheel: true, moveOnMouseMove: false }, { type: 'slider' }],
+  xAxis: { type: 'time' }, 
+yAxis: { type: 'value' }
 }
 
 const testOptions = ref<any>({ title: { text: 'TEST (_value)' }, ...baseChartOptions, series: [] })
@@ -229,7 +232,7 @@ function updateTestChart() {
 function updateSpecChart() {
   const rows = applyDateFilter(specRows.value, formData.value.specStart, formData.value.specEnd)
   const to = (key: string) => rows.map(r => [new Date(r._time).getTime(), r[key]])
-  const series = [ { name: 'VALUE', type: 'line', showSymbol: false, data: to('_value') }, { name: 'LSL', type: 'line', showSymbol: false, data: to('lsl') }, { name: 'USL', type: 'line', showSymbol: false, data: to('usl') }, { name: 'LCL', type: 'line', showSymbol: false, data: to('lcl') }, { name: 'UCL', type: 'line', showSymbol: false, data: to('ucl') } ]
+  const series = [{ name: 'VALUE', type: 'line', showSymbol: false, data: to('_value') }, { name: 'LSL', type: 'line', showSymbol: false, data: to('lsl') }, { name: 'USL', type: 'line', showSymbol: false, data: to('usl') }, { name: 'LCL', type: 'line', showSymbol: false, data: to('lcl') }, { name: 'UCL', type: 'line', showSymbol: false, data: to('ucl') }]
   const yMin = formData.value.specYMin !== '' ? Number(formData.value.specYMin) : null
   const yMax = formData.value.specYMax !== '' ? Number(formData.value.specYMax) : null
   specOptions.value = { ...specOptions.value, series, yAxis: { ...specOptions.value.yAxis, min: yMin, max: yMax } }
@@ -278,15 +281,31 @@ onMounted(async () => {
     // AG Grid 생성
     const { createGrid } = await import('ag-grid-community')
     const testOptionsGrid: any = {
-      theme: 'legacy', columnDefs: testColumnDefs.value, rowData: [], defaultColDef: defaultColDef.value, animateRows: true,
-      rowHeight: 28, headerHeight: 32,
-      rowSelection: { mode: 'multiRow' }, pagination: true, paginationPageSize: 20, paginationPageSizeSelector: [20, 50, 100],
+      theme: 'legacy', 
+columnDefs: testColumnDefs.value, 
+rowData: [], 
+defaultColDef: defaultColDef.value, 
+animateRows: true,
+      rowHeight: 28, 
+headerHeight: 32,
+      rowSelection: { mode: 'multiRow' }, 
+pagination: true, 
+paginationPageSize: 20, 
+paginationPageSizeSelector: [20, 50, 100],
       onGridReady: (params: any) => { testGridApi = params.api; updateGridTheme() },
     }
     const specOptionsGrid: any = {
-      theme: 'legacy', columnDefs: specColumnDefs.value, rowData: [], defaultColDef: defaultColDef.value, animateRows: true,
-      rowHeight: 28, headerHeight: 32,
-      rowSelection: { mode: 'multiRow' }, pagination: true, paginationPageSize: 20, paginationPageSizeSelector: [20, 50, 100],
+      theme: 'legacy', 
+columnDefs: specColumnDefs.value, 
+rowData: [], 
+defaultColDef: defaultColDef.value, 
+animateRows: true,
+      rowHeight: 28, 
+headerHeight: 32,
+      rowSelection: { mode: 'multiRow' }, 
+pagination: true, 
+paginationPageSize: 20, 
+paginationPageSizeSelector: [20, 50, 100],
       onGridReady: (params: any) => { specGridApi = params.api; updateGridTheme() },
     }
     const testDiv = document.querySelector('#testGrid3'); if (testDiv) createGrid(testDiv as any, testOptionsGrid)
@@ -343,7 +362,10 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.ag-grid-container { height: 420px; width: 100%; }
+.ag-grid-container {
+  height: 420px;
+  width: 100%;
+}
 
 /* grid-4 레이아웃은 전역(app/assets/sass/form.scss)에서 관리 */
 </style>

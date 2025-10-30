@@ -21,5 +21,3 @@ function go(path: string) {
 </template>
 
 <style scoped></style>
-
-

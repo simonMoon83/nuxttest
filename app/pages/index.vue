@@ -1,11 +1,11 @@
 <script setup lang='ts'>
+import HomeActivityTabs from '@/components/home/HomeActivityTabs.vue'
+import HomeDocs from '@/components/home/HomeDocs.vue'
 import HomeHero from '@/components/home/HomeHero.vue'
 import HomeKpis from '@/components/home/HomeKpis.vue'
-import HomeQuickActions from '@/components/home/HomeQuickActions.vue'
-import HomeActivityTabs from '@/components/home/HomeActivityTabs.vue'
-import HomeRecents from '@/components/home/HomeRecents.vue'
 import HomeOnboarding from '@/components/home/HomeOnboarding.vue'
-import HomeDocs from '@/components/home/HomeDocs.vue'
+import HomeQuickActions from '@/components/home/HomeQuickActions.vue'
+import HomeRecents from '@/components/home/HomeRecents.vue'
 
 // 인증 미들웨어 적용
 definePageMeta({
@@ -51,8 +51,6 @@ onBeforeUnmount(() => {
 
     <HomeOnboarding v-if="showOnboarding" />
     <HomeDocs />
-
-
 
   </div>
 </template>

@@ -1,6 +1,10 @@
+import sql from 'mssql'
 import { getDbConnection } from '../../utils/db'
+import { parsePaginationParams, createPaginatedResponse, getSqlPagination } from '../../utils/pagination'
+import { handleError } from '../../utils/error-handler'
+import type { PaginatedResponse } from '../../types/api-response'
 
-export default defineEventHandler(async (event) => {
+export default defineEventHandler(async (event): Promise<PaginatedResponse> => {
   try {
     const query = getQuery(event)
     const search = (query.search as string) || ''
@@ -8,11 +12,32 @@ export default defineEventHandler(async (event) => {
     const departmentIdRaw = (query.departmentId as string) || ''
     const departmentId = departmentIdRaw ? Number(departmentIdRaw) : null
 
+    // Parse pagination parameters
+    const { page, pageSize, offset } = parsePaginationParams(query)
+
     const connection = await getDbConnection()
+
+    // Get total count
+    const countResult = await connection.request()
+      .input('search', sql.NVarChar, `%${search}%`)
+      .input('deptName', sql.NVarChar, `%${deptName}%`)
+      .input('departmentId', sql.Int, departmentId)
+      .query(`
+        SELECT COUNT(*) as total
+        FROM app_users u
+        LEFT JOIN departments d ON d.id = u.department_id
+        WHERE ((@search = '%%') OR (u.username LIKE @search OR u.email LIKE @search OR u.full_name LIKE @search))
+          AND ((@departmentId IS NULL) OR (u.department_id = @departmentId))
+          AND ((@deptName = '%%') OR (d.name LIKE @deptName))
+      `)
+
+    const total = countResult.recordset[0].total
+
+    // Get paginated data
     const result = await connection.request()
-      .input('search', `%${search}%`)
-      .input('deptName', `%${deptName}%`)
-      .input('departmentId', departmentId)
+      .input('search', sql.NVarChar, `%${search}%`)
+      .input('deptName', sql.NVarChar, `%${deptName}%`)
+      .input('departmentId', sql.Int, departmentId)
       .query(`
         SELECT u.id, u.username, u.email, u.full_name, u.is_active, u.created_at, u.updated_at,
                u.department_id, d.name AS department_name
@@ -22,12 +47,18 @@ export default defineEventHandler(async (event) => {
           AND ((@departmentId IS NULL) OR (u.department_id = @departmentId))
           AND ((@deptName = '%%') OR (d.name LIKE @deptName))
         ORDER BY u.created_at DESC
+        ${getSqlPagination(offset, pageSize)}
       `)
 
-    return { success: true, data: result.recordset }
-  } catch (error) {
-    console.error('사용자 목록 조회 실패:', error)
-    throw createError({ statusCode: 500, message: '사용자 목록을 불러오지 못했습니다.' })
+    return createPaginatedResponse(
+      result.recordset,
+      page,
+      pageSize,
+      total,
+    )
+  }
+  catch (error) {
+    return handleError(error, event)
   }
 })
 

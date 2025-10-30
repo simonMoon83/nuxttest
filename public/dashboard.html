@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System Dashboard</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 30px;
+      font-size: 32px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .card h2 {
+      font-size: 14px;
+      text-transform: uppercase;
+      color: #666;
+      margin-bottom: 12px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .card .value {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .card .label {
+      font-size: 13px;
+      color: #888;
+    }
+
+    .status {
+      display: inline-block;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .healthy {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .degraded {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .unhealthy {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .timestamp {
+      font-size: 12px;
+      color: #999;
+      margin-top: 20px;
+    }
+
+    .error {
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      color: #721c24;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .loading {
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>System Dashboard</h1>
+
+    <div id="error" class="error" style="display: none;"></div>
+    <div id="loading" class="loading">Loading system status...</div>
+
+    <div id="dashboard" style="display: none;">
+      <div class="grid">
+        <div class="card">
+          <h2>System Status</h2>
+          <div class="value">
+            <span id="status" class="status">...</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Uptime</h2>
+          <div class="value" id="uptime">...</div>
+          <div class="label">minutes</div>
+        </div>
+
+        <div class="card">
+          <h2>Database</h2>
+          <div class="value" id="db-status">...</div>
+          <div class="label" id="db-latency">...</div>
+        </div>
+
+        <div class="card">
+          <h2>Memory</h2>
+          <div class="value" id="memory-status">...</div>
+        </div>
+
+        <div class="card">
+          <h2>Cache Size</h2>
+          <div class="value" id="cache-size">...</div>
+          <div class="label">entries</div>
+        </div>
+
+        <div class="card">
+          <h2>Version</h2>
+          <div class="value" id="version" style="font-size: 24px;">...</div>
+        </div>
+      </div>
+
+      <div class="timestamp">
+        Last updated: <span id="last-update">...</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let updateInterval;
+
+    async function updateHealth() {
+      try {
+        const res = await fetch('/api/health');
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${data.message || 'Health check failed'}`);
+        }
+
+        // Hide loading/error, show dashboard
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('error').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'block';
+
+        // Update status
+        const statusEl = document.getElementById('status');
+        statusEl.textContent = data.status.toUpperCase();
+        statusEl.className = 'status ' + data.status;
+
+        // Update uptime
+        const uptimeMinutes = Math.floor(data.uptime / 60);
+        document.getElementById('uptime').textContent = uptimeMinutes.toLocaleString();
+
+        // Update database
+        const dbHealthy = data.checks.database.healthy;
+        document.getElementById('db-status').textContent = dbHealthy ? '✓' : '✗';
+        document.getElementById('db-status').style.color = dbHealthy ? '#28a745' : '#dc3545';
+        document.getElementById('db-latency').textContent =
+          dbHealthy ? `Latency: ${data.checks.database.latency}ms` : 'Connection failed';
+
+        // Update memory
+        const memHealthy = data.checks.memory.healthy;
+        document.getElementById('memory-status').textContent = memHealthy ? '✓' : '✗';
+        document.getElementById('memory-status').style.color = memHealthy ? '#28a745' : '#dc3545';
+
+        // Update version
+        document.getElementById('version').textContent = data.version || 'N/A';
+
+        // Update timestamp
+        document.getElementById('last-update').textContent = new Date().toLocaleString();
+
+        // Try to get cache size from metrics endpoint
+        try {
+          const metricsRes = await fetch('/api/metrics');
+          const metricsText = await metricsRes.text();
+          const cacheSizeMatch = metricsText.match(/cache_size (\d+)/);
+          if (cacheSizeMatch) {
+            document.getElementById('cache-size').textContent = cacheSizeMatch[1];
+          }
+        } catch (e) {
+          document.getElementById('cache-size').textContent = 'N/A';
+        }
+
+      } catch (error) {
+        console.error('Health check failed:', error);
+
+        // Show error
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'none';
+        const errorEl = document.getElementById('error');
+        errorEl.textContent = '⚠️ Failed to fetch system status: ' + error.message;
+        errorEl.style.display = 'block';
+      }
+    }
+
+    // Initial update
+    updateHealth();
+
+    // Update every 5 seconds
+    updateInterval = setInterval(updateHealth, 5000);
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      clearInterval(updateInterval);
+    });
+  </script>
+</body>
+</html>

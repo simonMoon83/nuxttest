@@ -12,26 +12,27 @@ export interface MultipleStoredProcedureRequest {
   }>
 }
 
-export const useStoredProcedure = () => {
+export function useStoredProcedure() {
   const { $fetch } = useNuxtApp()
 
   /**
    * 단일 Stored Procedure 실행
    */
   const executeProcedure = async (
-    procedureName: string, 
-    parameters: StoredProcedureParams = {}
+    procedureName: string,
+    parameters: StoredProcedureParams = {},
   ): Promise<StoredProcedureResult> => {
     try {
       const result = await $fetch('/api/stored-procedure/execute', {
         method: 'POST',
         body: {
           procedureName,
-          parameters
-        }
+          parameters,
+        },
       })
       return result
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Stored procedure 실행 오류:', error)
       throw error
     }
@@ -41,18 +42,19 @@ export const useStoredProcedure = () => {
    * 여러 Stored Procedure 순차 실행
    */
   const executeMultipleProcedures = async (
-    procedures: Array<{ name: string; parameters?: StoredProcedureParams }>
+    procedures: Array<{ name: string, parameters?: StoredProcedureParams }>,
   ) => {
     try {
       const result = await $fetch('/api/stored-procedure/execute', {
         method: 'POST',
         body: {
           action: 'multiple',
-          parameters: procedures
-        }
+          parameters: procedures,
+        },
       })
       return result
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Multiple stored procedures 실행 오류:', error)
       throw error
     }
@@ -67,11 +69,12 @@ export const useStoredProcedure = () => {
         method: 'POST',
         body: {
           action: 'parameters',
-          procedureName
-        }
+          procedureName,
+        },
       })
       return result
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Stored procedure 파라미터 조회 오류:', error)
       throw error
     }
@@ -84,7 +87,8 @@ export const useStoredProcedure = () => {
     try {
       const result = await $fetch('/api/stored-procedure/list')
       return result
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Stored procedure 목록 조회 오류:', error)
       throw error
     }
@@ -101,12 +105,14 @@ export const useStoredProcedure = () => {
     const execute = async () => {
       loading.value = true
       error.value = null
-      
+
       try {
         result.value = await executeProcedure(procedureName, parameters)
-      } catch (err) {
+      }
+      catch (err) {
         error.value = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.'
-      } finally {
+      }
+      finally {
         loading.value = false
       }
     }
@@ -115,7 +121,7 @@ export const useStoredProcedure = () => {
       result: readonly(result),
       loading: readonly(loading),
       error: readonly(error),
-      execute
+      execute,
     }
   }
 
@@ -124,6 +130,6 @@ export const useStoredProcedure = () => {
     executeMultipleProcedures,
     getProcedureParameters,
     getProcedureList,
-    useExecuteProcedure
+    useExecuteProcedure,
   }
 }

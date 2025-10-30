@@ -43,3 +43,16 @@ jobs:
 
       - name: Test
         run: pnpm test:ci
+
+      - name: Test Coverage
+        run: pnpm test:coverage
+
+      - name: Upload Coverage Reports
+        uses: codecov/codecov-action@v4
+        if: success()
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/coverage-final.json
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false

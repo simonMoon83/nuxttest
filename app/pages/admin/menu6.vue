@@ -19,7 +19,6 @@ const schema = ref<any>([])
 // 편집 스키마 (기본값 사용)
 const editSchema = ref<any>([])
 
-
 // 사용할 저장 프로시저 이름
 const procedureName = ref('sp_menu_info2')
 
@@ -126,7 +125,7 @@ onMounted(() => {
         <div class="col">
           <AgGrid
             ref="agGridRef"
-            :title="title + ' (그리드)'"
+            :title="`${title} (그리드)`"
             :row-data="rowData"
             :search-query="searchQuery"
             grid-id="menu5_header"
@@ -141,7 +140,7 @@ onMounted(() => {
         </div>
         <div class="col">
           <CardGrid
-            :title="title + ' (카드뷰)'"
+            :title="`${title} (카드뷰)`"
             :row-data="rowData"
             :column-defs="columnDefs"
             :search-query="searchQuery"
@@ -153,4 +152,3 @@ onMounted(() => {
     </template>
   </DefaultPage>
 </template>
-

@@ -38,7 +38,7 @@ export const useNotificationStore = defineStore('notifications', () => {
     isLoading.value = true
     try {
       const res = await $fetch<ListResponse>('/api/notifications', {
-        query: { limit }
+        query: { limit },
       })
       const newList = res.data || []
       // 신규 항목 토스트 표시 (클라이언트 전용)
@@ -49,7 +49,7 @@ export const useNotificationStore = defineStore('notifications', () => {
           if (newItems.length > 0) {
             const { showInfoMessage } = useMessages()
             const top = newItems.slice(0, 3)
-            top.forEach(n => {
+            top.forEach((n) => {
               showInfoMessage(n.title, n.message ?? n.title, 3500)
             })
             if (newItems.length > top.length) {
@@ -57,7 +57,8 @@ export const useNotificationStore = defineStore('notifications', () => {
             }
           }
         }
-      } catch {}
+      }
+      catch {}
 
       // 상태 갱신
       items.value = newList
@@ -65,30 +66,34 @@ export const useNotificationStore = defineStore('notifications', () => {
       // 최대 ID 갱신
       lastMaxId.value = Math.max(lastMaxId.value || 0, ...newList.map(n => n.id)) || lastMaxId.value || 0
       initialized.value = true
-    } catch (e) {
+    }
+    catch (e) {
       // noop
-    } finally {
+    }
+    finally {
       isLoading.value = false
     }
   }
 
   async function markRead(ids: number[]) {
-    if (!ids?.length) return
+    if (!ids?.length)
+      return
     try {
       await $fetch('/api/notifications/mark-read', {
         method: 'POST',
-        body: { ids }
+        body: { ids },
       })
       // 낙관적 업데이트
       const idSet = new Set(ids)
       const now = new Date()
       const nowIso = now.toISOString()
       const nowText = formatYMDHMSLocal(now)
-      items.value = items.value.map((n) => idSet.has(n.id)
+      items.value = items.value.map(n => idSet.has(n.id)
         ? { ...n, is_read: true, read_at: n.read_at ?? nowIso, read_at_text: n.read_at_text ?? nowText }
         : n)
       unreadCount.value = Math.max(0, items.value.filter(n => !n.is_read).length)
-    } catch (e) {
+    }
+    catch (e) {
       // fallback: 재조회
       await fetchList()
     }
@@ -98,25 +103,27 @@ export const useNotificationStore = defineStore('notifications', () => {
     try {
       await $fetch('/api/notifications/mark-read', {
         method: 'POST',
-        body: { markAll: true }
+        body: { markAll: true },
       })
       const now = new Date()
       const nowIso = now.toISOString()
       const nowText = formatYMDHMSLocal(now)
-      items.value = items.value.map((n) => ({
+      items.value = items.value.map(n => ({
         ...n,
         is_read: true,
         read_at: n.read_at ?? nowIso,
-        read_at_text: n.read_at_text ?? nowText
+        read_at_text: n.read_at_text ?? nowText,
       }))
       unreadCount.value = 0
-    } catch (e) {
+    }
+    catch (e) {
       await fetchList()
     }
   }
 
   function startPolling(intervalMs = 30000) {
-    if (pollingTimer.value) return
+    if (pollingTimer.value)
+      return
     // 즉시 1회
     fetchList().catch(() => {})
     const id = window.setInterval(() => {
@@ -144,5 +151,3 @@ export const useNotificationStore = defineStore('notifications', () => {
     stopPolling,
   }
 })
-
-

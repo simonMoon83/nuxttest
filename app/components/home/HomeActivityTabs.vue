@@ -47,5 +47,3 @@ function openConv(id: number) {
 </template>
 
 <style scoped></style>
-
-

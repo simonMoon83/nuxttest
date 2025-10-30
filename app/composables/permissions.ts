@@ -14,5 +14,3 @@ export function usePermission() {
 
   return { can, canReadPage, canWritePage }
 }
-
-

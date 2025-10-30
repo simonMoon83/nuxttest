@@ -341,13 +341,13 @@ onUnmounted(() => {
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
-  
+
   &:hover {
     background: var(--p-surface-hover);
     color: var(--p-text-color);
     border-color: var(--p-primary-color);
   }
-  
+
   i {
     font-size: 0.875rem;
   }

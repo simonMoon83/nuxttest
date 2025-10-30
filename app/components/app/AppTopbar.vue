@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { makeHierarchicalSelectOptions, type DepartmentBase } from '../../composables/departments'
 import type { NotificationItem } from '../../stores/notifications'
+import { type DepartmentBase, makeHierarchicalSelectOptions } from '../../composables/departments'
+
 const authStore = useAuthStore()
 const tabsStore = useTabsStore()
 const headerCollapsed = useState<boolean>('headerCollapsed', () => false)
 const collapseBtnRef = ref<any>(null)
-const expandBtnPos = ref<{ top: number; left: number } | null>(null)
+const expandBtnPos = ref<{ top: number, left: number } | null>(null)
 
 // Notifications
 const notificationStore = useNotificationStore()
@@ -32,7 +33,7 @@ const groupTitle = ref('')
 const selectedUsers = ref<any[]>([])
 const selectedDeptId = ref<number | null>(null)
 const deptIncludeSub = ref(true)
-const deptOptions = ref<Array<{ id: number; label: string }>>([])
+const deptOptions = ref<Array<{ id: number, label: string }>>([])
 // Org tree for hierarchical selection
 const orgTreeNodes = ref<any[]>([])
 const orgTreeSelection = ref<Record<string, any>>({})
@@ -321,7 +322,7 @@ function expandHeader() {
                     <li v-for="n in notificationStore.items" :key="n.id" class="py-2 px-1 flex gap-2 items-start">
                       <span class="mt-1">
                         <span
-                          :class="['inline-block w-2.5 h-2.5 rounded-full', n.is_read ? 'bg-gray-400' : 'bg-rose-500', !n.is_read ? 'cursor-pointer' : '']"
+                          class="inline-block w-2.5 h-2.5 rounded-full" :class="[n.is_read ? 'bg-gray-400' : 'bg-rose-500', !n.is_read ? 'cursor-pointer' : '']"
                           v-tooltip.bottom="'읽음 표시'"
                           @click.stop="!n.is_read && notificationStore.markRead([n.id])"
                         ></span>
@@ -369,7 +370,12 @@ function expandHeader() {
                 </button>
               </span>
               <OverlayPanel ref="chatPanel" :breakpoints="{ '960px': '90vw', '640px': '95vw' }" style="width: 360px; max-width: 90vw;">
-                <ChatList @open="openChatFromList" @start="() => { showStartChat = true; try { chatPanel?.hide() } catch {} }" />
+                <ChatList
+@open="openChatFromList" @start="() => {
+ showStartChat = true; try { chatPanel?.hide() }
+ catch {} 
+}"
+/>
               </OverlayPanel>
             </ClientOnly>
             <ClientOnly>
@@ -398,21 +404,30 @@ function expandHeader() {
                   <div class="flex flex-col gap-2">
                     <button
                       class="h-9 px-3 rounded flex items-center gap-2 border border-gray-300 dark:border-gray-600 bg-white/70 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm text-sm text-left"
-                      @click="() => { navigateTo('/profile/edit'); try { profilePanel?.hide() } catch {} }"
+                      @click="() => {
+ navigateTo('/profile/edit'); try { profilePanel?.hide() }
+ catch {} 
+}"
                     >
                       <i class="pi pi-user-edit text-gray-600"></i>
                       프로필 편집
                     </button>
                     <button
                       class="h-9 px-3 rounded flex items-center gap-2 border border-gray-300 dark:border-gray-600 bg-white/70 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm text-sm text-left"
-                      @click="() => { navigateTo('/settings'); try { profilePanel?.hide() } catch {} }"
+                      @click="() => {
+ navigateTo('/settings'); try { profilePanel?.hide() }
+ catch {} 
+}"
                     >
                       <i class="pi pi-cog text-gray-600"></i>
                       계정 설정
                     </button>
                     <button
                       class="h-9 px-3 rounded flex items-center gap-2 border border-gray-300 dark:border-gray-600 bg-white/70 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm text-sm text-left"
-                      @click="() => { navigateTo('/help'); try { profilePanel?.hide() } catch {} }"
+                      @click="() => {
+ navigateTo('/help'); try { profilePanel?.hide() }
+ catch {} 
+}"
                     >
                       <i class="pi pi-question-circle text-gray-600"></i>
                       도움말
@@ -420,7 +435,10 @@ function expandHeader() {
                     <div class="border-t border-gray-200 dark:border-gray-700 my-1"></div>
                     <button
                       class="h-9 px-3 rounded flex items-center gap-2 border border-gray-300 dark:border-gray-600 bg-white/70 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm text-sm text-left text-red-600"
-                      @click="() => { handleLogout(); try { profilePanel?.hide() } catch {} }"
+                      @click="() => {
+ handleLogout(); try { profilePanel?.hide() }
+ catch {} 
+}"
                     >
                       <i class="pi pi-sign-out"></i>
                       로그아웃

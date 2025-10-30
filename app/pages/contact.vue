@@ -23,7 +23,7 @@ async function submit() {
   const em = email.value.trim()
   const msg = message.value.trim()
   if (!em) { showToast('이메일을 입력하세요', undefined, 'warn'); return }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) { showToast('유효한 이메일을 입력하세요', undefined, 'warn'); return }
+  if (!/^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/.test(em)) { showToast('유효한 이메일을 입력하세요', undefined, 'warn'); return }
   if (!msg) { showToast('메시지를 입력하세요', undefined, 'warn'); return }
   sending.value = true
   try {
@@ -76,5 +76,3 @@ async function submit() {
 
 <style scoped>
 </style>
-
-

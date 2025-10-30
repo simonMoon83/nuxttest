@@ -81,16 +81,54 @@ class IconSelectEditor {
     
     const iconOptions = [
       '', // 빈 아이콘 옵션 (첫 번째)
-      'pi pi-home', 'pi pi-check-square', 'pi pi-list', 'pi pi-image', 'pi pi-server',
-      'pi pi-book', 'pi pi-user', 'pi pi-cog', 'pi pi-search', 'pi pi-pencil',
-      'pi pi-trash', 'pi pi-plus', 'pi pi-save', 'pi pi-times', 'pi pi-check',
-      'pi pi-info-circle', 'pi pi-exclamation-triangle', 'pi pi-times-circle', 'pi pi-check-circle',
-      'pi pi-folder', 'pi pi-file', 'pi pi-download', 'pi pi-upload', 'pi pi-print',
-      'pi pi-refresh', 'pi pi-bell', 'pi pi-envelope', 'pi pi-phone', 'pi pi-map-marker',
-      'pi pi-clock', 'pi pi-calendar', 'pi pi-chart-bar', 'pi pi-chart-line', 'pi pi-table',
-      'pi pi-database', 'pi pi-globe', 'pi pi-shield', 'pi pi-key', 'pi pi-lock',
-      'pi pi-unlock', 'pi pi-arrow-up', 'pi pi-arrow-down', 'pi pi-arrow-left', 'pi pi-arrow-right',
-      'pi pi-star', 'pi pi-heart', 'pi pi-thumbs-up', 'pi pi-thumbs-down'
+      'pi pi-home', 
+'pi pi-check-square', 
+'pi pi-list', 
+'pi pi-image', 
+'pi pi-server',
+      'pi pi-book', 
+'pi pi-user', 
+'pi pi-cog', 
+'pi pi-search', 
+'pi pi-pencil',
+      'pi pi-trash', 
+'pi pi-plus', 
+'pi pi-save', 
+'pi pi-times', 
+'pi pi-check',
+      'pi pi-info-circle', 
+'pi pi-exclamation-triangle', 
+'pi pi-times-circle', 
+'pi pi-check-circle',
+      'pi pi-folder', 
+'pi pi-file', 
+'pi pi-download', 
+'pi pi-upload', 
+'pi pi-print',
+      'pi pi-refresh', 
+'pi pi-bell', 
+'pi pi-envelope', 
+'pi pi-phone', 
+'pi pi-map-marker',
+      'pi pi-clock', 
+'pi pi-calendar', 
+'pi pi-chart-bar', 
+'pi pi-chart-line', 
+'pi pi-table',
+      'pi pi-database', 
+'pi pi-globe', 
+'pi pi-shield', 
+'pi pi-key', 
+'pi pi-lock',
+      'pi pi-unlock', 
+'pi pi-arrow-up', 
+'pi pi-arrow-down', 
+'pi pi-arrow-left', 
+'pi pi-arrow-right',
+      'pi pi-star', 
+'pi pi-heart', 
+'pi pi-thumbs-up', 
+'pi pi-thumbs-down'
     ]
     
     // 아이콘 그리드 생성
@@ -193,7 +231,6 @@ const iconColumnDef = ref<any>({
   singleClickEdit: false
 })
 
-
 // 사용할 저장 프로시저 이름
 const procedureName = ref('sp_menu_info999')
 
@@ -251,7 +288,6 @@ function onCellDoubleClicked(event: any) {
     }
   }
 }
-
 
 // 편집 관련 이벤트 핸들러들
 function onCellValueChanged(event: any) {
@@ -351,9 +387,8 @@ onMounted(() => {
          @row-editing-started="onRowEditingStarted"
          @row-editing-stopped="onRowEditingStopped"
        />
-       <!--@cell-double-clicked="onCellDoubleClicked"
-         주석처리함-->
+       <!-- @cell-double-clicked="onCellDoubleClicked"
+         주석처리함 -->
     </template>
   </DefaultPage>
 </template>
-

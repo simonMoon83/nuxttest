@@ -1,0 +1,72 @@
+# Prometheus configuration for Nuxt App monitoring
+# Place this file in your Prometheus installation directory
+#
+# Quick start with Docker:
+#   docker run -d -p 9090:9090 \
+#     -v $(pwd)/prometheus.yml:/etc/prometheus/prometheus.yml \
+#     prom/prometheus
+#
+# @see docs/monitoring-guide.md
+
+global:
+  scrape_interval: 15s      # Scrape metrics every 15 seconds
+  evaluation_interval: 15s  # Evaluate rules every 15 seconds
+
+# Alerting configuration (optional)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - 'alertmanager:9093'
+
+# Load rules once and periodically evaluate them
+rule_files:
+  # - "alerts.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Nuxt App metrics
+  - job_name: 'nuxtapp'
+    static_configs:
+      - targets: ['localhost:3000']  # Change to your server address
+    metrics_path: '/api/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+# Example alert rules (create alerts.yml):
+#
+# groups:
+#   - name: nuxtapp_alerts
+#     interval: 30s
+#     rules:
+#       - alert: ApplicationDown
+#         expr: app_up == 0
+#         for: 1m
+#         labels:
+#           severity: critical
+#         annotations:
+#           summary: "Application is down"
+#           description: "The application has been down for more than 1 minute"
+#
+#       - alert: DatabaseUnhealthy
+#         expr: database_healthy == 0
+#         for: 1m
+#         labels:
+#           severity: critical
+#         annotations:
+#           summary: "Database connection failed"
+#           description: "Cannot connect to the database"
+#
+#       - alert: HighDatabaseLatency
+#         expr: database_latency_ms > 100
+#         for: 5m
+#         labels:
+#           severity: warning
+#         annotations:
+#           summary: "High database latency"
+#           description: "Database queries are taking more than 100ms on average"

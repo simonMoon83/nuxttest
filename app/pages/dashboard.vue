@@ -3,7 +3,7 @@
 definePageMeta({ middleware: 'auth', name: 'Dashboard' })
 
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
-import { ref, computed, watch, onMounted, shallowRef } from 'vue'
+import { computed, onMounted, ref, shallowRef, watch } from 'vue'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
 
@@ -159,8 +159,8 @@ function parseTagsInput(input: string): string[] {
 
 function applyDateFilter(rows: any[], start: string, end: string): any[] {
 	if (!start && !end) return rows
-	const startDate = start ? new Date(start + 'T00:00:00') : null
-	const endDate = end ? new Date(end + 'T23:59:59.999') : null
+	const startDate = start ? new Date(`${start}T00:00:00`) : null
+	const endDate = end ? new Date(`${end}T23:59:59.999`) : null
 	return rows.filter(r => {
 		const t = new Date(r._time).getTime()
 		if (startDate && t < startDate.getTime()) return false
@@ -479,7 +479,7 @@ onMounted(() => {
 
 <style scoped>
 .ag-grid-container {
-	height: 420px;
-	width: 100%;
+  height: 420px;
+  width: 100%;
 }
 </style>

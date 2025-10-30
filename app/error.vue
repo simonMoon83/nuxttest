@@ -5,7 +5,7 @@ const status = computed(() => Number(props.error?.statusCode) || 500)
 const title = computed(() => props.error?.statusMessage || 'Error')
 
 function goHome() { return navigateTo('/') }
-function goBack() { if (process.client && history.length > 1) history.back(); else goHome() }
+function goBack() { if (import.meta.client && history.length > 1) history.back(); else goHome() }
 </script>
 
 <template>
@@ -31,11 +31,10 @@ function goBack() { if (process.client && history.length > 1) history.back(); el
       </div>
     </div>
   </div>
-  
 </template>
 
 <style scoped>
-.min-h-screen { min-height: 100vh; }
+.min-h-screen {
+  min-height: 100vh;
+}
 </style>
-
-

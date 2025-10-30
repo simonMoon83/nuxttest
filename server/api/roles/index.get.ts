@@ -1,4 +1,7 @@
+import sql from 'mssql'
 import { getDbConnection } from '../../utils/db'
+import { handleError } from '../../utils/error-handler'
+import type { ApiResponse } from '../../types/api-response'
 
 async function ensureTables(db: any) {
   await db.request().query(`
@@ -15,23 +18,55 @@ async function ensureTables(db: any) {
   `)
 }
 
-export default defineEventHandler(async (event) => {
-  const db = await getDbConnection()
-  await ensureTables(db)
-  const q = (getQuery(event).search as string) || ''
-  const r = await db.request()
-    .input('q', `%${q}%`)
-    .query(`
-      SELECT id, role_name, role_description, permissions, is_active, created_at, updated_at
-      FROM user_roles
-      WHERE (@q='%%') OR (role_name LIKE @q OR role_description LIKE @q)
-      ORDER BY role_name ASC
-    `)
-  const data = r.recordset.map((row: any) => ({ ...row, permissions: JSON.parse(row.permissions || '{}') }))
+export default defineEventHandler(async (event): Promise<ApiResponse> => {
+  try {
+    const db = await getDbConnection()
+    await ensureTables(db)
+    const q = (getQuery(event).search as string) || ''
 
-  // role_permissions 테이블 병합(정규화된 권한 우선 반영)
-  if (data.length > 0) {
-    // 보장
+    // Optimized query - JOIN roles with permissions in single query
+    const r = await db.request()
+      .input('q', sql.NVarChar, `%${q}%`)
+      .query(`
+        SELECT
+          r.id, r.role_name, r.role_description, r.permissions,
+          r.is_active, r.created_at, r.updated_at,
+          rp.resource, rp.action
+        FROM user_roles r
+        LEFT JOIN role_permissions rp ON rp.role_id = r.id
+        WHERE (@q='%%') OR (r.role_name LIKE @q OR r.role_description LIKE @q)
+        ORDER BY r.role_name ASC, rp.resource ASC
+      `)
+
+    // Group results by role
+    const rolesMap = new Map()
+    for (const row of r.recordset) {
+      if (!rolesMap.has(row.id)) {
+        rolesMap.set(row.id, {
+          id: row.id,
+          role_name: row.role_name,
+          role_description: row.role_description,
+          permissions: JSON.parse(row.permissions || '{}'),
+          is_active: row.is_active,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+        })
+      }
+
+      // Merge normalized permissions
+      if (row.resource && row.action) {
+        const role = rolesMap.get(row.id)
+        const cur = role.permissions[row.resource]
+        // write takes precedence over read
+        if (!cur || row.action === 'write') {
+          role.permissions[row.resource] = row.action
+        }
+      }
+    }
+
+    const data = Array.from(rolesMap.values())
+
+    // Ensure role_permissions table exists
     await db.request().query(`
       IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='role_permissions')
         CREATE TABLE role_permissions (
@@ -45,28 +80,17 @@ export default defineEventHandler(async (event) => {
         )
     `)
 
-    const ids = data.map(d => d.id)
-    // 동적 IN 구문 구성
-    const params: string[] = []
-    const req = db.request()
-    ids.forEach((id, idx) => { params.push(`@p${idx}`); req.input(`p${idx}`, id) })
-    const sql = `SELECT role_id, resource, action FROM role_permissions WHERE role_id IN (${params.join(',')})`
-    const rp = ids.length > 0 ? await req.query(sql) : { recordset: [] }
-    const byRole: Record<number, Array<{ resource: string; action: 'read' | 'write' }>> = {}
-    for (const row of (rp as any).recordset || []) {
-      const arr = byRole[row.role_id] || (byRole[row.role_id] = [])
-      arr.push({ resource: row.resource, action: row.action })
-    }
-    for (const role of data) {
-      const list = byRole[role.id] || []
-      for (const { resource, action } of list) {
-        // write 우선
-        const cur = role.permissions[resource]
-        if (!cur || action === 'write') role.permissions[resource] = action
-      }
+    return {
+      success: true,
+      data,
+      meta: {
+        timestamp: new Date().toISOString(),
+      },
     }
   }
-  return { success: true, data }
+  catch (error) {
+    return handleError(error, event)
+  }
 })
 
 

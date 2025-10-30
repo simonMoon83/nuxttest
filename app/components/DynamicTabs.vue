@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { useTabsStore, type TabItem } from '../stores/tabs'
 import { useAuthStore } from '../stores/auth'
+import { type TabItem, useTabsStore } from '../stores/tabs'
+
 const router = useRouter()
 const tabsStore = useTabsStore()
 const authStore = useAuthStore()
@@ -81,5 +82,3 @@ watch(() => tabsStore.activeKey, (key) => {
 
 <style scoped>
 </style>
-
-

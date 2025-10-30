@@ -1,13 +1,16 @@
 export default defineNuxtRouteMiddleware(async (to) => {
   // 로그인 페이지는 통과
-  if (to.path === '/login') return
+  if (to.path === '/login')
+    return
 
   const auth = useAuthStore()
   // SSR/초기 로드 시 인증/권한 로드 보장
-  try { await auth.initAuth() } catch {}
+  try { await auth.initAuth() }
+  catch {}
 
   // 관리자 예외
-  if (auth.user?.username === 'admin') return
+  if (auth.user?.username === 'admin')
+    return
 
   // 매칭되지 않는 라우트(없는 페이지)는 권한 검사 건너뛰고 Nuxt 404 처리에 맡김
   if (!to.matched?.length || to.name === '404') {
@@ -41,5 +44,3 @@ export default defineNuxtRouteMiddleware(async (to) => {
     }
   }
 })
-
-

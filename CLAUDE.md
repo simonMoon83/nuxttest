@@ -86,7 +86,10 @@ pnpm release                # 린트 + 빌드 + 버전 업데이트 + git push (
   - 알림: `/api/notifications`, `/api/notifications/mark-read`, `/api/notifications/create`
   - 저장 프로시저: `/api/stored-procedure/list`, `/api/stored-procedure/execute`
   - 설정: `/api/settings` (앱 레벨 설정을 위한 GET/POST)
-- **미들웨어**: 요청 로깅을 위한 `server/middleware/log.ts`
+  - **모니터링**: `/api/health` (Health check), `/api/metrics` (Prometheus), `/api/db-stats` (DB 통계, 관리자만)
+- **미들웨어**:
+  - `server/middleware/log.ts`: 요청 로깅
+  - `server/middleware/metrics.ts`: 성능 메트릭 수집 및 느린 요청 추적
 
 ### 프론트엔드 아키텍처
 - **레이아웃**:
@@ -306,9 +309,35 @@ cd test/k6
 k6 run main-api.test.js
 ```
 
+## 모니터링 및 운영
+
+### Health Check
+- **엔드포인트**: `GET /api/health`
+- **응답**: 시스템 상태 (healthy/degraded/unhealthy), 데이터베이스 및 메모리 체크
+- **Docker Health Check**: Dockerfile에 포함, 30초마다 확인
+- **간단한 대시보드**: `/dashboard.html`에서 실시간 상태 확인
+
+### Prometheus 메트릭
+- **엔드포인트**: `GET /api/metrics` (Prometheus 텍스트 형식)
+- **메트릭**: `app_up`, `app_uptime_seconds`, `database_healthy`, `database_latency_ms`, `cache_size`
+- **설정**: `docs/prometheus.yml` 참조
+
+### 알림
+- **Discord/Slack Webhook**: `server/utils/alert.ts`의 `sendDiscordAlert()`, `sendSlackAlert()` 사용
+- **환경 변수**: `DISCORD_WEBHOOK_URL`, `SLACK_WEBHOOK_URL`
+- **자동 Health Check**: `scripts/health-check.sh` (cron으로 실행)
+
+### 성능 추적
+- **느린 요청 로깅**: `server/middleware/metrics.ts`가 1초 이상 요청 자동 로깅
+- **DB 통계**: `GET /api/db-stats` (관리자만, 연결 풀 및 쿼리 통계)
+- **느린 쿼리 감지**: `server/utils/db-monitor.ts`의 `getSlowQueries()`
+
+자세한 내용은 [docs/monitoring-guide.md](docs/monitoring-guide.md) 참조
+
 ## 추가 문서
 
 `docs/`에서 자세한 가이드 확인:
+- `monitoring-guide.md`: 모니터링 설정 및 운영 가이드 (Uptime Kuma, Prometheus, Grafana, 알림)
 - `authentication-system.md`: 다이어그램을 포함한 완전한 인증 구현
 - `user-role-management-guide.md`: RBAC 설정 및 관리
 - `chat-overview.md`, `chat-api.md`: 채팅 시스템 아키텍처
