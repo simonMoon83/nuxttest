@@ -53,10 +53,17 @@ export default defineEventHandler(async (event) => {
     })
 
     // 쿠키에 토큰 설정 (세션 쿠키: 브라우저 닫으면 삭제)
+    const forwardedProto = getHeader(event, 'x-forwarded-proto')
+    const isHttps = forwardedProto === 'https'
+    const cookieSecure =
+      process.env.COOKIE_SECURE === 'true'
+      || (process.env.NODE_ENV === 'production' && isHttps)
+
     setCookie(event, 'auth-token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict'
+      secure: cookieSecure,
+      sameSite: 'strict',
+      path: '/',
     })
 
     return {

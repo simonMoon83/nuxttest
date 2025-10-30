@@ -17,6 +17,13 @@ function buildConfig(): sql.config {
     user: requiredEnv('DB_USER'),
     password: requiredEnv('DB_PASSWORD'),
     database: requiredEnv('DB_NAME'),
+    // 연결/요청 타임아웃을 환경변수로 제어할 수 있도록 지원
+    connectionTimeout: process.env.DB_CONNECTION_TIMEOUT_MS
+      ? Number.parseInt(process.env.DB_CONNECTION_TIMEOUT_MS, 10)
+      : undefined,
+    requestTimeout: process.env.DB_REQUEST_TIMEOUT_MS
+      ? Number.parseInt(process.env.DB_REQUEST_TIMEOUT_MS, 10)
+      : undefined,
     options: {
       encrypt: process.env.DB_ENCRYPT === 'true',
       trustServerCertificate: process.env.DB_TRUST_SERVER_CERT !== 'false',
