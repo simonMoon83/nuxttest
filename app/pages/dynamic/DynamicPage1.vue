@@ -2,6 +2,20 @@
 // DynamicPage1: 현재 라우트 또는 탭의 메뉴 id를 기반으로 s_menu_display를 조회하여
 // contents_type(grid|card)에 따라 AgGrid 또는 CardGrid를 순서대로 렌더링한다.
 
+/**
+ * 개요
+ * - 메뉴 트리(`useNavigationMenu`)에서 현재 활성 메뉴/파라미터(`menuId`)를 해석
+ * - s_menu_display(API)를 조회해 컨텐츠 유형(grid|card)을 판별하고 해당 컴포넌트를 렌더링
+ * - 메뉴의 `procedure_name`과 동적 검색 스키마(sp_grid_info)를 사용해 조회/저장(케이스) 수행
+ * - 코드값(select 옵션)은 sp_code_info를 통해 동적으로 로드
+ *
+ * 구성
+ * - 상태/계산: menuId, rows, contentData, filters, dynamicSchema 등
+ * - 데이터 로드: loadDisplayConfig, loadDynamicSearchSchema
+ * - 액션: onSearchHandled, onSaveHandled
+ * - 헬퍼: sanitizeFilters, buildFilterPayload, path/menu 탐색 유틸 등
+ */
+
 const route = useRoute()
 const { menu, fetchMenuData, refreshMenu } = useNavigationMenu()
 
@@ -23,6 +37,10 @@ interface DisplayRow {
   [key: string]: any
 }
 
+/**
+ * 현재 라우트에서 사용될 menuId를 결정한다.
+ * 우선순위: params.menuId > query.menuId > meta.menuId
+ */
 const menuId = computed<string | null>(() => {
   // 우선순위: params.menuId > query.menuId > meta.menuId
   const p = (route.params as any)?.menuId
@@ -35,10 +53,14 @@ const menuId = computed<string | null>(() => {
   return null
 })
 
+// 렌더링 데이터/상태
 const rows = ref<DisplayRow[]>([])
 const loading = ref(false)
 const errorMsg = ref<string | null>(null)
 const contentData = ref<any[]>([])
+
+// 자식 컴포넌트 참조 (v-for에서 수집)
+const blockRefs = ref<any[]>([])
 
 // 검색 폼 상태
 const filters = ref<Record<string, any>>({})
@@ -46,6 +68,11 @@ const dynamicSchema = ref<any[]>([])
 const isLoadingSchema = ref(false)
 const finalSchema = computed(() => Array.isArray(dynamicSchema.value) ? dynamicSchema.value : [])
 
+/**
+ * s_menu_display 구성을 로드한다.
+ * - endpoint: GET /api/display/:menuId[?procedure_name=...]
+ * - 결과를 `rows`에 보관하고, 컨텐츠 데이터는 초기화한다.
+ */
 async function loadDisplayConfig() {
   if (menuId.value == null) { rows.value = []; return }
   try {
@@ -71,6 +98,7 @@ async function loadDisplayConfig() {
   }
 }
 
+// 초기 마운트/메뉴 변경 시 구성 및 검색 스키마를 함께 로드
 onMounted(async () => {
   // 메뉴 데이터 보장 후 구성 로드
   try {
@@ -93,6 +121,11 @@ watch(menuId, async () => {
 
 // search_name 변경 시 스키마 재로드 (선언 이후에 watch 등록)
 
+/**
+ * 검색 버튼/폼 저장 이벤트 핸들러
+ * - effectiveMenuNode.procedure_name의 search 케이스로 SP를 호출해 `contentData`를 채운다.
+ * - filters는 스키마 기반으로 정제되어 전달된다.
+ */
 function onSearchHandled() {
   // display 구성 보장 후, primary 컨텐츠에 맞는 조회 수행
   const list = Array.isArray(rows.value) ? rows.value : []
@@ -124,6 +157,11 @@ function onSearchHandled() {
   })()
 }
 
+/**
+ * 저장 버튼 핸들러
+ * - 1순위: 첫 블록 컴포넌트가 save()를 노출하면 이를 호출해 컴포넌트별 저장을 수행
+ * - 2순위: 폴백으로 기존 방식(폼 필터 기반)으로 SP 호출
+ */
 function onSaveHandled() {
   const list = Array.isArray(rows.value) ? rows.value : []
   const primary = list.find(r => Number(r?.contents_seq) === 1) || list[0]
@@ -132,6 +170,13 @@ function onSaveHandled() {
   if (!procedureName) { return }
   ;(async () => {
     try {
+      // 1) 자식 컴포넌트에 save()가 노출되어 있으면 우선 사용
+      const inst = Array.isArray(blockRefs.value) ? blockRefs.value[0] : null
+      if (inst && typeof (inst as any).save === 'function') {
+        await (inst as any).save()
+        return
+      }
+      // 2) 없으면 폼 필터 기반 기본 저장으로 폴백
       const cleanFilters = buildFilterPayload(filters.value, finalSchema.value)
       await $fetch<any>('/api/stored-procedure/execute', {
         method: 'POST',
@@ -144,6 +189,10 @@ function onSaveHandled() {
   })()
 }
 
+/**
+ * 필터 깊은 정제
+ * - 키가 '@' 또는 '$' 로 시작하는 모든 속성을 제거한다.
+ */
 function sanitizeFilters(input: any): any {
   // 깊은 정제: 키가 @ 또는 $ 로 시작하는 모든 속성 제거
   if (Array.isArray(input)) {
@@ -160,6 +209,9 @@ function sanitizeFilters(input: any): any {
   return input
 }
 
+/**
+ * 폼 스키마에 정의된 필드만 추려서 payload를 만든다.
+ */
 function buildFilterPayload(raw: Record<string, any>, schema: any[]): Record<string, any> {
   const cleaned = sanitizeFilters(raw) || {}
   if (!Array.isArray(schema) || schema.length === 0) return cleaned
@@ -176,6 +228,9 @@ function buildFilterPayload(raw: Record<string, any>, schema: any[]): Record<str
 }
 
 // 현재 라우트 경로와 가장 잘 매칭되는 메뉴 항목 찾기 (app.vue/DefaultPage와 동일한 방식 간소화)
+/**
+ * 경로 정규화 유틸
+ */
 function normalizePath(input?: string | null) {
   if (!input) return undefined
   try {
@@ -183,9 +238,16 @@ function normalizePath(input?: string | null) {
     return trimmed.replace(/\/$/, '').toLowerCase()
   } catch { return input || undefined }
 }
+/**
+ * 메뉴 아이템에서 경로 후보를 추출
+ */
 function extractItemPath(item: any) {
   return normalizePath(item?.href || item?.to || item?.path)
 }
+/**
+ * 현재 경로와 가장 잘 매칭되는 메뉴 노드를 찾는다.
+ * - 동일 경로 완전일치 > prefix > suffix 순으로 스코어링
+ */
 function findBestMenuNodeByPath(items: any[] | undefined, currentPath: string) {
   if (!items || items.length === 0) return undefined
   const target = normalizePath(currentPath)
@@ -209,6 +271,9 @@ function findBestMenuNodeByPath(items: any[] | undefined, currentPath: string) {
 
 const activeMenuItem = computed(() => findBestMenuNodeByPath(menu.value, route.path))
 
+/**
+ * 메뉴 트리에서 menu_id로 노드를 찾는다.
+ */
 function findMenuNodeById(id: string | null) {
   if (!id || !Array.isArray(menu.value)) return undefined
   const target = String(id)
@@ -225,8 +290,14 @@ function findMenuNodeById(id: string | null) {
 }
 
 const menuNodeById = computed(() => findMenuNodeById(menuId.value))
+/**
+ * 우선순위: menuId로 찾은 노드 > 현재 경로로 추정한 노드
+ */
 const effectiveMenuNode = computed(() => menuNodeById.value || activeMenuItem.value)
 
+/**
+ * 'Y'/'N', 1/0, true/false 등 다양한 형태를 boolean으로 강제 변환
+ */
 function coerceFlag(value: any, defaultValue: boolean): boolean {
   if (value === undefined || value === null) return defaultValue
   if (typeof value === 'boolean') return value
@@ -238,12 +309,16 @@ function coerceFlag(value: any, defaultValue: boolean): boolean {
   return defaultValue
 }
 
+// 메뉴 설정(search_yn/save_yn)에 따른 버튼 표시 여부
 const showSearchButton = computed(() => coerceFlag((effectiveMenuNode.value as any)?.search_yn, true))
 const showSaveButton = computed(() => coerceFlag((effectiveMenuNode.value as any)?.save_yn, false))
 
 function extractItemTitle(item: any) { return item?.title || item?.label || item?.text || item?.name || '' }
 function extractItemIcon(item: any) { return item?.icon || 'pi pi-bookmark' }
 
+/**
+ * 페이지 상단 아이콘
+ */
 const pageIcon = computed(() => {
   try {
     const node = activeMenuItem.value
@@ -252,6 +327,10 @@ const pageIcon = computed(() => {
   } catch { return 'pi pi-bookmark' }
 })
 
+/**
+ * 브레드크럼 타이틀
+ * - 우선 현재 경로 매칭 결과 사용, 없으면 menuId 조회, 최후엔 경로 세그먼트
+ */
 const breadcrumbTitle = computed(() => {
   try {
     // 우선 현재 경로 기반 매칭
@@ -284,6 +363,12 @@ const breadcrumbTitle = computed(() => {
 // 디버그 로그 제거 완료
 
 // 동적 검색 스키마 로드: s_menu_info.search_name 을 grid_id로 사용 (effectiveMenuNode 선언 이후)
+/**
+ * 검색 폼 스키마를 동적으로 로드한다.
+ * - sp_grid_info(search)로 필드 메타를 가져와 FormKit 스키마 구성
+ * - primeSelect 유형은 sp_code_info(search)로 코드값 옵션을 채운다.
+ * - 스키마 기반 초기 filters를 구성한다.
+ */
 async function loadDynamicSearchSchema() {
   try {
     isLoadingSchema.value = true
@@ -354,9 +439,16 @@ async function loadDynamicSearchSchema() {
 }
 
 // search_name 변경 시 스키마 재로드 (effectiveMenuNode 선언 이후에 등록)
+// effectiveMenuNode가 변하면 관련 grid_id와 스키마가 달라질 수 있으므로 즉시 재조회
 watch(effectiveMenuNode, () => { loadDynamicSearchSchema() }, { immediate: true })
 
 // 렌더링 블록 변환: s_menu_display 한 행 -> 실제 컴포넌트 + props
+/**
+ * s_menu_display의 primary 행을 해석하여 실제 렌더 컴포넌트(AgGrid|CardGrid)를 결정한다.
+ * - grid: AgGrid에 rowData 전달
+ * - card: CardGrid에 rowData 전달
+ * - 기타: 안내 텍스트 영역
+ */
 const resolvedBlocks = computed(() => {
   const list = Array.isArray(rows.value) ? rows.value : []
   if (list.length === 0) return []
@@ -364,6 +456,7 @@ const resolvedBlocks = computed(() => {
   const primary = list.find((r) => Number(r?.contents_seq) === 1) || list[0]
   const type = (primary?.contents_type || '').toLowerCase()
   const headerTitle = primary?.contents_header || undefined
+  
   if (type === 'grid') {
     return [
       {
@@ -373,9 +466,12 @@ const resolvedBlocks = computed(() => {
           title: headerTitle,
           columnDefs: [],
           rowData: contentData.value,
-          editable: false,
+          editable: !!(primary as any)?.save_case && String((primary as any)?.save_case).trim() !== '',
           treeData: false,
           gridId: headerTitle,
+          procedureName: (effectiveMenuNode.value as any)?.procedure_name,
+          saveCase: (primary as any)?.save_case || 'save',
+          menuId: menuId.value,
         },
         onGridReady: (_params: any) => {},
         onCellDblClick: (_e: any) => {},
@@ -432,6 +528,7 @@ const resolvedBlocks = computed(() => {
     <!-- 검색 영역 -->
     <div class="w-full pb-2 mb-2 border-b border-gray-200 dark:border-gray-700">
       <div class="compact-form">
+        <!-- 동적 스키마 기반 폼. 저장(Submit) 대신 data-saved 이벤트로 검색 트리거 -->
         <FormKitDataEdit
           v-if="finalSchema.length > 0"
           :key="`schema-${finalSchema.length}`"
@@ -453,6 +550,7 @@ const resolvedBlocks = computed(() => {
         :key="block.key"
         :is="block.component"
         v-bind="block.props"
+        ref="blockRefs"
         @grid-ready="block.onGridReady"
         @cell-double-clicked="block.onCellDblClick"
         @card-double-clicked="block.onCardDblClick"
@@ -462,6 +560,7 @@ const resolvedBlocks = computed(() => {
 </template>
 
 <style scoped>
+/* 로딩 상태에서 인터랙션 제한 */
 .loading {
   opacity: 0.6;
   pointer-events: none;

@@ -379,7 +379,6 @@ const gridOptions = computed(() => {
     suppressScrollOnNewData: true, // 데이터 변경 시 자동 스크롤 방지
     // 편집 관련 설정
     ...(props.editable && {
-      editType: 'singleCell' as const, // 개별 셀 편집 모드
       stopEditingWhenCellsLoseFocus: true, // 포커스 잃을 때 편집 종료
       singleClickEdit: props.editMode === 'singleClick', // 편집 모드에 따른 설정
     })
@@ -900,7 +899,7 @@ onMounted(async () => {
          :tree-data="props.treeData"
          :get-data-path="props.treeData ? getDataPath : undefined"
          :auto-group-column-def="props.treeData ? autoGroupColumnDef : undefined"
-         :grid-options="gridOptions"
+         v-bind="gridOptions"
          :animate-rows="true"
          theme="legacy"
          style="width: 100%; height: calc(100% - 8px);"
