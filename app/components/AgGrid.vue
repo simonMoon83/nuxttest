@@ -9,6 +9,19 @@ import { AgGridVue } from 'ag-grid-vue3'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
 
+/**
+ * 컴포넌트 개요
+ * - AG Grid(Vue3) 래퍼 컴포넌트
+ * - 기능: 동적 컬럼 로드(sp_grid_info), 코드 옵션 로드(sp_code_info), 편집/삭제/추가, 트리 데이터,
+ *         엑셀 내보내기, 빠른 검색(Quick Filter), 라이트/다크 테마 전환, 상태 아이콘 표기(__rownum 열)
+ * - props: title, columnDefs, rowData, searchQuery, gridId, treeData, editable, editMode, rowSelect 등
+ * - emits: grid-ready, cell-double-clicked, cell-value-changed, row-editing-started/row-editing-stopped,
+ *          row-added, rows-deleted, expand-all, collapse-all
+ * - expose: expandAll, collapseAll, exportExcel, applyFilter, getGridApi, loadDynamicColumnDefs,
+ *           getDynamicColumnDefs, markDeleted, clearStatuses, addRow, deleteSelectedRows, stopEditing,
+ *           getAllRows, getChangedRows
+ */
+
 // Props 인터페이스 정의
 interface Props {
   title?: string // 그리드 제목
@@ -21,6 +34,10 @@ interface Props {
   editable?: boolean // 편집 가능 여부
   editMode?: 'singleClick' | 'doubleClick' | 'enterKey' // 편집 모드
   rowSelect?: boolean // 행 선택 기능 사용 여부
+  procedureName?: string // 저장/조회에 사용할 프로시저명
+  saveCase?: string // 저장 케이스 값(ex. 'save')
+  menuId?: string | number // 저장 시 전달할 메뉴 ID
+  extraSaveParams?: Record<string, any> // 추가 저장 파라미터
 }
 
 // Props 기본값 설정
@@ -33,10 +50,25 @@ const props = withDefaults(defineProps<Props>(), {
   treeData: false,
   editable: false,
   editMode: 'singleClick',
-  rowSelect: false
+  rowSelect: false,
+  procedureName: '',
+  saveCase: 'save',
+  menuId: undefined,
+  extraSaveParams: () => ({})
 })
 
 // Emits 정의 - 부모 컴포넌트로 이벤트 전달
+/**
+ * 이벤트 요약
+ * - grid-ready: AG Grid 초기화 완료
+ * - cell-double-clicked: 셀 더블클릭
+ * - expand-all / collapse-all: 트리 펼치기/접기
+ * - cell-value-changed: 셀 값 변경
+ * - row-editing-started / row-editing-stopped: 행 편집 시작/종료
+ * - row-added / rows-deleted: 행 추가/삭제
+ * - saved: 저장 성공(result 포함)
+ * - save-error: 저장 실패(error 포함)
+ */
 const emit = defineEmits<{
   'grid-ready': [params: any] // 그리드 준비 완료 이벤트
   'cell-double-clicked': [event: any] // 셀 더블클릭 이벤트
@@ -47,6 +79,8 @@ const emit = defineEmits<{
   'row-editing-stopped': [event: any] // 행 편집 종료 이벤트
   'row-added': [row: any]
   'rows-deleted': [rows: any[]]
+  'saved': [result: any]
+  'save-error': [error: any]
 }>()
 
 // 메뉴 아이템 인터페이스 정의
@@ -62,6 +96,7 @@ interface MenuItem {
 }
 
 // AG Grid 모듈 등록 - 필요한 기능들을 활성화
+// (필요한 기능만 번들에 포함되도록 명시적으로 모듈 등록)
 ModuleRegistry.registerModules([AllCommunityModule, TreeDataModule, ExcelExportModule, CellSelectionModule, ClipboardModule])
 
 // 다크모드/라이트모드 감지
@@ -75,6 +110,8 @@ const gridApi = shallowRef<any | null>(null)
 
 // 동적 컬럼 정보
 const dynamicColumnDefs = ref<any[]>([])
+// 저장 파라미터로 사용할 필드 목록(col_save=Y) 저장
+const saveParamFields = ref<string[]>([])
 
 // 값 변환 및 포맷 보조 함수들
 function coerceBooleanValue(value: any): boolean {
@@ -122,6 +159,22 @@ function formatDateValue(input: any, kind: 'date' | 'datetime'): string {
   return isNaN(tryDate.getTime()) ? raw : formatDateValue(tryDate, kind)
 }
 
+/**
+ * col_edit 정책을 표준화한다.
+ * - 'A': Always, 항상 편집 가능
+ * - 'F': First/New row only, 신규 행에서만 편집 가능(__status==='N')
+ * - 'N': Never, 편집 불가(기본)
+ */
+function coerceEditPolicy(value: any): 'A' | 'F' | 'N' {
+  const s = String(value ?? '').trim().toUpperCase()
+  if (s === 'A' || s === 'F') return s
+  return 'N'
+}
+/** 신규 행 여부를 반환한다(__status === 'N'). */
+function isNewRowFlag(row: any): boolean {
+  try { return !!row && row.__status === 'N' } catch { return false }
+}
+
 // sp_grid_info 값 정규화 헬퍼들
 function toTrimmedString(value: any): string {
   return String(value ?? '').trim()
@@ -166,6 +219,30 @@ function smartSet(data: any, expectedField: string, newValue: any): boolean {
   return false
 }
 
+function coerceCheckboxToBit(field: string, value: any): any {
+  try {
+    const defs = dynamicColumnDefs.value || []
+    const def = defs.find((d: any) => d && d.field === field)
+    const t = String(def?.__colType || '').toLowerCase()
+    if (t === 'checkbox' || t === 'bool' || t === 'boolean') {
+      return coerceBooleanValue(value) ? 1 : 0
+    }
+  } catch {}
+  return value
+}
+
+/** 행 객체에서 지정된 필드만 추출한다(col_save 지정 필드). */
+function pickSaveFields(row: any, fields: string[]): any {
+  if (!row || typeof row !== 'object') return {}
+  const out: any = {}
+  fields.forEach((f) => {
+    const key = findMatchingKey(row, f) || f
+    const raw = (row as any)[key]
+    out[f] = coerceCheckboxToBit(f, raw)
+  })
+  return out
+}
+
 /**
  * 동적 컬럼 정보 조회 함수
  */
@@ -190,6 +267,7 @@ async function loadDynamicColumnDefs() {
     if (result.success && result.data && Array.isArray(result.data)) {
       // 드롭다운 옵션 사전 로드용 맵
       const dropdownPromises: Promise<void>[] = []
+      const saveFields: string[] = []
       const tempDefs: any[] = result.data.map((col: any) => {
         const def: any = {
           field: toTrimmedString(col.col_id || ''),
@@ -197,33 +275,51 @@ async function loadDynamicColumnDefs() {
           width: toNumberOrUndefined(col.col_width) ?? 100,
           hide: toHideBoolean(col.col_hide),
           flex: toNumberOrUndefined(col.col_flex) ?? undefined,
+          __colType: toLowerTrimmed(col.col_type || ''),
         }
 
         const colType = toLowerTrimmed(col.col_type || '')
-        const editable = props.editable === true
+        const policy = coerceEditPolicy(col.col_edit)
+        const anyEditable = props.editable === true && (policy === 'A' || policy === 'F')
+        const editableByPolicy: boolean | ((p: any) => boolean) = policy === 'A'
+          ? true
+          : (policy === 'F' ? ((p: any) => isNewRowFlag(p?.data)) : false)
+        const isEditableRow = (row: any) => {
+          if (!props.editable) return false
+          if (policy === 'A') return true
+          if (policy === 'F') return isNewRowFlag(row)
+          return false
+        }
+        const saveParam = coerceBooleanValue(col.col_save)
+        if (saveParam) {
+          def.__saveParam = true
+          if (def.field) saveFields.push(def.field)
+        }
 
         if (colType === 'text' || colType === '' || !colType) {
-          if (editable) def.cellEditor = 'agTextCellEditor'
+          if (anyEditable) def.cellEditor = 'agTextCellEditor'
+          def.editable = editableByPolicy
           def.valueFormatter = (p: any) => (p.value == null ? '' : p.value)
           def.valueGetter = (p: any) => smartGet(p?.data, def.field)
-          if (editable) def.valueSetter = (p: any) => smartSet(p?.data, def.field, p.newValue)
+          if (anyEditable) def.valueSetter = (p: any) => smartSet(p?.data, def.field, p.newValue)
         } else if (colType === 'number') {
           def.filter = 'agNumberColumnFilter'
           def.valueParser = (p: any) => {
             const v = Number(p.newValue)
             return isNaN(v) ? null : v
           }
-          if (editable) def.cellEditor = 'agTextCellEditor'
+          if (anyEditable) def.cellEditor = 'agTextCellEditor'
+          def.editable = editableByPolicy
           def.valueFormatter = (p: any) => (p.value == null ? '' : p.value)
           def.valueGetter = (p: any) => smartGet(p?.data, def.field)
-          if (editable) def.valueSetter = (p: any) => smartSet(p?.data, def.field, (p.newValue == null || p.newValue === '') ? null : Number(p.newValue))
+          if (anyEditable) def.valueSetter = (p: any) => smartSet(p?.data, def.field, (p.newValue == null || p.newValue === '') ? null : Number(p.newValue))
         } else if (colType === 'checkbox' || colType === 'bool' || colType === 'boolean') {
           // 클릭으로 직접 토글되도록 실제 DOM 요소 렌더링
           def.cellRenderer = (p: any) => {
             const input = document.createElement('input')
             input.type = 'checkbox'
             input.checked = coerceBooleanValue(smartGet(p?.data, def.field))
-            input.disabled = !editable
+            input.disabled = !isEditableRow(p?.data)
             input.addEventListener('click', (ev) => ev.stopPropagation())
             input.addEventListener('change', () => {
               const newVal = !!input.checked
@@ -234,8 +330,8 @@ async function loadDynamicColumnDefs() {
             return input
           }
           // 더블클릭 편집 경로 유지
-          if (editable) {
-            def.editable = true
+          if (anyEditable) {
+            def.editable = editableByPolicy
             def.cellEditor = (params: any) => {
               const e = document.createElement('input')
               e.type = 'checkbox'
@@ -250,8 +346,8 @@ async function loadDynamicColumnDefs() {
           def.filter = 'agDateColumnFilter'
           def.valueFormatter = (p: any) => formatDateValue(p.value, colType === 'datetime' ? 'datetime' : 'date')
           def.valueGetter = (p: any) => smartGet(p?.data, def.field)
-          if (editable) {
-            def.editable = true
+          if (anyEditable) {
+            def.editable = editableByPolicy
             def.cellEditorPopup = true
             def.cellEditor = (params: any) => {
               const input = document.createElement('input')
@@ -309,8 +405,8 @@ async function loadDynamicColumnDefs() {
               }
             })())
           }
-          if (editable) {
-            def.editable = true
+          if (anyEditable) {
+            def.editable = editableByPolicy
             def.cellEditorPopup = true
             def.cellEditor = (params: any) => {
               const select = document.createElement('select')
@@ -343,6 +439,7 @@ async function loadDynamicColumnDefs() {
       // 옵션 로드가 끝나면 일괄 반영
       try { await Promise.allSettled(dropdownPromises) } catch {}
       dynamicColumnDefs.value = tempDefs
+      saveParamFields.value = saveFields
     } else {
       console.warn('동적 컬럼 정보가 없거나 잘못된 형식입니다:', result)
     }
@@ -644,6 +741,63 @@ function exportExcel() {
   if (api) api.exportDataAsExcel({ fileName: 'MenuList', sheetName: 'Menus' }) 
 }
 
+/**
+ * 변경 데이터 저장 실행
+ * - props.procedureName / props.saveCase / props.extraSaveParams 사용
+ * - getChangedRows()로 추가/수정/삭제 행을 수집하고, col_save 지정 필드만 전송
+ * - 성공 시 'saved' 이벤트, 실패 시 'save-error' 이벤트 emit
+ */
+async function save(): Promise<any> {
+  const procedureName = String(props.procedureName || '').trim()
+  const saveCase = String(props.saveCase || 'save').trim()
+  if (!procedureName) {
+    const err = new Error('procedureName이 설정되지 않았습니다.')
+    emit('save-error', err)
+    throw err
+  }
+  try {
+    const changed = (exposeMethods as any)?.getChangedRows?.() as { added: any[]; modified: any[]; deleted: any[] } || { added: [], modified: [], deleted: [] }
+    const saveFields = saveParamFields.value || []
+    const execForRows = async (rows: any[], state: 'N' | 'M' | 'D') => {
+      for (const row of rows) {
+        const rowParams = pickSaveFields(row, saveFields)
+        const parameters = {
+          case: saveCase,
+          row_state: state,
+          ...props.extraSaveParams,
+          ...rowParams,
+        }
+        await $fetch<any>('/api/stored-procedure/execute', {
+          method: 'POST',
+          body: { procedureName, parameters }
+        })
+      }
+    }
+    await execForRows(changed.added, 'N')
+    await execForRows(changed.modified, 'M')
+    await execForRows(changed.deleted, 'D')
+
+    // 성공적으로 저장된 후 상태 초기화
+    try {
+      const rows = Array.isArray(props.rowData) ? props.rowData : []
+      rows.forEach((r: any) => { if (r && r.__status) delete r.__status })
+      try { newlyAddedRows.value?.clear?.() } catch {}
+      try {
+        seenRows.value = new WeakSet<any>()
+        rows.forEach((r: any) => { if (r && typeof r === 'object') seenRows.value.add(r) })
+      } catch {}
+      refreshStatusCells()
+    } catch {}
+
+    const summary = { added: changed.added.length, modified: changed.modified.length, deleted: changed.deleted.length }
+    emit('saved', summary)
+    return summary
+  } catch (error) {
+    emit('save-error', error)
+    throw error
+  }
+}
+
 // 행 추가/삭제 동작
 function addRow() {
   const fields = finalColumnDefs.value.map((c: any) => c?.field).filter((f: any) => f && f !== '__rownum')
@@ -671,6 +825,17 @@ function addRow() {
   }
 }
 
+/**
+ * 외부 공개 메서드 요약
+ * - expandAll/collapseAll: 트리 전체 펼치기/접기
+ * - exportExcel: 엑셀 내보내기
+ * - applyFilter: Quick Filter 적용
+ * - getGridApi: 내부 Grid API 반환
+ * - loadDynamicColumnDefs/getDynamicColumnDefs: 동적 컬럼 로드/조회
+ * - markDeleted/clearStatuses: 행 상태 관리
+ * - addRow/deleteSelectedRows/stopEditing: 행 추가/삭제/편집 종료
+ * - getAllRows/getChangedRows: 전체/변경 행 조회(added/modified/deleted 구분)
+ */
 // 외부에서 호출할 수 있는 메서드들을 expose
 const exposeMethods = {
   expandAll: expandAllGrid, // 전체 펼치기
@@ -691,6 +856,7 @@ const exposeMethods = {
   addRow,
   deleteSelectedRows,
   stopEditing: () => { try { gridApi.value?.stopEditing?.() } catch {} },
+  save, // 저장 메서드 추가
   // 현재 그리드의 모든 행 데이터 반환 (필터/소트 무시, 내부 스토어 기준)
   getAllRows: (): any[] => {
     const api = gridApi.value
@@ -719,6 +885,8 @@ const exposeMethods = {
     const deleted = all.filter((r: any) => r && r.__status === 'D')
     return { added, modified, deleted }
   },
+  getSaveParamFields: () => saveParamFields.value, // 저장 파라미터 필드 목록
+  // save 항목은 위에 이미 포함됨
 }
 
 // 부모 컴포넌트에서 메서드 호출 가능하도록 expose
@@ -899,7 +1067,7 @@ onMounted(async () => {
          :tree-data="props.treeData"
          :get-data-path="props.treeData ? getDataPath : undefined"
          :auto-group-column-def="props.treeData ? autoGroupColumnDef : undefined"
-         v-bind="gridOptions"
+         :grid-options="gridOptions"
          :animate-rows="true"
          theme="legacy"
          style="width: 100%; height: calc(100% - 8px);"
