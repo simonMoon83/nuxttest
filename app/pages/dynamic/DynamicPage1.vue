@@ -33,6 +33,9 @@ interface DisplayRow {
   save_yn?: boolean | number | null
   row_click_case?: string | null
   row_click_target?: string | null
+  grid_id?: string | null  // s_grid_master의 grid_id (schema.vue에서 설정)
+  search_case?: string | null  // 검색 시 사용할 case 값
+  save_case?: string | null  // 저장 시 사용할 case 값
   // 추가 필드 호환
   [key: string]: any
 }
@@ -131,7 +134,7 @@ function onSearchHandled() {
   const list = Array.isArray(rows.value) ? rows.value : []
   const primary = list.find(r => Number(r?.contents_seq) === 1) || list[0]
   const procedureName = (effectiveMenuNode.value as any)?.procedure_name
-  const searchCase = (primary as any)?.search_case || 'search'
+  const searchCase = primary?.search_case || 'search'
   if (!procedureName) { return }
   ;(async () => {
     try {
@@ -152,6 +155,7 @@ function onSearchHandled() {
         : []
       contentData.value = rowsOut
     } catch (err) {
+      console.error('검색 실패:', err)
       contentData.value = []
     }
   })()
@@ -166,7 +170,7 @@ function onSaveHandled() {
   const list = Array.isArray(rows.value) ? rows.value : []
   const primary = list.find(r => Number(r?.contents_seq) === 1) || list[0]
   const procedureName = (effectiveMenuNode.value as any)?.procedure_name
-  const saveCase = (primary as any)?.save_case || 'save'
+  const saveCase = primary?.save_case || 'save'
   if (!procedureName) { return }
   ;(async () => {
     try {
@@ -178,14 +182,20 @@ function onSaveHandled() {
       }
       // 2) 없으면 폼 필터 기반 기본 저장으로 폴백
       const cleanFilters = buildFilterPayload(filters.value, finalSchema.value)
-      await $fetch<any>('/api/stored-procedure/execute', {
+      const result = await $fetch<any>('/api/stored-procedure/execute', {
         method: 'POST',
         body: {
           procedureName,
           parameters: { case: saveCase, ...cleanFilters, menu_id: menuId.value }
         }
       })
-    } catch {}
+      if (result?.success) {
+        // 저장 성공 후 검색 재실행
+        await onSearchHandled()
+      }
+    } catch (err) {
+      console.error('저장 실패:', err)
+    }
   })()
 }
 
@@ -442,70 +452,72 @@ async function loadDynamicSearchSchema() {
 // effectiveMenuNode가 변하면 관련 grid_id와 스키마가 달라질 수 있으므로 즉시 재조회
 watch(effectiveMenuNode, () => { loadDynamicSearchSchema() }, { immediate: true })
 
-// 렌더링 블록 변환: s_menu_display 한 행 -> 실제 컴포넌트 + props
-/**
- * s_menu_display의 primary 행을 해석하여 실제 렌더 컴포넌트(AgGrid|CardGrid)를 결정한다.
- * - grid: AgGrid에 rowData 전달
- * - card: CardGrid에 rowData 전달
- * - 기타: 안내 텍스트 영역
- */
+// schema.vue에서 설정한 grid_id를 사용하여 s_grid_detail에서 컬럼 정보를 동적으로 로드
 const resolvedBlocks = computed(() => {
   const list = Array.isArray(rows.value) ? rows.value : []
   if (list.length === 0) return []
-  // DynamicPage1은 단일 컨텐츠: contents_seq == 1 우선, 없으면 첫 항목
-  const primary = list.find((r) => Number(r?.contents_seq) === 1) || list[0]
-  const type = (primary?.contents_type || '').toLowerCase()
-  const headerTitle = primary?.contents_header || undefined
-  
-  if (type === 'grid') {
-    return [
-      {
-        key: 'primary-grid',
+
+  // contents_seq 순서대로 정렬하여 여러 블록 지원
+  const sortedList = [...list].sort((a, b) => {
+    const seqA = Number(a?.contents_seq || 0)
+    const seqB = Number(b?.contents_seq || 0)
+    return seqA - seqB
+  })
+
+  return sortedList.map((row, index) => {
+    const type = (row?.contents_type || '').toLowerCase()
+    const headerTitle = row?.contents_header || undefined
+    // schema.vue에서 설정한 grid_id 사용 (없으면 contents_header를 fallback으로 사용)
+    const gridId = row?.grid_id || headerTitle || undefined
+    const saveYn = coerceFlag(row?.save_yn, false)
+
+    if (type === 'grid') {
+      return {
+        key: `grid-${index}-${row.contents_seq}`,
         component: AgGrid,
         props: {
           title: headerTitle,
           columnDefs: [],
           rowData: contentData.value,
-          editable: !!(primary as any)?.save_case && String((primary as any)?.save_case).trim() !== '',
+          editable: saveYn,  // save_yn이 true면 편집 가능
           treeData: false,
-          gridId: headerTitle,
-          procedureName: (effectiveMenuNode.value as any)?.procedure_name,
-          saveCase: (primary as any)?.save_case || 'save',
-          menuId: menuId.value,
+          gridId: gridId,  // schema.vue에서 설정한 grid_id 사용
+          rowSelect: true,
+          editMode: 'doubleClick' as const,
         },
         onGridReady: (_params: any) => {},
         onCellDblClick: (_e: any) => {},
         onCardDblClick: undefined,
-      },
-    ]
-  }
-  if (type === 'card') {
-    return [
-      {
-        key: 'primary-card',
+        searchCase: row?.search_case || 'search',
+        saveCase: row?.save_case || 'save',
+      }
+    }
+    if (type === 'card') {
+      return {
+        key: `card-${index}-${row.contents_seq}`,
         component: CardGrid,
         props: {
           title: headerTitle,
           columnDefs: [],
           rowData: contentData.value,
-          cols: 1,
+          cols: row?.contents_width || 3,
         },
         onGridReady: undefined,
         onCellDblClick: undefined,
         onCardDblClick: (_row: any) => {},
-      },
-    ]
-  }
-  return [
-    {
-      key: 'primary-unknown',
+        searchCase: row?.search_case || 'search',
+        saveCase: row?.save_case || 'save',
+      }
+    }
+    return {
+      key: `unknown-${index}-${row.contents_seq}`,
       component: 'div',
-      props: { class: 'text-color-secondary' },
+      props: { class: 'text-color-secondary p-4' },
       onGridReady: undefined,
       onCellDblClick: undefined,
       onCardDblClick: undefined,
-    },
-  ]
+    }
+  })
 })
 </script>
 
