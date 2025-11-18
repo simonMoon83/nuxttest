@@ -13,7 +13,8 @@ export interface MultipleStoredProcedureRequest {
 }
 
 export function useStoredProcedure() {
-  const { $fetch } = useNuxtApp()
+  const nuxtApp = useNuxtApp()
+  const appFetch = nuxtApp?.$fetch || $fetch
 
   /**
    * 단일 Stored Procedure 실행
@@ -23,7 +24,7 @@ export function useStoredProcedure() {
     parameters: StoredProcedureParams = {},
   ): Promise<StoredProcedureResult> => {
     try {
-      const result = await $fetch('/api/stored-procedure/execute', {
+      const result = await appFetch('/api/stored-procedure/execute', {
         method: 'POST',
         body: {
           procedureName,
@@ -45,7 +46,7 @@ export function useStoredProcedure() {
     procedures: Array<{ name: string, parameters?: StoredProcedureParams }>,
   ) => {
     try {
-      const result = await $fetch('/api/stored-procedure/execute', {
+      const result = await appFetch('/api/stored-procedure/execute', {
         method: 'POST',
         body: {
           action: 'multiple',
@@ -65,7 +66,7 @@ export function useStoredProcedure() {
    */
   const getProcedureParameters = async (procedureName: string) => {
     try {
-      const result = await $fetch('/api/stored-procedure/execute', {
+      const result = await appFetch('/api/stored-procedure/execute', {
         method: 'POST',
         body: {
           action: 'parameters',
@@ -85,7 +86,7 @@ export function useStoredProcedure() {
    */
   const getProcedureList = async () => {
     try {
-      const result = await $fetch('/api/stored-procedure/list')
+      const result = await appFetch('/api/stored-procedure/list')
       return result
     }
     catch (error) {

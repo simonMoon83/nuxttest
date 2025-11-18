@@ -1,5 +1,19 @@
 import { executeStoredProcedure } from '../../../utils/storedProcedure'
 
+interface GridDetailRow {
+  grid_id: string
+  col_id: string
+  col_name: string
+  col_seq: number | null
+  col_type: string | null
+  col_size: string | null
+  col_code: string | null
+  col_width: number | null
+  col_hide: number | null
+  col_flex: number | null
+  use_yn: 'Y' | 'N'
+}
+
 export default defineEventHandler(async (event) => {
   try {
     const gridId = event.context.params?.gridId
@@ -11,7 +25,6 @@ export default defineEventHandler(async (event) => {
       })
     }
     
-    // sp_grid_info 프로시저 호출하여 그리드 상세 정보 조회
     const result = await executeStoredProcedure('sp_grid_info', {
       case: 'search',
       grid_id: gridId
@@ -23,11 +36,13 @@ export default defineEventHandler(async (event) => {
         statusMessage: result.error || '그리드 상세 정보 조회 실패'
       })
     }
+
+    const data = (result.data || result.recordset || []) as GridDetailRow[]
     
     return {
       success: true,
-      data: result.data || result.recordset || [],
-      count: Array.isArray(result.data) ? result.data.length : (Array.isArray(result.recordset) ? result.recordset.length : 0)
+      data,
+      count: data.length
     }
   } catch (error) {
     console.error('그리드 상세 정보 조회 실패:', error)
