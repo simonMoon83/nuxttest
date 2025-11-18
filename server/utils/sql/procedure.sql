@@ -24,15 +24,16 @@ CREATE   procedure  [dbo].[sp_adm011]
         @grid_type                varchar(10)      =  null,
         @grid_row                 int              =  null,
         @use_yn                   char(1)          =  null,
-        @user_id                  varchar(20)      =  null
+        @user_id                  varchar(20)      =  null,
+		@row_state                varchar(1)       =  null
 as
 begin
 set     nocount on
 
 declare @rowcnt               integer,
-        @now                  varchar(14)
+        @now                  datetime
 
-select  @now                  =  format(getdate(), 'yyyyMMddHHmmss')
+select  @now                  =  getdate()
 
 if      @case  =  'search'
 begin
@@ -47,11 +48,7 @@ begin
 end
 else if @case  =  'save'
 begin
-    select  @rowcnt           =  count(1)
-      from  s_grid_master a0 (nolock)
-     where  a0.grid_id                =  @grid_id
-
-    if  @rowcnt  =  0
+    if      @row_state  =  'A'
     begin
         insert into s_grid_master (
                 grid_id,
@@ -77,7 +74,7 @@ begin
                     return_msg   =  ''
         end
     end
-    else
+    else if @row_state = 'M'
     begin
         update  a0
            set  grid_name              =  @grid_name,
@@ -87,29 +84,26 @@ begin
                 update_user_id         =  @user_id,
                 update_date            =  @now
           from  s_grid_master a0
-         where  a0.grid_id                =  @grid_id
+         where  a0.grid_id             =  @grid_id
 
         if  @@error <> 0
         begin
             select  return_code  =  'Err',
                     return_msg   =  ''
         end
-    end
+	end
+	else if @row_state = 'D'
+	begin
+		delete  a0
+		  from  s_grid_master a0
+		 where  a0.grid_id             =  @grid_id
 
-    select  return_code  =  'complete',
-            return_msg   =  ''
-
-end
-else if @case  =  'delete'
-begin
-    delete  a0
-      from  s_grid_master a0
-         where  a0.grid_id                =  @grid_id
-
-    if  @@error <> 0
-    begin
-        select  return_code  =  'Err',
-                return_msg   =  ''
+		if  @@error <> 0
+		begin
+			select  return_code  =  'Err',
+					return_msg   =  ''
+		end
+	
     end
 
     select  return_code  =  'complete',
@@ -164,9 +158,9 @@ begin
 set     nocount on
 
 declare @rowcnt               integer,
-        @now                  varchar(14)
+        @now                  datetime
 
-select  @now                  =  format(getdate(), 'yyyyMMddHHmmss')
+select  @now                  =  getdate()
 
 if      @case  =  'search'
 begin
@@ -576,35 +570,48 @@ end;
 Proc ID     : sp_grid_info
 Proc Name   : 그리드 정보
 Create Date : 2025.08.30
-Proc Params : @case - Search : 조회  
-                      Save   : 저장  
-                      Delete : 삭제  
+Proc Params : @case      - Search : 조회  
+                           Save   : 저장 (row_state로 분기)
+              @row_state - A : 추가 (INSERT)
+                           M : 수정 (UPDATE)
+                           D : 삭제 (DELETE)
 -----------------------------------*/
 /*-----------------------------------
-exec    sp_grid_info
-        @case                     =  'search',
-		@grid_id                  =  'menu5_search'
-
 exec    sp_grid_info
         @case                     =  'search',
 		@grid_id                  =  'menu5_header'
 
 exec    sp_grid_info
-        @case                     =  'save'
-        @grid_id                  =  ''
-        @col_id                   =  ''
-        @col_name                 =  ''
-        @col_seq                  =  ''
-        @col_type                 =  ''
-        @col_size                 =  ''
-        @col_code                 =  ''
-        @col_width                =  ''
-        @col_hide                 =  ''
-        @col_flex                 =  ''
-        @use_yn                   =  ''
+        @case                     =  'save',
+        @row_state                =  'A',
+        @grid_id                  =  'menu5_header',
+        @col_id                   =  'test_col',
+        @col_name                 =  '테스트컬럼',
+        @col_seq                  =  1,
+        @col_type                 =  'text',
+        @col_size                 =  '50',
+        @use_yn                   =  'Y',
+        @user_id                  =  'admin'
+
+exec    sp_grid_info
+        @case                     =  'save',
+        @row_state                =  'M',
+        @grid_id                  =  'menu5_header',
+        @col_id                   =  'test_col',
+        @col_name                 =  '수정된컬럼',
+        @use_yn                   =  'Y',
+        @user_id                  =  'admin'
+
+exec    sp_grid_info
+        @case                     =  'save',
+        @row_state                =  'D',
+        @grid_id                  =  'menu5_header',
+        @col_id                   =  'test_col',
+        @user_id                  =  'admin'
 -----------------------------------*/
 CREATE   procedure  [dbo].[sp_grid_info]
         @case                     varchar(10),
+        @row_state                char(1)          =  null,
         @grid_id                  varchar(20)      =  null,
         @col_id                   varchar(20)      =  null,
         @col_name                 varchar(30)      =  null,
@@ -621,8 +628,7 @@ as
 begin
 set     nocount on
 
-declare @rowcnt               integer,
-        @now                  varchar(14)
+declare @now                  varchar(14)
 
 select  @now                  =  format(getdate(), 'yyyyMMddHHmmss')
 
@@ -646,12 +652,7 @@ begin
 end
 else if @case  =  'save'
 begin
-    select  @rowcnt           =  count(1)
-      from  s_grid_detail a0 (nolock)
-     where  a0.grid_id                =  @grid_id
-       and  a0.col_id                 =  @col_id
-
-    if  @rowcnt  =  0
+    if      @row_state  =  'A'    -- Add (INSERT)
     begin
         insert into s_grid_detail (
                 grid_id,
@@ -687,9 +688,10 @@ begin
         begin
             select  return_code  =  'Err',
                     return_msg   =  ''
+            return
         end
     end
-    else
+    else if @row_state =  'M'     -- Modify (UPDATE)
     begin
         update  a0
            set  col_name               =  @col_name,
@@ -711,24 +713,22 @@ begin
         begin
             select  return_code  =  'Err',
                     return_msg   =  ''
+            return
         end
     end
-
-    select  return_code  =  'complete',
-            return_msg   =  ''
-
-end
-else if @case  =  'delete'
-begin
-    delete  a0
-      from  s_grid_detail a0
+    else if @row_state =  'D'     -- Delete
+    begin
+        delete  a0
+          from  s_grid_detail a0
          where  a0.grid_id                =  @grid_id
            and  a0.col_id                 =  @col_id
 
-    if  @@error <> 0
-    begin
-        select  return_code  =  'Err',
-                return_msg   =  ''
+        if  @@error <> 0
+        begin
+            select  return_code  =  'Err',
+                    return_msg   =  ''
+            return
+        end
     end
 
     select  return_code  =  'complete',
@@ -934,9 +934,9 @@ begin
 set     nocount on
 
 declare @rowcnt               integer,
-        @now                  varchar(14)
+        @now                  datetime
 
-select  @now                  =  format(getdate(), 'yyyyMMddHHmmss')
+select  @now                  =  getdate()
 
 if      @case  =  'search2'
 begin
@@ -1090,9 +1090,9 @@ begin
 set     nocount on
 
 declare @rowcnt               integer,
-        @now                  varchar(14)
+        @now                  datetime
 
-select  @now                  =  format(getdate(), 'yyyyMMddHHmmss')
+select  @now                  =  getdate()
 
 if      @case  =  'search2'
 begin
@@ -1474,4 +1474,5 @@ begin
             return_msg        =  '유저 정보를 삭제하였습니다.'
 end
 
+end;
 end;

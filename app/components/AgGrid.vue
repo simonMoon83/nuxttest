@@ -35,9 +35,9 @@ interface Props {
   editMode?: 'singleClick' | 'doubleClick' | 'enterKey' // 편집 모드
   rowSelect?: boolean // 행 선택 기능 사용 여부
   procedureName?: string // 저장/조회에 사용할 프로시저명
-  saveCase?: string // 저장 케이스 값(ex. 'save')
   menuId?: string | number // 저장 시 전달할 메뉴 ID
   extraSaveParams?: Record<string, any> // 추가 저장 파라미터
+  saveParamFields?: string[] // 저장 시 사용할 필드 목록
 }
 
 // Props 기본값 설정
@@ -79,6 +79,7 @@ const emit = defineEmits<{
   'row-editing-stopped': [event: any] // 행 편집 종료 이벤트
   'row-added': [row: any]
   'rows-deleted': [rows: any[]]
+  'row-clicked': [event: any] // 행 클릭 이벤트
   'saved': [result: any]
   'save-error': [error: any]
 }>()
@@ -660,6 +661,7 @@ function onCellFocused(event: any) {
 
 function onRowClicked(event: any) {
   tryStopEditingOnRowChange(event?.rowIndex)
+  emit('row-clicked', event)
 }
 
 /**
@@ -749,7 +751,6 @@ function exportExcel() {
  */
 async function save(): Promise<any> {
   const procedureName = String(props.procedureName || '').trim()
-  const saveCase = String(props.saveCase || 'save').trim()
   if (!procedureName) {
     const err = new Error('procedureName이 설정되지 않았습니다.')
     emit('save-error', err)
@@ -758,14 +759,16 @@ async function save(): Promise<any> {
   try {
     const changed = (exposeMethods as any)?.getChangedRows?.() as { added: any[]; modified: any[]; deleted: any[] } || { added: [], modified: [], deleted: [] }
     const saveFields = saveParamFields.value || []
-    const execForRows = async (rows: any[], state: 'N' | 'M' | 'D') => {
+    
+    // 행 상태별 처리 함수
+    const execForRows = async (rows: any[], rowState: 'A' | 'M' | 'D') => {
       for (const row of rows) {
         const rowParams = pickSaveFields(row, saveFields)
         const parameters = {
-          case: saveCase,
-          row_state: state,
-          ...props.extraSaveParams,
+          case: 'save',
+          row_state: rowState,
           ...rowParams,
+          ...props.extraSaveParams,
         }
         await $fetch<any>('/api/stored-procedure/execute', {
           method: 'POST',
@@ -773,7 +776,9 @@ async function save(): Promise<any> {
         })
       }
     }
-    await execForRows(changed.added, 'N')
+    
+    // 추가/수정/삭제 처리
+    await execForRows(changed.added, 'A')
     await execForRows(changed.modified, 'M')
     await execForRows(changed.deleted, 'D')
 
@@ -895,6 +900,13 @@ defineExpose(exposeMethods)
 // 감시자들 (Watchers)
 // 다크모드 변경 시 테마 업데이트
 watch(() => colorMode.value, () => updateGridTheme())
+
+// saveParamFields prop 변경 시 ref에 동기화
+watch(() => props.saveParamFields, (newFields) => {
+  if (newFields && Array.isArray(newFields)) {
+    saveParamFields.value = [...newFields]
+  }
+}, { immediate: true })
 
 // 검색 쿼리 변경 시 필터 적용
 watch(() => props.searchQuery, () => {

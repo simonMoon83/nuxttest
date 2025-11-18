@@ -1,23 +1,17 @@
 <script setup lang="ts">
-import { AgGridVue } from 'ag-grid-vue3'
-import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
+import AgGrid from '~/components/AgGrid.vue'
 import type { RowClickedEvent, ValueFormatterParams } from 'ag-grid-community'
-import { CellSelectionModule, ClipboardModule, ExcelExportModule } from 'ag-grid-enterprise'
 import { useStoredProcedure } from '@/composables/useStoredProcedure'
 import { useConfirmation } from '@/composables/confirmation'
 import { useAsyncAction } from '@/composables/useAsyncAction'
 import { useCodeBook } from '@/composables/useCodeBook'
 import { useAuthStore } from '@/stores/auth'
 import type { CodeGroup, CodeItem, GridDetail, GridMaster } from '@/types/schema'
-import 'ag-grid-community/styles/ag-grid.css'
-import 'ag-grid-community/styles/ag-theme-quartz.css'
 
 definePageMeta({
   layout: 'default',
   middleware: 'auth'
 })
-
-ModuleRegistry.registerModules([AllCommunityModule, ExcelExportModule, CellSelectionModule, ClipboardModule])
 
 interface DropdownOption<T = string> {
   label: string
@@ -470,72 +464,9 @@ const handleGridDetailRowClick = (event: RowClickedEvent<GridDetail>) => {
   focusedGridDetail.value = event.data || null
 }
 
-const handleGridMasterCellValueChanged = async (event: any) => {
-  if (!event.data) return
-  
-  try {
-    await gridMasterSaver.run(async () => {
-      const result = await executeProcedure('sp_adm011', {
-        case: 'save',
-        grid_id: event.data.grid_id,
-        grid_name: event.data.grid_name,
-        grid_type: event.data.grid_type || null,
-        grid_row: event.data.grid_row || null,
-        use_yn: event.data.use_yn || 'Y',
-        user_id: currentUserId.value
-      })
-      if (!result.success) throw new Error(result.error || '그리드 마스터 저장 실패')
-    })
-    
-    toast.add({
-      severity: 'success',
-      summary: '저장 완료',
-      detail: '변경사항이 저장되었습니다.',
-      life: 2000
-    })
-  } catch (error) {
-    console.error('그리드 마스터 저장 실패:', error)
-    handleError(error instanceof Error ? error.message : '저장에 실패했습니다.')
-    await loadGrids({ selectGridId: event.data.grid_id })
-  }
-}
-
-const handleGridDetailCellValueChanged = async (event: any) => {
-  if (!event.data || !selectedGridId.value) return
-  
-  try {
-    await gridDetailSaver.run(async () => {
-      const result = await executeProcedure('sp_grid_info', {
-        case: 'save',
-        grid_id: selectedGridId.value,
-        col_id: event.data.col_id,
-        col_name: event.data.col_name,
-        col_seq: event.data.col_seq || null,
-        col_type: event.data.col_type || null,
-        col_size: event.data.col_size || null,
-        col_code: event.data.col_code || null,
-        col_width: event.data.col_width || null,
-        col_hide: event.data.col_hide ?? null,
-        col_flex: event.data.col_flex || null,
-        use_yn: event.data.use_yn || 'Y',
-        user_id: currentUserId.value
-      })
-      
-      if (!result.success) throw new Error(result.error || '그리드 상세 저장 실패')
-    })
-    
-    toast.add({
-      severity: 'success',
-      summary: '저장 완료',
-      detail: '변경사항이 저장되었습니다.',
-      life: 2000
-    })
-  } catch (error) {
-    console.error('그리드 상세 저장 실패:', error)
-    handleError(error instanceof Error ? error.message : '저장에 실패했습니다.')
-    if (selectedGridId.value) await loadGridDetail(selectedGridId.value)
-  }
-}
+// AgGrid 참조
+const gridMasterAgGridRef = ref()
+const gridDetailAgGridRef = ref()
 
 const editSelectedGridMaster = () => {
   if (selectedGrid.value) openEditGridMaster(selectedGrid.value)
@@ -551,6 +482,65 @@ const editFocusedGridDetail = () => {
 
 const deleteFocusedGridDetail = () => {
   if (focusedGridDetail.value) deleteGridDetail(focusedGridDetail.value)
+}
+
+// AgGrid 행 추가/삭제/저장 기능
+const addGridMasterRow = () => {
+  if (gridMasterAgGridRef.value) {
+    gridMasterAgGridRef.value.addRow()
+    toast.add({
+      severity: 'info',
+      summary: '행 추가',
+      detail: '새 행이 추가되었습니다. 데이터를 입력한 후 저장하세요.',
+      life: 3000
+    })
+  }
+}
+
+const deleteGridMasterRows = () => {
+  if (gridMasterAgGridRef.value) {
+    gridMasterAgGridRef.value.deleteSelectedRows()
+  }
+}
+
+const saveGridMasterChanges = async () => {
+  if (!gridMasterAgGridRef.value) return
+  await gridMasterAgGridRef.value.save()
+  await loadGrids({ selectGridId: selectedGridId.value })
+}
+
+const addGridDetailRow = () => {
+  if (!selectedGridId.value) {
+    toast.add({
+      severity: 'warn',
+      summary: '그리드 미선택',
+      detail: '먼저 그리드를 선택하세요.',
+      life: 3000
+    })
+    return
+  }
+
+  if (gridDetailAgGridRef.value) {
+    gridDetailAgGridRef.value.addRow()
+    toast.add({
+      severity: 'info',
+      summary: '행 추가',
+      detail: '새 컬럼이 추가되었습니다. 데이터를 입력한 후 저장하세요.',
+      life: 3000
+    })
+  }
+}
+
+const deleteGridDetailRows = () => {
+  if (gridDetailAgGridRef.value) {
+    gridDetailAgGridRef.value.deleteSelectedRows()
+  }
+}
+
+const saveGridDetailChanges = async () => {
+  if (!gridDetailAgGridRef.value || !selectedGridId.value) return
+  await gridDetailAgGridRef.value.save()
+  await loadGridDetail(selectedGridId.value)
 }
 
 const refreshGrids = async () => {
@@ -596,9 +586,11 @@ const gridMasterActionsSchema = computed(() => [
         $el: 'div',
         attrs: { class: 'flex flex-wrap gap-2' },
         children: [
-          { $cmp: 'Button', props: { label: '추가', icon: 'pi pi-plus', severity: 'primary', onClick: () => openAddGridMaster() } },
-          { $cmp: 'Button', props: { label: '수정', icon: 'pi pi-pencil', severity: 'secondary', disabled: !selectedGrid.value, onClick: () => editSelectedGridMaster() } },
-          { $cmp: 'Button', props: { label: '삭제', icon: 'pi pi-trash', outlined: true, severity: 'secondary', disabled: !selectedGrid.value, onClick: () => deleteSelectedGridMaster() } }
+          { $cmp: 'Button', props: { label: '행추가', icon: 'pi pi-plus', severity: 'success', size: 'small', onClick: () => addGridMasterRow() } },
+          { $cmp: 'Button', props: { label: '행삭제', icon: 'pi pi-trash', severity: 'danger', outlined: true, size: 'small', onClick: () => deleteGridMasterRows() } },
+          { $cmp: 'Button', props: { label: '저장', icon: 'pi pi-save', severity: 'primary', size: 'small', loading: savingGridMaster.value, onClick: () => saveGridMasterChanges() } },
+          { $cmp: 'Button', props: { label: '수정', icon: 'pi pi-pencil', severity: 'secondary', size: 'small', disabled: !selectedGrid.value, onClick: () => editSelectedGridMaster() } },
+          { $cmp: 'Button', props: { label: '개별삭제', icon: 'pi pi-times', outlined: true, severity: 'secondary', size: 'small', disabled: !selectedGrid.value, onClick: () => deleteSelectedGridMaster() } }
         ]
       }
     ]
@@ -620,9 +612,11 @@ const gridDetailActionsSchema = computed(() => [
         $el: 'div',
         attrs: { class: 'flex flex-wrap gap-2' },
         children: [
-          { $cmp: 'Button', props: { label: '추가', icon: 'pi pi-plus', severity: 'primary', disabled: !selectedGridId.value, onClick: () => openAddGridDetail() } },
-          { $cmp: 'Button', props: { label: '수정', icon: 'pi pi-pencil', severity: 'secondary', disabled: !focusedGridDetail.value, onClick: () => editFocusedGridDetail() } },
-          { $cmp: 'Button', props: { label: '삭제', icon: 'pi pi-trash', outlined: true, severity: 'secondary', disabled: !focusedGridDetail.value, onClick: () => deleteFocusedGridDetail() } }
+          { $cmp: 'Button', props: { label: '행추가', icon: 'pi pi-plus', severity: 'success', size: 'small', disabled: !selectedGridId.value, onClick: () => addGridDetailRow() } },
+          { $cmp: 'Button', props: { label: '행삭제', icon: 'pi pi-trash', severity: 'danger', outlined: true, size: 'small', disabled: !selectedGridId.value, onClick: () => deleteGridDetailRows() } },
+          { $cmp: 'Button', props: { label: '저장', icon: 'pi pi-save', severity: 'primary', size: 'small', disabled: !selectedGridId.value, loading: savingGridDetail.value, onClick: () => saveGridDetailChanges() } },
+          { $cmp: 'Button', props: { label: '수정', icon: 'pi pi-pencil', severity: 'secondary', size: 'small', disabled: !focusedGridDetail.value, onClick: () => editFocusedGridDetail() } },
+          { $cmp: 'Button', props: { label: '개별삭제', icon: 'pi pi-times', outlined: true, severity: 'secondary', size: 'small', disabled: !focusedGridDetail.value, onClick: () => deleteFocusedGridDetail() } }
         ]
       }
     ]
@@ -634,17 +628,40 @@ watch(() => gridFilterForm.value.keyword, (keyword) => {
 })
 
 const gridMasterColumnDefs = computed(() => [
-  { field: 'grid_id', headerName: '그리드 ID', minWidth: 200, editable: false },
-  { field: 'grid_name', headerName: '그리드명', minWidth: 200, editable: true, cellEditor: 'agTextCellEditor' },
+  { 
+    field: 'grid_id', 
+    headerName: '그리드 ID', 
+    minWidth: 200, 
+    editable: (params: any) => params.data && params.data.__status === 'N',
+    cellEditor: 'agTextCellEditor',
+    cellEditorPopup: false
+  },
+  { 
+    field: 'grid_name', 
+    headerName: '그리드명', 
+    minWidth: 200, 
+    editable: true, 
+    cellEditor: 'agTextCellEditor',
+    cellEditorPopup: false
+  },
   { 
     field: 'grid_type', 
     headerName: '타입', 
     width: 130, 
     editable: true, 
     cellEditor: 'agSelectCellEditor', 
-    cellEditorParams: { values: gridTypeOptions.value.map(opt => opt.value) } 
+    cellEditorParams: { values: gridTypeOptions.value.map(opt => opt.value) },
+    cellEditorPopup: false
   },
-  { field: 'grid_row', headerName: '행 수', width: 110, editable: true, cellEditor: 'agNumberCellEditor', cellEditorParams: { min: 0 } },
+  { 
+    field: 'grid_row', 
+    headerName: '행 수', 
+    width: 110, 
+    editable: true, 
+    cellEditor: 'agNumberCellEditor', 
+    cellEditorParams: { min: 0 },
+    cellEditorPopup: false
+  },
   { 
     field: 'use_yn', 
     headerName: '사용', 
@@ -652,21 +669,45 @@ const gridMasterColumnDefs = computed(() => [
     editable: true,
     cellEditor: 'agSelectCellEditor',
     cellEditorParams: { values: ['Y', 'N'] },
-    valueFormatter: (params: ValueFormatterParams) => formatYesNo(params.value as string) 
+    valueFormatter: (params: ValueFormatterParams) => formatYesNo(params.value as string),
+    cellEditorPopup: false
   }
 ])
 
 const gridDetailColumnDefs = computed(() => [
-  { field: 'col_seq', headerName: '순서', width: 100, editable: true, cellEditor: 'agNumberCellEditor', cellEditorParams: { min: 0 } },
-  { field: 'col_id', headerName: '컬럼 ID', minWidth: 160, editable: false },
-  { field: 'col_name', headerName: '컬럼명', minWidth: 160, editable: true, cellEditor: 'agTextCellEditor' },
+  { 
+    field: 'col_seq', 
+    headerName: '순서', 
+    width: 100, 
+    editable: true, 
+    cellEditor: 'agNumberCellEditor', 
+    cellEditorParams: { min: 0 },
+    cellEditorPopup: false
+  },
+  { 
+    field: 'col_id', 
+    headerName: '컬럼 ID', 
+    minWidth: 160, 
+    editable: (params: any) => params.data && params.data.__status === 'N',
+    cellEditor: 'agTextCellEditor',
+    cellEditorPopup: false
+  },
+  { 
+    field: 'col_name', 
+    headerName: '컬럼명', 
+    minWidth: 160, 
+    editable: true, 
+    cellEditor: 'agTextCellEditor',
+    cellEditorPopup: false
+  },
   { 
     field: 'col_type', 
     headerName: '타입', 
     width: 120, 
     editable: true, 
     cellEditor: 'agSelectCellEditor', 
-    cellEditorParams: { values: columnTypeOptions.value.map(opt => opt.value) } 
+    cellEditorParams: { values: columnTypeOptions.value.map(opt => opt.value) },
+    cellEditorPopup: false
   },
   { 
     field: 'col_size', 
@@ -674,7 +715,8 @@ const gridDetailColumnDefs = computed(() => [
     width: 110, 
     editable: true, 
     cellEditor: 'agSelectCellEditor', 
-    cellEditorParams: { values: fieldSizeOptions.value.map(opt => opt.value) } 
+    cellEditorParams: { values: fieldSizeOptions.value.map(opt => opt.value) },
+    cellEditorPopup: false
   },
   { 
     field: 'col_code', 
@@ -682,9 +724,18 @@ const gridDetailColumnDefs = computed(() => [
     width: 140, 
     editable: true, 
     cellEditor: 'agSelectCellEditor', 
-    cellEditorParams: { values: codeGroupOptions.value.map(opt => opt.value) } 
+    cellEditorParams: { values: codeGroupOptions.value.map(opt => opt.value) },
+    cellEditorPopup: false
   },
-  { field: 'col_width', headerName: '너비', width: 110, editable: true, cellEditor: 'agNumberCellEditor', cellEditorParams: { min: 0 } },
+  { 
+    field: 'col_width', 
+    headerName: '너비', 
+    width: 110, 
+    editable: true, 
+    cellEditor: 'agNumberCellEditor', 
+    cellEditorParams: { min: 0 },
+    cellEditorPopup: false
+  },
   { 
     field: 'col_hide', 
     headerName: '숨김', 
@@ -692,7 +743,8 @@ const gridDetailColumnDefs = computed(() => [
     editable: true,
     cellEditor: 'agSelectCellEditor',
     cellEditorParams: { values: [0, 1] },
-    valueFormatter: (params: ValueFormatterParams) => (Number(params.value) === 1 ? '숨김' : '표시') 
+    valueFormatter: (params: ValueFormatterParams) => (Number(params.value) === 1 ? '숨김' : '표시'),
+    cellEditorPopup: false
   },
   { 
     field: 'use_yn', 
@@ -701,9 +753,18 @@ const gridDetailColumnDefs = computed(() => [
     editable: true,
     cellEditor: 'agSelectCellEditor',
     cellEditorParams: { values: ['Y', 'N'] },
-    valueFormatter: (params: ValueFormatterParams) => formatYesNo(params.value as string) 
+    valueFormatter: (params: ValueFormatterParams) => formatYesNo(params.value as string),
+    cellEditorPopup: false
   },
-  { field: 'col_flex', headerName: 'Flex', width: 100, editable: true, cellEditor: 'agNumberCellEditor', cellEditorParams: { min: 0 } }
+  { 
+    field: 'col_flex', 
+    headerName: 'Flex', 
+    width: 100, 
+    editable: true, 
+    cellEditor: 'agNumberCellEditor', 
+    cellEditorParams: { min: 0 },
+    cellEditorPopup: false
+  }
 ])
 
 const gridMasterSchema = computed(() => [
@@ -772,9 +833,9 @@ onMounted(async () => {
       <p class="text-gray-600 dark:text-gray-400">s_grid_master / s_grid_detail 두 테이블만 빠르게 정비할 수 있도록 재구성했습니다.</p>
     </div>
 
-    <Card>
+      <Card>
       <template #title>그리드 검색 · 현황</template>
-      <template #content>
+        <template #content>
         <div class="compact-form">
           <FormKitDataEdit
             v-model="gridFilterForm"
@@ -792,7 +853,7 @@ onMounted(async () => {
             <p class="text-sm text-gray-500">{{ stat.label }}</p>
             <p class="text-2xl font-semibold text-gray-900 dark:text-gray-100">{{ stat.value }}</p>
           </div>
-        </div>
+              </div>
       </template>
     </Card>
 
@@ -809,22 +870,23 @@ onMounted(async () => {
           />
         </div>
         <ClientOnly>
-          <div :class="agGridThemeClass" class="w-full" style="height: 450px;">
-            <AgGridVue
-              style="width: 100%; height: 100%;"
-              :row-data="filteredGridList"
-              :column-defs="gridMasterColumnDefs"
-              :default-col-def="agDefaultColDef"
-              row-selection="single"
-              :overlay-no-rows-template="agNoRowsTemplate"
-              single-click-edit
-              @row-clicked="handleGridRowClick"
-              @cell-value-changed="handleGridMasterCellValueChanged"
-            />
-          </div>
+          <AgGrid
+            ref="gridMasterAgGridRef"
+            title="그리드 마스터"
+            :row-data="filteredGridList"
+            :column-defs="gridMasterColumnDefs"
+            :editable="true"
+            edit-mode="singleClick"
+            :row-select="true"
+            grid-id="schema_master"
+            procedure-name="sp_adm011"
+            :save-param-fields="['grid_id', 'grid_name', 'grid_type', 'grid_row', 'use_yn']"
+            :extra-save-params="{ user_id: currentUserId }"
+            @row-clicked="handleGridRowClick"
+          />
           <template #fallback>
             <div class="flex h-36 items-center justify-center text-sm text-gray-500">그리드 로딩 중...</div>
-          </template>
+      </template>
         </ClientOnly>
         
         <Transition name="fade">
@@ -833,7 +895,7 @@ onMounted(async () => {
               <h3 class="text-lg font-semibold text-primary-900 dark:text-primary-100">
                 {{ editingGridMaster ? '그리드 마스터 수정' : '그리드 마스터 추가' }}
               </h3>
-            </div>
+      </div>
             <div class="compact-form">
               <FormKitDataEdit
                 v-model="gridMasterForm"
@@ -860,22 +922,23 @@ onMounted(async () => {
           />
         </div>
         <ClientOnly>
-          <div :class="agGridThemeClass" class="w-full" style="height: 450px;">
-            <AgGridVue
-              style="width: 100%; height: 100%;"
-              :row-data="gridDetailList"
-              :column-defs="gridDetailColumnDefs"
-              :default-col-def="agDefaultColDef"
-              row-selection="single"
-              :overlay-no-rows-template="agNoRowsTemplate"
-              single-click-edit
-              @row-clicked="handleGridDetailRowClick"
-              @cell-value-changed="handleGridDetailCellValueChanged"
-            />
-          </div>
+          <AgGrid
+            ref="gridDetailAgGridRef"
+            title="그리드 상세"
+            :row-data="gridDetailList"
+            :column-defs="gridDetailColumnDefs"
+            :editable="true"
+            edit-mode="singleClick"
+            :row-select="true"
+            grid-id="schema_detail"
+            procedure-name="sp_grid_info"
+            :save-param-fields="['col_id', 'col_name', 'col_seq', 'col_type', 'col_size', 'col_code', 'col_width', 'col_hide', 'col_flex', 'use_yn']"
+            :extra-save-params="{ grid_id: selectedGridId, user_id: currentUserId }"
+            @row-clicked="handleGridDetailRowClick"
+          />
           <template #fallback>
             <div class="flex h-36 items-center justify-center text-sm text-gray-500">상세 로딩 중...</div>
-          </template>
+      </template>
         </ClientOnly>
         
         <Transition name="fade">
@@ -884,15 +947,15 @@ onMounted(async () => {
               <h3 class="text-lg font-semibold text-primary-900 dark:text-primary-100">
                 {{ editingGridDetail ? '컬럼 수정' : '컬럼 추가' }}
               </h3>
-            </div>
+      </div>
             <div class="compact-form">
               <FormKitDataEdit
                 v-model="gridDetailForm"
                 :schema="gridDetailSchema"
                 form-class="form-horizontal grid-12"
                 submit-label=""
-              />
-            </div>
+                    />
+                  </div>
           </div>
         </Transition>
       </template>
