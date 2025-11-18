@@ -43,8 +43,10 @@ begin
             grid_row                 =  a0.grid_row,
             use_yn                   =  a0.use_yn
       from  s_grid_master a0 (nolock)
-	 where  a0.grid_id            like  '%' + isnull( @grid_name, '' ) + '%'
-	    or  a0.grid_name          like  '%' + isnull( @grid_name, '' ) + '%'
+	 where (isnull( @grid_id,  '' ) = '' or a0.grid_id   =  @grid_id)
+	   and (isnull( @grid_name, '' ) = '' 
+	    or  a0.grid_id            like  '%' + @grid_name + '%'
+	    or  a0.grid_name          like  '%' + @grid_name + '%')
 end
 else if @case  =  'save'
 begin

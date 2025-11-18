@@ -1,7 +1,10 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'marketing' })
 const s = ref<any>({})
-try { const r: any = await $fetch('/api/settings'); s.value = r?.data || {} } catch {}
+try {
+  const r: any = await $fetch('/api/settings')
+  s.value = r?.data || {}
+} catch {}
 
 const name = ref('')
 const email = ref('')

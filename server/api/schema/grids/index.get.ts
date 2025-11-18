@@ -1,3 +1,4 @@
+import { getQuery } from 'h3'
 import { executeStoredProcedure } from '../../../utils/storedProcedure'
 
 interface GridMasterRow {
@@ -17,7 +18,7 @@ export default defineEventHandler(async () => {
     if (!result.success) {
       throw createError({
         statusCode: 500,
-        statusMessage: result.error || '그리드 목록 조회 실패'
+        statusMessage: result.error || '그리드 목록 조회 실패',
       })
     }
 
@@ -28,12 +29,12 @@ export default defineEventHandler(async () => {
       data,
       count: data.length
     }
-  } catch (error) {
+  }
+  catch (error) {
     console.error('그리드 목록 조회 실패:', error)
     throw createError({
       statusCode: 500,
-      statusMessage: error instanceof Error ? error.message : '그리드 목록 조회 실패'
+      statusMessage: error instanceof Error ? error.message : '그리드 목록 조회 실패',
     })
   }
 })
-
