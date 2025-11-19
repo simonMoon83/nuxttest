@@ -57,12 +57,12 @@ export interface MenuDisplayEntry {
   contents_seq: number
   contents_type: string
   contents_header: string | null
-  grid_id: string | null
-  save_yn: 'Y' | 'N'
-  search_case: string | null
-  save_case: string | null
   contents_width: number | null
   contents_height: number | null
+  search_case: string | null
+  save_case: string | null
+  row_click_case: string | null
+  row_click_target: string | null
 }
 
 export interface CodeItem {

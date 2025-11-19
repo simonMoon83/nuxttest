@@ -1477,4 +1477,282 @@ begin
 end
 
 end;
+
+/*-----------------------------------
+Proc ID     : sp_menu_display_info
+Proc Name   : 메뉴 화면 구성 관리
+Create Date : 2025.11.19
+Proc Params : @case      - Search : 조회  
+                           Save   : 저장 (row_state로 분기)
+              @row_state - A : 추가 (INSERT)
+                           M : 수정 (UPDATE)
+                           D : 삭제 (DELETE)
+-----------------------------------*/
+/*-----------------------------------
+exec    sp_menu_display_info
+        @case                     =  'search',
+        @menu_id                  =  'ADM011'
+
+exec    sp_menu_display_info
+        @case                     =  'save',
+        @row_state                =  'A',
+        @menu_id                  =  'ADM011',
+        @contents_seq             =  1,
+        @contents_type            =  'grid',
+        @contents_header          =  'adm011_header',
+        @contents_width           =  100,
+        @contents_height          =  100,
+        @search_case              =  'search',
+        @save_case                =  'save',
+        @row_click_case           =  null,
+        @row_click_target         =  null,
+        @user_id                  =  'admin'
+
+exec    sp_menu_display_info
+        @case                     =  'save',
+        @row_state                =  'D',
+        @menu_id                  =  'ADM011',
+        @contents_seq             =  1,
+        @user_id                  =  'admin'
+-----------------------------------*/
+CREATE   procedure  [dbo].[sp_menu_display_info]
+        @case                     varchar(10),
+        @row_state                char(1)          =  null,
+        @menu_id                  varchar(20)      =  null,
+        @contents_seq             int              =  null,
+        @contents_type            varchar(20)      =  null,
+        @contents_header          varchar(100)     =  null,
+        @contents_width           int              =  null,
+        @contents_height          int              =  null,
+        @search_case              varchar(20)      =  null,
+        @save_case                varchar(20)      =  null,
+        @row_click_case           varchar(20)      =  null,
+        @row_click_target         varchar(20)      =  null,
+        @user_id                  varchar(20)      =  null
+as
+begin
+set     nocount on
+
+declare @now                  varchar(14)
+
+select  @now                  =  format(getdate(), 'yyyyMMddHHmmss')
+
+if      @case  =  'search'
+begin
+    select  menu_id                  =  a0.menu_id,
+            contents_seq             =  a0.contents_seq,
+            contents_type            =  a0.contents_type,
+            contents_header          =  a0.contents_header,
+            contents_width           =  a0.contents_width,
+            contents_height          =  a0.contents_height,
+            search_case              =  a0.search_case,
+            save_case                =  a0.save_case,
+            row_click_case           =  a0.row_click_case,
+            row_click_target         =  a0.row_click_target
+      from  s_menu_display a0 (nolock)
+     where  a0.menu_id               =  @menu_id
+     order  by
+            a0.contents_seq
+end
+else if @case  =  'save'
+begin
+    if      @row_state  =  'A'    -- Add (INSERT)
+    begin
+        insert into s_menu_display (
+                menu_id,
+                contents_seq,
+                contents_type,
+                contents_header,
+                contents_width,
+                contents_height,
+                search_case,
+                save_case,
+                row_click_case,
+                row_click_target,
+                insert_user_id,
+                insert_date,
+                update_user_id,
+                update_date)
+        select  @menu_id,
+                @contents_seq,
+                @contents_type,
+                @contents_header,
+                @contents_width,
+                @contents_height,
+                @search_case,
+                @save_case,
+                @row_click_case,
+                @row_click_target,
+                @user_id, @now, 
+                @user_id, @now
+
+        if  @@error <> 0
+        begin
+            select  return_code  =  'Err',
+                    return_msg   =  '메뉴 화면 구성 추가 실패'
+            return
+        end
+    end
+    else if @row_state =  'M'     -- Modify (UPDATE)
+    begin
+        update  a0
+           set  contents_type          =  @contents_type,
+                contents_header        =  @contents_header,
+                contents_width         =  @contents_width,
+                contents_height        =  @contents_height,
+                search_case            =  @search_case,
+                save_case              =  @save_case,
+                row_click_case         =  @row_click_case,
+                row_click_target       =  @row_click_target,
+                update_user_id         =  @user_id,
+                update_date            =  @now
+          from  s_menu_display a0
+         where  a0.menu_id             =  @menu_id
+           and  a0.contents_seq        =  @contents_seq
+
+        if  @@error <> 0
+        begin
+            select  return_code  =  'Err',
+                    return_msg   =  '메뉴 화면 구성 수정 실패'
+            return
+        end
+    end
+    else if @row_state =  'D'     -- Delete
+    begin
+        delete  a0
+          from  s_menu_display a0
+         where  a0.menu_id             =  @menu_id
+           and  a0.contents_seq        =  @contents_seq
+
+        if  @@error <> 0
+        begin
+            select  return_code  =  'Err',
+                    return_msg   =  '메뉴 화면 구성 삭제 실패'
+            return
+        end
+    end
+
+    select  return_code  =  'complete',
+            return_msg   =  ''
+
+end
+
+end;
+
+/*-----------------------------------
+Proc ID     : sp_grid_master
+Proc Name   : 그리드 마스터 관리
+Create Date : 2025.11.19
+Proc Params : @case - Search : 조회  
+                      Save   : 저장 (row_state로 분기)
+              @row_state - A : 추가 (INSERT)
+                           M : 수정 (UPDATE)
+                           D : 삭제 (DELETE)
+                      Delete : 삭제  
+-----------------------------------*/
+/*-----------------------------------
+exec    sp_grid_master
+        @case                     =  'search'
+exec    sp_grid_master
+        @case                     =  'save'
+        @grid_id                  =  ''
+        @grid_name                =  ''
+        @grid_type                =  ''
+        @grid_row                 =  ''
+        @use_yn                   =  ''
+-----------------------------------*/
+CREATE   procedure  [dbo].[sp_grid_master]
+        @case                     varchar(10),
+        @grid_id                  varchar(20)      =  null,
+        @grid_name                varchar(30)      =  null,
+        @grid_type                varchar(10)      =  null,
+        @grid_row                 int              =  null,
+        @use_yn                   char(1)          =  null,
+        @user_id                  varchar(20)      =  null,
+		@row_state                varchar(1)       =  null
+as
+begin
+set     nocount on
+
+declare @rowcnt               integer,
+        @now                  varchar(14)
+
+select  @now                  =  format(getdate(), 'yyyyMMddHHmmss')
+
+if      @case  =  'search'
+begin
+    select  grid_id                  =  a0.grid_id,
+            grid_name                =  a0.grid_name,
+            grid_type                =  a0.grid_type,
+            grid_row                 =  a0.grid_row,
+            use_yn                   =  a0.use_yn
+      from  s_grid_master a0 (nolock)
+	 where  a0.grid_id            like  '%' + isnull( @grid_name, '' ) + '%'
+	    or  a0.grid_name          like  '%' + isnull( @grid_name, '' ) + '%'
+end
+else if @case  =  'save'
+begin
+    if      @row_state  =  'A'
+    begin
+        insert into s_grid_master (
+                grid_id,
+                grid_name,
+                grid_type,
+                grid_row,
+                use_yn,
+                insert_user_id,
+                insert_date,
+                update_user_id,
+                update_date)
+        select  @grid_id,
+                @grid_name,
+                @grid_type,
+                @grid_row,
+                @use_yn,
+                @user_id, @now, 
+                @user_id, @now
+
+        if  @@error <> 0
+        begin
+            select  return_code  =  'Err',
+                    return_msg   =  ''
+        end
+    end
+    else if @row_state = 'M'
+    begin
+        update  a0
+           set  grid_name              =  @grid_name,
+                grid_type              =  @grid_type,
+                grid_row               =  @grid_row,
+                use_yn                 =  @use_yn,
+                update_user_id         =  @user_id,
+                update_date            =  @now
+          from  s_grid_master a0
+         where  a0.grid_id             =  @grid_id
+
+        if  @@error <> 0
+        begin
+            select  return_code  =  'Err',
+                    return_msg   =  ''
+        end
+	end
+	else if @row_state = 'D'
+	begin
+		delete  a0
+		  from  s_grid_master a0
+		 where  a0.grid_id             =  @grid_id
+
+		if  @@error <> 0
+		begin
+			select  return_code  =  'Err',
+					return_msg   =  ''
+		end
+	
+    end
+
+    select  return_code  =  'complete',
+            return_msg   =  ''
+
+end
+
 end;

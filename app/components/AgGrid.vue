@@ -38,6 +38,9 @@ interface Props {
   menuId?: string | number // 저장 시 전달할 메뉴 ID
   extraSaveParams?: Record<string, any> // 추가 저장 파라미터
   saveParamFields?: string[] // 저장 시 사용할 필드 목록
+  showSaveButton?: boolean // 저장 버튼 표시 여부
+  saveButtonLabel?: string // 저장 버튼 레이블
+  savingState?: boolean // 외부에서 저장 중 상태 전달
 }
 
 // Props 기본값 설정
@@ -54,7 +57,10 @@ const props = withDefaults(defineProps<Props>(), {
   procedureName: '',
   saveCase: 'save',
   menuId: undefined,
-  extraSaveParams: () => ({})
+  extraSaveParams: () => ({}),
+  showSaveButton: false,
+  saveButtonLabel: '저장',
+  savingState: false
 })
 
 // Emits 정의 - 부모 컴포넌트로 이벤트 전달
@@ -113,6 +119,10 @@ const gridApi = shallowRef<any | null>(null)
 const dynamicColumnDefs = ref<any[]>([])
 // 저장 파라미터로 사용할 필드 목록(col_save=Y) 저장
 const saveParamFields = ref<string[]>([])
+
+// 저장 중 상태 관리
+const internalSaving = ref(false)
+const isSaving = computed(() => props.savingState || internalSaving.value)
 
 // 값 변환 및 포맷 보조 함수들
 function coerceBooleanValue(value: any): boolean {
@@ -803,6 +813,22 @@ async function save(): Promise<any> {
   }
 }
 
+/**
+ * 저장 버튼 클릭 핸들러
+ * - 내부 저장 중 상태 관리
+ * - save() 함수 호출
+ */
+async function handleSave() {
+  if (isSaving.value) return
+  
+  internalSaving.value = true
+  try {
+    await save()
+  } finally {
+    internalSaving.value = false
+  }
+}
+
 // 행 추가/삭제 동작
 function addRow() {
   const fields = finalColumnDefs.value.map((c: any) => c?.field).filter((f: any) => f && f !== '__rownum')
@@ -1058,11 +1084,12 @@ onMounted(async () => {
         <Button icon="pi pi-angle-double-up" text size="small" v-tooltip.bottom="'전체 접기'" @click="collapseAllGrid" />
       </template>
 
-      <!-- 우측 액션 버튼: 엑셀, 행 추가/행 삭제 -->
+      <!-- 우측 액션 버튼: 엑셀, 행 추가/행 삭제/저장 -->
       <div class="ml-auto flex items-center gap-1">
         <Button icon="pi pi-file-excel" label="엑셀" size="small" text severity="success" @click="exportExcel" />
         <Button v-if="props.editable" icon="pi pi-plus" label="행추가" size="small" text severity="primary" @click="addRow" />
         <Button v-if="props.editable" icon="pi pi-minus" label="행삭제" size="small" text severity="danger" @click="deleteSelectedRows" />
+        <Button v-if="props.showSaveButton" icon="pi pi-save" :label="props.saveButtonLabel" size="small" text severity="info" :loading="isSaving" @click="handleSave" />
       </div>
     </div>
 

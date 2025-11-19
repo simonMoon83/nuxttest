@@ -6,7 +6,7 @@ import { useConfirmation } from '@/composables/confirmation'
 import { useAsyncAction } from '@/composables/useAsyncAction'
 import { useCodeBook } from '@/composables/useCodeBook'
 import { useAuthStore } from '@/stores/auth'
-import type { CodeGroup, CodeItem, GridDetail, GridMaster } from '@/types/schema'
+import type { CodeGroup, CodeItem, GridDetail, GridMaster, MenuDisplayEntry } from '@/types/schema'
 
 definePageMeta({
   layout: 'default',
@@ -19,6 +19,7 @@ interface DropdownOption<T = string> {
 }
 
 const toast = useToast()
+const route = useRoute() // 라우트 추가
 const colorMode = useColorMode()
 const authStore = useAuthStore()
 const { executeProcedure } = useStoredProcedure()
@@ -30,58 +31,72 @@ const agGridThemeClass = computed(() => colorMode.value === 'dark' ? 'ag-theme-q
 const requiredCodeGroups = ['YN_FLAG', 'BINARY_FLAG', 'GRID_TYPE', 'GRID_COLUMN_TYPE', 'GRID_FIELD_SIZE'] as const
 
 const gridSearch = ref('')
+const selectedProcedure = ref('sp_grid_master') // 현재 선택된 프로시저
+
+// URL 쿼리 파라미터에 따른 프로시저 자동 설정
+// 예: /admin/schema?sp=019 -> sp_adm019 (레거시 지원)
+// 예: /admin/schema?procedure=sp_grid_master
+const querySp = computed(() => {
+  const sp = route.query.sp
+  if (sp) return `sp_adm${String(sp).padStart(3, '0')}`
+  const proc = route.query.procedure
+  if (proc) return String(proc)
+  return null
+})
+
+const isAutoProcedure = computed(() => !!querySp.value)
+
+watch(() => querySp.value, (newProc) => {
+  if (newProc) {
+    selectedProcedure.value = newProc
+    gridFilterForm.value.procedure = newProc
+    
+    // availableProcedures에 없으면 임시로 추가 (화면 표시용)
+    if (!availableProcedures.some(p => p.value === newProc)) {
+      availableProcedures.push({ label: `${newProc} (자동)`, value: newProc })
+    }
+    // 자동 조회
+    refreshGrids()
+  }
+}, { immediate: true })
 
 const gridsAction = useAsyncAction()
 const gridDetailAction = useAsyncAction()
+const menuDisplayAction = useAsyncAction()
 const codeGroupsAction = useAsyncAction()
 const gridMasterSaver = useAsyncAction()
 const gridDetailSaver = useAsyncAction()
+const menuDisplaySaver = useAsyncAction()
+
+// 사용 가능한 프로시저 목록
+const availableProcedures = reactive([
+  { label: 'sp_grid_master - 그리드 마스터', value: 'sp_grid_master' },
+])
 
 const loadingGrids = gridsAction.loading
 const loadingGridDetail = gridDetailAction.loading
+const loadingMenuDisplay = menuDisplayAction.loading
 const loadingCodeGroups = codeGroupsAction.loading
 const savingGridMaster = gridMasterSaver.loading
 const savingGridDetail = gridDetailSaver.loading
+const savingMenuDisplay = menuDisplaySaver.loading
 
 const gridList = ref<GridMaster[]>([])
 const gridDetailList = ref<GridDetail[]>([])
+const menuDisplayList = ref<MenuDisplayEntry[]>([])
 const availableCodeGroups = ref<CodeGroup[]>([])
 
 const selectedGrid = ref<GridMaster | null>(null)
 const selectedGridId = computed(() => selectedGrid.value?.grid_id ?? null)
+const selectedMenuId = ref<string | null>(null)
 const focusedGridDetail = ref<GridDetail | null>(null)
+const focusedMenuDisplay = ref<MenuDisplayEntry | null>(null)
 
 const currentUserId = computed(() => {
   const user = authStore.user
   if (!user) return 'admin'
   return user.username || String(user.id)
 })
-
-const showGridMasterEditor = ref(false)
-const showGridDetailEditor = ref(false)
-
-const gridMasterForm = ref({
-  grid_id: '',
-  grid_name: '',
-  grid_type: '',
-  grid_row: 0,
-  use_yn: 'Y' as 'Y' | 'N'
-})
-const editingGridMaster = ref<GridMaster | null>(null)
-
-const gridDetailForm = ref({
-  col_id: '',
-  col_name: '',
-  col_seq: 0,
-  col_type: '',
-  col_size: '',
-  col_code: '',
-  col_width: 0,
-  col_hide: 0,
-  col_flex: 0,
-  use_yn: 'Y' as 'Y' | 'N'
-})
-const editingGridDetail = ref<GridDetail | null>(null)
 
 const mapStringOptions = (group: string, fallback: DropdownOption[] = []) => computed(() => {
   const codes = codeBook.getOptions(group)
@@ -166,7 +181,9 @@ const loadGrids = async (options: GridLoadOptions = {}) => {
   const { selectGridId, autoSelectFirst = true } = options
   try {
     const data = await gridsAction.run(async () => {
-      const result = await $fetch<{ success: boolean, data: GridMaster[] }>('/api/schema/grids')
+      const result = await $fetch<{ success: boolean, data: GridMaster[] }>(
+        `/api/schema/grids?procedureName=${selectedProcedure.value}`
+      )
       if (!result.success) throw new Error('그리드 목록을 불러오지 못했습니다.')
       return result.data || []
     })
@@ -219,7 +236,6 @@ const loadGridDetail = async (gridId: string) => {
     })
     gridDetailList.value = data
     focusedGridDetail.value = null
-    showGridDetailEditor.value = false
   } catch (error) {
     console.error('그리드 상세 로드 실패:', error)
     handleError('그리드 상세 정보를 불러오는데 실패했습니다.')
@@ -240,307 +256,136 @@ const loadCodeGroups = async () => {
   }
 }
 
-const openAddGridMaster = () => {
-  editingGridMaster.value = null
-  gridMasterForm.value = {
-    grid_id: '',
-    grid_name: '',
-    grid_type: '',
-    grid_row: 0,
-    use_yn: 'Y'
-  }
-  showGridMasterEditor.value = true
-}
-
-const openEditGridMaster = (grid: GridMaster) => {
-  editingGridMaster.value = grid
-  gridMasterForm.value = {
-    grid_id: grid.grid_id || '',
-    grid_name: grid.grid_name || '',
-    grid_type: grid.grid_type || '',
-    grid_row: grid.grid_row ?? 0,
-    use_yn: grid.use_yn || 'Y'
-  }
-  showGridMasterEditor.value = true
-}
-
-const saveGridMaster = async () => {
-  if (!gridMasterForm.value.grid_id || !gridMasterForm.value.grid_name) {
-    toast.add({
-      severity: 'warn',
-      summary: '경고',
-      detail: '그리드 ID와 그리드명은 필수입니다.',
-      life: 3000
-    })
+const loadMenuDisplay = async (menuId: string | null = null) => {
+  const targetMenuId = menuId || selectedMenuId.value
+  console.log('🔍 loadMenuDisplay 호출:', { menuId, selectedMenuId: selectedMenuId.value, targetMenuId })
+  
+  if (!targetMenuId) {
+    console.warn('⚠️ targetMenuId가 없어 조회를 건너뜁니다.')
+    menuDisplayList.value = []
     return
   }
-
+  
   try {
-    await gridMasterSaver.run(async () => {
-      const result = await executeProcedure('sp_adm011', {
-        case: 'save',
-        grid_id: gridMasterForm.value.grid_id,
-        grid_name: gridMasterForm.value.grid_name,
-        grid_type: gridMasterForm.value.grid_type || null,
-        grid_row: gridMasterForm.value.grid_row || null,
-        use_yn: gridMasterForm.value.use_yn || 'Y',
-        user_id: currentUserId.value
-      })
-      if (!result.success) throw new Error(result.error || '그리드 마스터 저장 실패')
+    const data = await menuDisplayAction.run(async () => {
+      console.log('📡 API 호출:', `/api/display/${targetMenuId}`)
+      const result = await $fetch<{ success: boolean, data: MenuDisplayEntry[] }>(`/api/display/${targetMenuId}`)
+      console.log('✅ API 응답:', result)
+      if (!result.success) throw new Error('메뉴 화면 구성을 불러오지 못했습니다.')
+      return result.data || []
     })
-
-    const savedGridId = gridMasterForm.value.grid_id
-
-    toast.add({
-      severity: 'success',
-      summary: '성공',
-      detail: '그리드 마스터를 저장했습니다.',
-      life: 3000
-    })
-    showGridMasterEditor.value = false
-    await loadGrids({ selectGridId: savedGridId })
-  } catch (error) {
-    console.error('그리드 마스터 저장 실패:', error)
-    handleError(error instanceof Error ? error.message : '그리드 마스터 저장에 실패했습니다.')
-  }
-}
-
-const deleteGridMaster = (grid: GridMaster) => {
-  confirmAction(async () => {
-    try {
-      await gridMasterSaver.run(async () => {
-        const result = await executeProcedure('sp_adm011', {
-          case: 'delete',
-          grid_id: grid.grid_id
-        })
-        if (!result.success) throw new Error(result.error || '그리드 마스터 삭제 실패')
-      })
-
+    console.log('📊 조회된 데이터:', data)
+    menuDisplayList.value = data
+    focusedMenuDisplay.value = null
+    
+    if (data.length === 0) {
       toast.add({
-        severity: 'success',
-        summary: '성공',
-        detail: '그리드 마스터를 삭제했습니다.',
+        severity: 'info',
+        summary: '조회 완료',
+        detail: `${targetMenuId}에 대한 메뉴 화면 구성이 없습니다.`,
         life: 3000
       })
-      await loadGrids()
-    } catch (error) {
-      console.error('그리드 마스터 삭제 실패:', error)
-      handleError(error instanceof Error ? error.message : '그리드 마스터 삭제에 실패했습니다.')
-    }
-  }, '그리드 마스터 삭제', `정말로 "${grid.grid_name}" 그리드를 삭제하시겠습니까?`, '확인')
-}
-
-const openAddGridDetail = () => {
-  if (!selectedGridId.value) {
-    toast.add({
-      severity: 'warn',
-      summary: '경고',
-      detail: '그리드를 먼저 선택해주세요.',
-      life: 3000
-    })
-    return
-  }
-
-  editingGridDetail.value = null
-  gridDetailForm.value = {
-    col_id: '',
-    col_name: '',
-    col_seq: gridDetailList.value.length + 1,
-    col_type: '',
-    col_size: '',
-    col_code: '',
-    col_width: 0,
-    col_hide: 0,
-    col_flex: 0,
-    use_yn: 'Y'
-  }
-  showGridDetailEditor.value = true
-}
-
-const openEditGridDetail = (detail: GridDetail) => {
-  editingGridDetail.value = detail
-  gridDetailForm.value = {
-    col_id: detail.col_id || '',
-    col_name: detail.col_name || '',
-    col_seq: detail.col_seq || 0,
-    col_type: detail.col_type || '',
-    col_size: detail.col_size || '',
-    col_code: detail.col_code || '',
-    col_width: detail.col_width || 0,
-    col_hide: detail.col_hide || 0,
-    col_flex: detail.col_flex || 0,
-    use_yn: detail.use_yn || 'Y'
-  }
-  showGridDetailEditor.value = true
-}
-
-const closeGridDetailEditor = () => {
-  showGridDetailEditor.value = false
-  editingGridDetail.value = null
-}
-
-const saveGridDetail = async () => {
-  if (!selectedGridId.value || !gridDetailForm.value.col_id || !gridDetailForm.value.col_name) {
-    toast.add({
-      severity: 'warn',
-      summary: '경고',
-      detail: '그리드 ID, 컬럼 ID, 컬럼명은 필수입니다.',
-      life: 3000
-    })
-    return
-  }
-
-  try {
-    await gridDetailSaver.run(async () => {
-      const result = await executeProcedure('sp_grid_info', {
-        case: 'save',
-        grid_id: selectedGridId.value,
-        col_id: gridDetailForm.value.col_id,
-        col_name: gridDetailForm.value.col_name,
-        col_seq: gridDetailForm.value.col_seq || null,
-        col_type: gridDetailForm.value.col_type || null,
-        col_size: gridDetailForm.value.col_size || null,
-        col_code: gridDetailForm.value.col_code || null,
-        col_width: gridDetailForm.value.col_width || null,
-        col_hide: gridDetailForm.value.col_hide ?? null,
-        col_flex: gridDetailForm.value.col_flex || null,
-        use_yn: gridDetailForm.value.use_yn || 'Y',
-        user_id: currentUserId.value
-      })
-
-      if (!result.success) throw new Error(result.error || '그리드 상세 저장 실패')
-    })
-
-    toast.add({
-      severity: 'success',
-      summary: '성공',
-      detail: '그리드 상세를 저장했습니다.',
-      life: 3000
-    })
-    if (selectedGridId.value) await loadGridDetail(selectedGridId.value)
-    closeGridDetailEditor()
-  } catch (error) {
-    console.error('그리드 상세 저장 실패:', error)
-    handleError(error instanceof Error ? error.message : '그리드 상세 저장에 실패했습니다.')
-  }
-}
-
-const deleteGridDetail = (detail: GridDetail) => {
-  if (!selectedGridId.value) return
-
-  confirmAction(async () => {
-    try {
-      await gridDetailSaver.run(async () => {
-        const result = await executeProcedure('sp_grid_info', {
-          case: 'delete',
-          grid_id: selectedGridId.value,
-          col_id: detail.col_id
-        })
-        if (!result.success) throw new Error(result.error || '그리드 상세 삭제 실패')
-      })
-
+    } else {
       toast.add({
         severity: 'success',
-        summary: '성공',
-        detail: '그리드 상세를 삭제했습니다.',
-        life: 3000
+        summary: '조회 완료',
+        detail: `${data.length}개의 화면 구성을 조회했습니다.`,
+        life: 2000
       })
-      focusedGridDetail.value = null
-      if (selectedGridId.value) await loadGridDetail(selectedGridId.value)
-    } catch (error) {
-      console.error('그리드 상세 삭제 실패:', error)
-      handleError(error instanceof Error ? error.message : '그리드 상세 삭제에 실패했습니다.')
     }
-  }, '그리드 상세 삭제', `정말로 "${detail.col_name}" 컬럼을 삭제하시겠습니까?`, '확인')
+  } catch (error) {
+    console.error('❌ 메뉴 화면 구성 로드 실패:', error)
+    handleError('메뉴 화면 구성을 불러오는데 실패했습니다.')
+    menuDisplayList.value = []
+  }
+}
+
+// grid_id에서 menu_id 추출 (예: adm019_header -> ADM019)
+const extractMenuIdFromGridId = (gridId: string): string => {
+  // grid_id 패턴: adm###_* 또는 ADM### 형식
+  const match = gridId.match(/^(adm\d{3})/i)
+  const captured = match?.[1]
+  if (captured) {
+    return captured.toUpperCase()
+  }
+  // 매칭 안 되면 원본 그대로 대문자로 반환
+  return gridId.toUpperCase()
 }
 
 const handleGridRowClick = (event: RowClickedEvent<GridMaster>) => {
   if (!event.data) return
+  console.log('🖱️ 그리드 마스터 클릭:', event.data)
   selectedGrid.value = event.data
-  if (event.data.grid_id) loadGridDetail(event.data.grid_id)
+  if (event.data.grid_id) {
+    console.log('📌 선택된 grid_id:', event.data.grid_id)
+    loadGridDetail(event.data.grid_id)
+    
+    // grid_id에서 menu_id 추출 (adm019_header -> ADM019)
+    const menuId = extractMenuIdFromGridId(event.data.grid_id)
+    console.log('🔄 추출된 menu_id:', menuId)
+    
+    selectedMenuId.value = menuId
+    loadMenuDisplay(menuId)
+  }
 }
 
 const handleGridDetailRowClick = (event: RowClickedEvent<GridDetail>) => {
   focusedGridDetail.value = event.data || null
 }
 
+const handleMenuDisplayRowClick = (event: RowClickedEvent<MenuDisplayEntry>) => {
+  focusedMenuDisplay.value = event.data || null
+}
+
 // AgGrid 참조
 const gridMasterAgGridRef = ref()
 const gridDetailAgGridRef = ref()
+const menuDisplayAgGridRef = ref()
 
-const editSelectedGridMaster = () => {
-  if (selectedGrid.value) openEditGridMaster(selectedGrid.value)
-}
-
-const deleteSelectedGridMaster = () => {
-  if (selectedGrid.value) deleteGridMaster(selectedGrid.value)
-}
-
-const editFocusedGridDetail = () => {
-  if (focusedGridDetail.value) openEditGridDetail(focusedGridDetail.value)
-}
-
-const deleteFocusedGridDetail = () => {
-  if (focusedGridDetail.value) deleteGridDetail(focusedGridDetail.value)
-}
-
-// AgGrid 행 추가/삭제/저장 기능
-const addGridMasterRow = () => {
-  if (gridMasterAgGridRef.value) {
-    gridMasterAgGridRef.value.addRow()
-    toast.add({
-      severity: 'info',
-      summary: '행 추가',
-      detail: '새 행이 추가되었습니다. 데이터를 입력한 후 저장하세요.',
-      life: 3000
-    })
-  }
-}
-
-const deleteGridMasterRows = () => {
-  if (gridMasterAgGridRef.value) {
-    gridMasterAgGridRef.value.deleteSelectedRows()
-  }
-}
-
-const saveGridMasterChanges = async () => {
-  if (!gridMasterAgGridRef.value) return
-  await gridMasterAgGridRef.value.save()
+// 저장 완료 이벤트 핸들러
+const onGridMasterSaved = async (result: any) => {
+  console.log('그리드 마스터 저장 완료:', result)
   await loadGrids({ selectGridId: selectedGridId.value })
+  toast.add({
+    severity: 'success',
+    summary: '저장 완료',
+    detail: `${result.added + result.modified + result.deleted}건 저장되었습니다.`,
+    life: 2000
+  })
 }
 
-const addGridDetailRow = () => {
-  if (!selectedGridId.value) {
-    toast.add({
-      severity: 'warn',
-      summary: '그리드 미선택',
-      detail: '먼저 그리드를 선택하세요.',
-      life: 3000
-    })
-    return
+const onGridDetailSaved = async (result: any) => {
+  console.log('그리드 상세 저장 완료:', result)
+  if (selectedGridId.value) {
+    await loadGridDetail(selectedGridId.value)
   }
-
-  if (gridDetailAgGridRef.value) {
-    gridDetailAgGridRef.value.addRow()
-    toast.add({
-      severity: 'info',
-      summary: '행 추가',
-      detail: '새 컬럼이 추가되었습니다. 데이터를 입력한 후 저장하세요.',
-      life: 3000
-    })
-  }
+  toast.add({
+    severity: 'success',
+    summary: '저장 완료',
+    detail: `${result.added + result.modified + result.deleted}건 저장되었습니다.`,
+    life: 2000
+  })
 }
 
-const deleteGridDetailRows = () => {
-  if (gridDetailAgGridRef.value) {
-    gridDetailAgGridRef.value.deleteSelectedRows()
-  }
+const onMenuDisplaySaved = async (result: any) => {
+  console.log('메뉴 화면 구성 저장 완료:', result)
+  await loadMenuDisplay()
+  toast.add({
+    severity: 'success',
+    summary: '저장 완료',
+    detail: `${result.added + result.modified + result.deleted}건 저장되었습니다.`,
+    life: 2000
+  })
 }
 
-const saveGridDetailChanges = async () => {
-  if (!gridDetailAgGridRef.value || !selectedGridId.value) return
-  await gridDetailAgGridRef.value.save()
-  await loadGridDetail(selectedGridId.value)
+const onSaveError = (error: any) => {
+  console.error('저장 실패:', error)
+  toast.add({
+    severity: 'error',
+    summary: '저장 실패',
+    detail: error.message || '저장 중 오류가 발생했습니다.',
+    life: 3000
+  })
 }
 
 const refreshGrids = async () => {
@@ -552,79 +397,52 @@ const refreshGrids = async () => {
 }
 
 const gridFilterForm = ref({
+  procedure: 'sp_grid_master',
   keyword: ''
 })
 
 const resetGridFilter = () => {
+  gridFilterForm.value.procedure = 'sp_grid_master'
   gridFilterForm.value.keyword = ''
 }
 
-const gridFilterSchema = computed(() => [
-  { $formkit: 'primeInputText', name: 'keyword', label: '그리드 검색', placeholder: 'ID 또는 이름', outerClass: 'col-12 md:col-8' },
-  {
+const gridFilterSchema = computed(() => {
+  const fields = []
+  
+  // URL 파라미터로 자동 설정된 경우 프로시저 선택 숨김
+  if (!isAutoProcedure.value) {
+    fields.push({ 
+      $formkit: 'primeSelect', 
+      name: 'procedure', 
+      label: '프로시저 선택', 
+      options: availableProcedures,
+      optionLabel: 'label',
+      optionValue: 'value',
+      outerClass: 'col-12 md:col-4' 
+    })
+  }
+
+  fields.push({ $formkit: 'primeInputText', name: 'keyword', label: '그리드 검색', placeholder: 'ID 또는 이름', outerClass: isAutoProcedure.value ? 'col-12 md:col-8' : 'col-12 md:col-4' })
+  
+  fields.push({
     $el: 'div',
     attrs: { class: 'col-12 md:col-4 flex justify-end gap-2' },
     children: [
       { $cmp: 'Button', props: { label: '초기화', outlined: true, severity: 'secondary', onClick: () => resetGridFilter() } },
       { $cmp: 'Button', props: { label: '조회', icon: 'pi pi-search', severity: 'secondary', onClick: () => refreshGrids() } }
     ]
-  }
-])
+  })
 
-const gridMasterActionsForm = ref({})
-const gridMasterActionsSchema = computed(() => [
-  {
-    $el: 'div',
-    attrs: { class: 'col-12 flex flex-wrap items-center justify-between gap-2' },
-    children: [
-      {
-        $el: 'span',
-        attrs: { class: 'text-sm text-gray-500' },
-        children: `선택된 그리드: ${selectedGridId.value ?? '-'}`
-      },
-      {
-        $el: 'div',
-        attrs: { class: 'flex flex-wrap gap-2' },
-        children: [
-          { $cmp: 'Button', props: { label: '행추가', icon: 'pi pi-plus', severity: 'success', size: 'small', onClick: () => addGridMasterRow() } },
-          { $cmp: 'Button', props: { label: '행삭제', icon: 'pi pi-trash', severity: 'danger', outlined: true, size: 'small', onClick: () => deleteGridMasterRows() } },
-          { $cmp: 'Button', props: { label: '저장', icon: 'pi pi-save', severity: 'primary', size: 'small', loading: savingGridMaster.value, onClick: () => saveGridMasterChanges() } },
-          { $cmp: 'Button', props: { label: '수정', icon: 'pi pi-pencil', severity: 'secondary', size: 'small', disabled: !selectedGrid.value, onClick: () => editSelectedGridMaster() } },
-          { $cmp: 'Button', props: { label: '개별삭제', icon: 'pi pi-times', outlined: true, severity: 'secondary', size: 'small', disabled: !selectedGrid.value, onClick: () => deleteSelectedGridMaster() } }
-        ]
-      }
-    ]
-  }
-])
+  return fields
+})
 
-const gridDetailActionsForm = ref({})
-const gridDetailActionsSchema = computed(() => [
-  {
-    $el: 'div',
-    attrs: { class: 'col-12 flex flex-wrap items-center justify-between gap-2' },
-    children: [
-      {
-        $el: 'span',
-        attrs: { class: 'text-sm text-gray-500' },
-        children: `선택된 그리드: ${selectedGridId.value ?? '-'}`
-      },
-      {
-        $el: 'div',
-        attrs: { class: 'flex flex-wrap gap-2' },
-        children: [
-          { $cmp: 'Button', props: { label: '행추가', icon: 'pi pi-plus', severity: 'success', size: 'small', disabled: !selectedGridId.value, onClick: () => addGridDetailRow() } },
-          { $cmp: 'Button', props: { label: '행삭제', icon: 'pi pi-trash', severity: 'danger', outlined: true, size: 'small', disabled: !selectedGridId.value, onClick: () => deleteGridDetailRows() } },
-          { $cmp: 'Button', props: { label: '저장', icon: 'pi pi-save', severity: 'primary', size: 'small', disabled: !selectedGridId.value, loading: savingGridDetail.value, onClick: () => saveGridDetailChanges() } },
-          { $cmp: 'Button', props: { label: '수정', icon: 'pi pi-pencil', severity: 'secondary', size: 'small', disabled: !focusedGridDetail.value, onClick: () => editFocusedGridDetail() } },
-          { $cmp: 'Button', props: { label: '개별삭제', icon: 'pi pi-times', outlined: true, severity: 'secondary', size: 'small', disabled: !focusedGridDetail.value, onClick: () => deleteFocusedGridDetail() } }
-        ]
-      }
-    ]
-  }
-])
 
 watch(() => gridFilterForm.value.keyword, (keyword) => {
   gridSearch.value = (keyword ?? '').toString()
+})
+
+watch(() => gridFilterForm.value.procedure, (procedure) => {
+  selectedProcedure.value = procedure || 'sp_adm011'
 })
 
 const gridMasterColumnDefs = computed(() => [
@@ -670,6 +488,93 @@ const gridMasterColumnDefs = computed(() => [
     cellEditor: 'agSelectCellEditor',
     cellEditorParams: { values: ['Y', 'N'] },
     valueFormatter: (params: ValueFormatterParams) => formatYesNo(params.value as string),
+    cellEditorPopup: false
+  }
+])
+
+const menuDisplayColumnDefs = computed(() => [
+  { 
+    field: 'menu_id', 
+    headerName: '메뉴 ID', 
+    width: 130, 
+    editable: (params: any) => params.data && params.data.__status === 'N',
+    cellEditor: 'agTextCellEditor',
+    cellEditorPopup: false
+  },
+  { 
+    field: 'contents_seq', 
+    headerName: '순서', 
+    width: 80, 
+    editable: (params: any) => params.data && params.data.__status === 'N',
+    cellEditor: 'agNumberCellEditor',
+    cellEditorParams: { min: 0 },
+    cellEditorPopup: false
+  },
+  { 
+    field: 'contents_type', 
+    headerName: '타입', 
+    width: 100, 
+    editable: true, 
+    cellEditor: 'agSelectCellEditor', 
+    cellEditorParams: { values: ['grid', 'card'] },
+    cellEditorPopup: false
+  },
+  { 
+    field: 'contents_header', 
+    headerName: '제목', 
+    minWidth: 150, 
+    editable: true, 
+    cellEditor: 'agTextCellEditor',
+    cellEditorPopup: false
+  },
+  { 
+    field: 'contents_width', 
+    headerName: '너비', 
+    width: 90, 
+    editable: true, 
+    cellEditor: 'agNumberCellEditor', 
+    cellEditorParams: { min: 0 },
+    cellEditorPopup: false
+  },
+  { 
+    field: 'contents_height', 
+    headerName: '높이', 
+    width: 90, 
+    editable: true, 
+    cellEditor: 'agNumberCellEditor', 
+    cellEditorParams: { min: 0 },
+    cellEditorPopup: false
+  },
+  { 
+    field: 'search_case', 
+    headerName: '검색 Case', 
+    width: 110, 
+    editable: true, 
+    cellEditor: 'agTextCellEditor',
+    cellEditorPopup: false
+  },
+  { 
+    field: 'save_case', 
+    headerName: '저장 Case', 
+    width: 110, 
+    editable: true, 
+    cellEditor: 'agTextCellEditor',
+    cellEditorPopup: false
+  },
+  { 
+    field: 'row_click_case', 
+    headerName: '클릭 Case', 
+    width: 110, 
+    editable: true, 
+    cellEditor: 'agTextCellEditor',
+    cellEditorPopup: false
+  },
+  { 
+    field: 'row_click_target', 
+    headerName: '클릭 Target', 
+    width: 120, 
+    editable: true, 
+    cellEditor: 'agTextCellEditor',
     cellEditorPopup: false
   }
 ])
@@ -767,48 +672,13 @@ const gridDetailColumnDefs = computed(() => [
   }
 ])
 
-const gridMasterSchema = computed(() => [
-  { $formkit: 'primeInputText', name: 'grid_id', label: '그리드 ID', validation: 'required', outerClass: 'col-12', disabled: !!editingGridMaster.value, help: editingGridMaster.value ? '그리드 ID는 수정할 수 없습니다.' : '' },
-  { $formkit: 'primeInputText', name: 'grid_name', label: '그리드명', validation: 'required', outerClass: 'col-12' },
-  { $formkit: 'primeSelect', name: 'grid_type', label: '그리드 타입', outerClass: 'col-12 md:col-6', options: gridTypeOptions.value, optionLabel: 'label', optionValue: 'value', placeholder: '선택하세요', showClear: true },
-  { $formkit: 'primeInputNumber', name: 'grid_row', label: '행 수', outerClass: 'col-12 md:col-6', min: 0, placeholder: '0' },
-  { $formkit: 'primeSelect', name: 'use_yn', label: '사용 여부', outerClass: 'col-12 md:col-6', options: ynOptions.value, optionLabel: 'label', optionValue: 'value' },
-  {
-    $el: 'div',
-    attrs: { class: 'col-12 flex justify-end gap-2 mt-4 pt-3 border-t border-gray-200 dark:border-gray-700' },
-    children: [
-      { $cmp: 'Button', props: { label: '취소', outlined: true, severity: 'secondary', onClick: () => { showGridMasterEditor.value = false } } },
-      { $cmp: 'Button', props: { label: '저장', icon: 'pi pi-check', severity: 'primary', loading: savingGridMaster.value, onClick: () => saveGridMaster() } }
-    ]
-  }
-])
-
-const gridDetailSchema = computed(() => [
-  { $formkit: 'primeInputText', name: 'col_id', label: '컬럼 ID', validation: 'required', outerClass: 'col-12 md:col-6', disabled: !!editingGridDetail.value, help: editingGridDetail.value ? '컬럼 ID는 수정할 수 없습니다.' : '' },
-  { $formkit: 'primeInputText', name: 'col_name', label: '컬럼명', validation: 'required', outerClass: 'col-12 md:col-6' },
-  { $formkit: 'primeInputNumber', name: 'col_seq', label: '표시 순서', outerClass: 'col-12 md:col-4', min: 0, placeholder: '1' },
-  { $formkit: 'primeSelect', name: 'col_type', label: '컬럼 타입', outerClass: 'col-12 md:col-4', options: columnTypeOptions.value, optionLabel: 'label', optionValue: 'value', placeholder: '선택하세요', showClear: true, filter: true },
-  { $formkit: 'primeSelect', name: 'col_size', label: '필드 폭', outerClass: 'col-12 md:col-4', options: fieldSizeOptions.value, optionLabel: 'label', optionValue: 'value', placeholder: '선택하세요', showClear: true },
-  { $formkit: 'primeSelect', name: 'col_code', label: '코드 그룹', outerClass: 'col-12 md:col-6', options: codeGroupOptions.value, optionLabel: 'label', optionValue: 'value', placeholder: '선택하세요', showClear: true, filter: true, loading: loadingCodeGroups.value },
-  { $formkit: 'primeInputNumber', name: 'col_width', label: '너비(px)', outerClass: 'col-12 md:col-3', min: 0, placeholder: '200' },
-  { $formkit: 'primeSelect', name: 'col_hide', label: '표시 여부', outerClass: 'col-12 md:col-3', options: binaryOptions.value, optionLabel: 'label', optionValue: 'value' },
-  { $formkit: 'primeInputNumber', name: 'col_flex', label: 'Flex', outerClass: 'col-12 md:col-3', min: 0, placeholder: '0' },
-  { $formkit: 'primeSelect', name: 'use_yn', label: '사용 여부', outerClass: 'col-12 md:col-3', options: ynOptions.value, optionLabel: 'label', optionValue: 'value' },
-  {
-    $el: 'div',
-    attrs: { class: 'col-12 flex justify-end gap-2 mt-4 pt-3 border-t border-gray-200 dark:border-gray-700' },
-    children: [
-      { $cmp: 'Button', props: { label: '취소', outlined: true, severity: 'secondary', onClick: () => closeGridDetailEditor() } },
-      { $cmp: 'Button', props: { label: '저장', icon: 'pi pi-check', severity: 'primary', loading: savingGridDetail.value, onClick: () => saveGridDetail() } }
-    ]
-  }
-])
 
 const gridFilterStats = computed(() => ([
   { label: '등록된 그리드', value: gridList.value.length },
   { label: '선택된 그리드', value: selectedGridId.value ?? '-' },
   { label: '선택된 그리드 컬럼', value: gridDetailList.value.length }
 ]))
+
 
 const loadInitialCodes = async () => {
   try {
@@ -830,12 +700,12 @@ onMounted(async () => {
   <div class="space-y-6 p-6">
     <div class="space-y-2">
       <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">그리드 스키마 관리</h1>
-      <p class="text-gray-600 dark:text-gray-400">s_grid_master / s_grid_detail 두 테이블만 빠르게 정비할 수 있도록 재구성했습니다.</p>
+      <p class="text-gray-600 dark:text-gray-400">s_grid_master / s_menu_display / s_grid_detail 통합 관리</p>
     </div>
 
-      <Card>
+    <Card>
       <template #title>그리드 검색 · 현황</template>
-        <template #content>
+      <template #content>
         <div class="compact-form">
           <FormKitDataEdit
             v-model="gridFilterForm"
@@ -853,113 +723,105 @@ onMounted(async () => {
             <p class="text-sm text-gray-500">{{ stat.label }}</p>
             <p class="text-2xl font-semibold text-gray-900 dark:text-gray-100">{{ stat.value }}</p>
           </div>
-              </div>
+        </div>
       </template>
     </Card>
 
-    <Card>
-      <template #title>s_grid_master (그리드 기본 정보)</template>
-      <template #content>
-        <div class="compact-form mb-3">
-          <FormKitDataEdit
-            :key="`grid-master-actions-${selectedGridId}`"
-            v-model="gridMasterActionsForm"
-            :schema="gridMasterActionsSchema"
-            form-class="form-horizontal grid-12"
-            submit-label=""
-          />
-        </div>
-        <ClientOnly>
-          <AgGrid
-            ref="gridMasterAgGridRef"
-            title="그리드 마스터"
-            :row-data="filteredGridList"
-            :column-defs="gridMasterColumnDefs"
-            :editable="true"
-            edit-mode="singleClick"
-            :row-select="true"
-            grid-id="schema_master"
-            procedure-name="sp_adm011"
-            :save-param-fields="['grid_id', 'grid_name', 'grid_type', 'grid_row', 'use_yn']"
-            :extra-save-params="{ user_id: currentUserId }"
-            @row-clicked="handleGridRowClick"
-          />
-          <template #fallback>
-            <div class="flex h-36 items-center justify-center text-sm text-gray-500">그리드 로딩 중...</div>
-      </template>
-        </ClientOnly>
-        
-        <Transition name="fade">
-          <div v-if="showGridMasterEditor" class="mt-4 rounded-lg border border-primary-200 dark:border-primary-700 bg-primary-50 dark:bg-primary-950 p-4">
-            <div class="mb-2 flex items-center justify-between">
-              <h3 class="text-lg font-semibold text-primary-900 dark:text-primary-100">
-                {{ editingGridMaster ? '그리드 마스터 수정' : '그리드 마스터 추가' }}
-              </h3>
-      </div>
-            <div class="compact-form">
-              <FormKitDataEdit
-                v-model="gridMasterForm"
-                :schema="gridMasterSchema"
-                form-class="form-horizontal grid-12"
-                submit-label=""
+    <!-- 2열 레이아웃: 좌측(Grid Master) / 우측(Menu Display + Grid Detail) -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- 좌측: Grid Master -->
+      <Card>
+        <template #title>s_grid_master (그리드 기본 정보)</template>
+        <template #content>
+          <ClientOnly>
+            <AgGrid
+              ref="gridMasterAgGridRef"
+              title="그리드 마스터"
+              :row-data="filteredGridList"
+              :column-defs="gridMasterColumnDefs"
+              :editable="true"
+              edit-mode="singleClick"
+              :row-select="true"
+              grid-id="schema_master"
+              :procedure-name="selectedProcedure"
+              :save-param-fields="['grid_id', 'grid_name', 'grid_type', 'grid_row', 'use_yn']"
+              :extra-save-params="{ user_id: currentUserId }"
+              :show-save-button="true"
+              save-button-label="저장"
+              @row-clicked="handleGridRowClick"
+              @saved="onGridMasterSaved"
+              @save-error="onSaveError"
+            />
+            <template #fallback>
+              <div class="flex h-36 items-center justify-center text-sm text-gray-500">그리드 로딩 중...</div>
+            </template>
+          </ClientOnly>
+        </template>
+      </Card>
+
+      <!-- 우측: Menu Display + Grid Detail (상하 배치) -->
+      <div class="space-y-6">
+        <!-- 우측 상단: Menu Display -->
+        <Card>
+          <template #title>s_menu_display (메뉴 화면 구성)</template>
+          <template #content>
+            <ClientOnly>
+              <AgGrid
+                ref="menuDisplayAgGridRef"
+                title="메뉴 화면 구성"
+                :row-data="menuDisplayList"
+                :column-defs="menuDisplayColumnDefs"
+                :editable="true"
+                edit-mode="singleClick"
+                :row-select="true"
+                grid-id="schema_menu_display"
+                procedure-name="sp_menu_display_info"
+                :save-param-fields="['menu_id', 'contents_seq', 'contents_type', 'contents_header', 'contents_width', 'contents_height', 'search_case', 'save_case', 'row_click_case', 'row_click_target']"
+                :extra-save-params="{ user_id: currentUserId }"
+                :show-save-button="true"
+                save-button-label="저장"
+                @row-clicked="handleMenuDisplayRowClick"
+                @saved="onMenuDisplaySaved"
+                @save-error="onSaveError"
               />
-            </div>
-          </div>
-        </Transition>
-      </template>
-    </Card>
+              <template #fallback>
+                <div class="flex h-36 items-center justify-center text-sm text-gray-500">메뉴 화면 구성 로딩 중...</div>
+              </template>
+            </ClientOnly>
+          </template>
+        </Card>
 
-    <Card>
-      <template #title>s_grid_detail (컬럼 상세)</template>
-      <template #content>
-        <div class="compact-form mb-3">
-          <FormKitDataEdit
-            :key="`grid-detail-actions-${selectedGridId}-${focusedGridDetail?.col_id}`"
-            v-model="gridDetailActionsForm"
-            :schema="gridDetailActionsSchema"
-            form-class="form-horizontal grid-12"
-            submit-label=""
-          />
-        </div>
-        <ClientOnly>
-          <AgGrid
-            ref="gridDetailAgGridRef"
-            title="그리드 상세"
-            :row-data="gridDetailList"
-            :column-defs="gridDetailColumnDefs"
-            :editable="true"
-            edit-mode="singleClick"
-            :row-select="true"
-            grid-id="schema_detail"
-            procedure-name="sp_grid_info"
-            :save-param-fields="['col_id', 'col_name', 'col_seq', 'col_type', 'col_size', 'col_code', 'col_width', 'col_hide', 'col_flex', 'use_yn']"
-            :extra-save-params="{ grid_id: selectedGridId, user_id: currentUserId }"
-            @row-clicked="handleGridDetailRowClick"
-          />
-          <template #fallback>
-            <div class="flex h-36 items-center justify-center text-sm text-gray-500">상세 로딩 중...</div>
-      </template>
-        </ClientOnly>
-        
-        <Transition name="fade">
-          <div v-if="showGridDetailEditor" class="mt-4 rounded-lg border border-primary-200 dark:border-primary-700 bg-primary-50 dark:bg-primary-950 p-4">
-            <div class="mb-2 flex items-center justify-between">
-              <h3 class="text-lg font-semibold text-primary-900 dark:text-primary-100">
-                {{ editingGridDetail ? '컬럼 수정' : '컬럼 추가' }}
-              </h3>
+        <!-- 우측 하단: Grid Detail -->
+        <Card>
+          <template #title>s_grid_detail (컬럼 상세)</template>
+          <template #content>
+            <ClientOnly>
+              <AgGrid
+                ref="gridDetailAgGridRef"
+                title="그리드 상세"
+                :row-data="gridDetailList"
+                :column-defs="gridDetailColumnDefs"
+                :editable="true"
+                edit-mode="singleClick"
+                :row-select="true"
+                grid-id="schema_detail"
+                procedure-name="sp_grid_info"
+                :save-param-fields="['col_id', 'col_name', 'col_seq', 'col_type', 'col_size', 'col_code', 'col_width', 'col_hide', 'col_flex', 'use_yn']"
+                :extra-save-params="{ grid_id: selectedGridId, user_id: currentUserId }"
+                :show-save-button="true"
+                save-button-label="저장"
+                @row-clicked="handleGridDetailRowClick"
+                @saved="onGridDetailSaved"
+                @save-error="onSaveError"
+              />
+              <template #fallback>
+                <div class="flex h-36 items-center justify-center text-sm text-gray-500">상세 로딩 중...</div>
+              </template>
+            </ClientOnly>
+          </template>
+        </Card>
       </div>
-            <div class="compact-form">
-              <FormKitDataEdit
-                v-model="gridDetailForm"
-                :schema="gridDetailSchema"
-                form-class="form-horizontal grid-12"
-                submit-label=""
-                    />
-                  </div>
-          </div>
-        </Transition>
-      </template>
-    </Card>
+    </div>
   </div>
 </template>
 

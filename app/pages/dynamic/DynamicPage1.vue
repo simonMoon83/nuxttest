@@ -89,10 +89,14 @@ async function loadDisplayConfig() {
     const url = queryStr
       ? `/api/display/${encodeURIComponent(String(menuId.value))}?${queryStr}`
       : `/api/display/${encodeURIComponent(String(menuId.value))}`
+    console.log('[DEBUG] 🔍 Display Config URL:', url)
     const res = await $fetch<any>(url)
+    console.log('[DEBUG] 📦 Display API Response:', res)
     rows.value = Array.isArray(res?.data) ? res.data : []
+    console.log('[DEBUG] 📋 Rows set:', rows.value)
     contentData.value = []
   } catch (e: any) {
+    console.error('[DEBUG] ❌ Display Config Error:', e)
     errorMsg.value = e?.message || '구성 정보를 불러오지 못했습니다.'
     rows.value = []
     contentData.value = []
@@ -455,7 +459,11 @@ watch(effectiveMenuNode, () => { loadDynamicSearchSchema() }, { immediate: true 
 // schema.vue에서 설정한 grid_id를 사용하여 s_grid_detail에서 컬럼 정보를 동적으로 로드
 const resolvedBlocks = computed(() => {
   const list = Array.isArray(rows.value) ? rows.value : []
-  if (list.length === 0) return []
+  console.log('[DEBUG] 🔧 resolvedBlocks - list:', list)
+  if (list.length === 0) {
+    console.log('[DEBUG] ⚠️ resolvedBlocks - Empty list, returning []')
+    return []
+  }
 
   // contents_seq 순서대로 정렬하여 여러 블록 지원
   const sortedList = [...list].sort((a, b) => {
@@ -470,6 +478,7 @@ const resolvedBlocks = computed(() => {
     // schema.vue에서 설정한 grid_id 사용 (없으면 contents_header를 fallback으로 사용)
     const gridId = row?.grid_id || headerTitle || undefined
     const saveYn = coerceFlag(row?.save_yn, false)
+    console.log('[DEBUG] 🎯 Block item:', { index, type, headerTitle, gridId, saveYn, row })
 
     if (type === 'grid') {
       return {
