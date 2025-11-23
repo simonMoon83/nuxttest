@@ -81,19 +81,23 @@ async function loadDisplayConfig() {
   try {
     loading.value = true
     errorMsg.value = null
-    // procedure_name만 전달 (sname은 여기서 사용하지 않음)
-    const proc = (effectiveMenuNode.value as any)?.procedure_name || ''
-    const qs = new URLSearchParams()
-    if (proc) qs.set('procedure_name', proc)
-    const queryStr = qs.toString()
-    const url = queryStr
-      ? `/api/display/${encodeURIComponent(String(menuId.value))}?${queryStr}`
-      : `/api/display/${encodeURIComponent(String(menuId.value))}`
-    console.log('[DEBUG] 🔍 Display Config URL:', url)
-    const res = await $fetch<any>(url)
-    console.log('[DEBUG] 📦 Display API Response:', res)
-    rows.value = Array.isArray(res?.data) ? res.data : []
-    console.log('[DEBUG] 📋 Rows set:', rows.value)
+    // Stored Procedure 호출로 전환: sp_menu_display_info(search)
+    const res = await $fetch<any>('/api/stored-procedure/execute', {
+      method: 'POST',
+      body: {
+        procedureName: 'sp_menu_display_info',
+        parameters: { case: 'search', menu_id: String(menuId.value) }
+      }
+    })
+    const rowsOut = Array.isArray(res?.data)
+      ? res.data
+      : Array.isArray(res?.recordset)
+        ? res.recordset
+        : Array.isArray(res?.recordsets?.[0])
+          ? res.recordsets[0]
+          : []
+    rows.value = rowsOut
+    console.log('[DEBUG] 📋 Rows set (SP):', rows.value)
     contentData.value = []
   } catch (e: any) {
     console.error('[DEBUG] ❌ Display Config Error:', e)
@@ -478,6 +482,8 @@ const resolvedBlocks = computed(() => {
     // schema.vue에서 설정한 grid_id 사용 (없으면 contents_header를 fallback으로 사용)
     const gridId = row?.grid_id || headerTitle || undefined
     const saveYn = coerceFlag(row?.save_yn, false)
+    const addYn = coerceFlag(row?.add_yn, false)
+    const delYn = coerceFlag(row?.del_yn, false)
     console.log('[DEBUG] 🎯 Block item:', { index, type, headerTitle, gridId, saveYn, row })
 
     if (type === 'grid') {
@@ -491,8 +497,13 @@ const resolvedBlocks = computed(() => {
           editable: saveYn,  // save_yn이 true면 편집 가능
           treeData: false,
           gridId: gridId,  // schema.vue에서 설정한 grid_id 사용
-          rowSelect: true,
+          rowSelect: false,
           editMode: 'doubleClick' as const,
+          showAddRowButton: addYn,
+          showDeleteRowButton: delYn,
+          // 저장 동작에 필요한 정보 전달
+          procedureName: (effectiveMenuNode.value as any)?.procedure_name || '',
+          saveCase: row?.save_case || 'save',
         },
         onGridReady: (_params: any) => {},
         onCellDblClick: (_e: any) => {},
@@ -533,11 +544,11 @@ const resolvedBlocks = computed(() => {
 <template>
   <div class="card flex flex-col gap-4">
     <!-- 상단 타이틀/액션 -->
-    <div class="w-full mt-1 mb-2 border-b-1 border-gray-400 dark:border-gray-700">
+    <div class="w-full mt-0 mb-2 border-b-1 border-gray-400 dark:border-gray-700">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-1">
-          <i :class="pageIcon" class="text-primary"></i>
-          <h2 class="text-xl font-semibold text-primary">{{ breadcrumbTitle }}</h2>
+          <i :class="pageIcon" class="text-black dark:text-white"></i>
+          <h2 class="text-lg font-semibold text-black dark:text-white m-0">{{ breadcrumbTitle }}</h2>
         </div>
         <div class="flex items-center gap-2">
           <Button label="검색" severity="secondary" size="small" v-if="showSearchButton" @click="onSearchHandled" />

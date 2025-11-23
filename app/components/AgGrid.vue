@@ -32,9 +32,12 @@ interface Props {
   treeData?: boolean // 트리 데이터 사용 여부
   autoGroupColumnName?: string // 자동 그룹 컬럼 헤더 이름
   editable?: boolean // 편집 가능 여부
+  showAddRowButton?: boolean // 행 추가 버튼 표시 여부 (기본: editable과 동일)
+  showDeleteRowButton?: boolean // 행 삭제 버튼 표시 여부 (기본: editable과 동일)
   editMode?: 'singleClick' | 'doubleClick' | 'enterKey' // 편집 모드
   rowSelect?: boolean // 행 선택 기능 사용 여부
   procedureName?: string // 저장/조회에 사용할 프로시저명
+  saveCase?: string // 저장 시 사용할 case (기본: 'save')
   menuId?: string | number // 저장 시 전달할 메뉴 ID
   extraSaveParams?: Record<string, any> // 추가 저장 파라미터
   saveParamFields?: string[] // 저장 시 사용할 필드 목록
@@ -52,6 +55,8 @@ const props = withDefaults(defineProps<Props>(), {
   gridId: '',
   treeData: false,
   editable: false,
+  showAddRowButton: false,
+  showDeleteRowButton: false,
   editMode: 'singleClick',
   rowSelect: false,
   procedureName: '',
@@ -290,15 +295,18 @@ async function loadDynamicColumnDefs() {
         }
 
         const colType = toLowerTrimmed(col.col_type || '')
-        const policy = coerceEditPolicy(col.col_edit)
-        const anyEditable = props.editable === true && (policy === 'A' || policy === 'F')
-        const editableByPolicy: boolean | ((p: any) => boolean) = policy === 'A'
+        // 편집 정책: 값이 비어있으면 'N'으로 간주 (정책만 사용)
+        const rawPolicy = col?.col_edit
+        const hasPolicy = String(rawPolicy ?? '').trim() !== ''
+        const policy = coerceEditPolicy(rawPolicy)
+        const effectivePolicy: 'A' | 'F' | 'N' = hasPolicy ? policy : 'N'
+        const anyEditable = (effectivePolicy === 'A' || effectivePolicy === 'F')
+        const editableByPolicy: boolean | ((p: any) => boolean) = effectivePolicy === 'A'
           ? true
-          : (policy === 'F' ? ((p: any) => isNewRowFlag(p?.data)) : false)
+          : (effectivePolicy === 'F' ? ((p: any) => isNewRowFlag(p?.data)) : false)
         const isEditableRow = (row: any) => {
-          if (!props.editable) return false
-          if (policy === 'A') return true
-          if (policy === 'F') return isNewRowFlag(row)
+          if (effectivePolicy === 'A') return true
+          if (effectivePolicy === 'F') return isNewRowFlag(row)
           return false
         }
         const saveParam = coerceBooleanValue(col.col_save)
@@ -462,17 +470,10 @@ async function loadDynamicColumnDefs() {
 }
 
 // 기본 컬럼 정의 - 모든 컬럼에 적용되는 기본 설정
-const defaultColDef = ref<any>({ 
-  resizable: true, // 컬럼 크기 조절 가능
-  sortable: true, // 정렬 가능
-  filter: true, // 필터링 가능
-  editable: props.editable, // 편집 가능 여부
-  // 편집 모드에 따른 설정
-  ...(props.editable && {
-    cellEditor: 'agTextCellEditor', // 기본 텍스트 편집기
-    cellEditorPopup: false, // 팝업 편집기 비활성화
-    singleClickEdit: props.editMode === 'singleClick', // 편집 모드에 따른 설정
-  })
+const defaultColDef = ref<any>({
+  resizable: true,
+  sortable: true,
+  filter: true,
 })
 
 // AG Grid 옵션 설정 (트리 데이터가 있을 때만 그룹 관련 설정 적용)
@@ -485,11 +486,9 @@ const gridOptions = computed(() => {
     enableRangeHandle: true, // 범위 핸들 활성화
     clipboardDelimiter: '\t', // 클립보드 구분자
     suppressScrollOnNewData: true, // 데이터 변경 시 자동 스크롤 방지
-    // 편집 관련 설정
-    ...(props.editable && {
-      stopEditingWhenCellsLoseFocus: true, // 포커스 잃을 때 편집 종료
-      singleClickEdit: props.editMode === 'singleClick', // 편집 모드에 따른 설정
-    })
+    // 편집 관련 전역 설정 (컬럼별 editable 정책에 의해 실제 편집 가능 여부가 결정됨)
+    stopEditingWhenCellsLoseFocus: true,
+    singleClickEdit: props.editMode === 'singleClick',
   }
   
   // 트리 데이터가 있을 때만 그룹 관련 설정 추가
@@ -602,8 +601,27 @@ function onGridReady(params: any) {
  */
 function onCellDoubleClicked(event: any) { 
   try { 
-    // 편집 가능한 셀인 경우 편집 시작
-    if (props.editable && event.column && event.column.getColDef().editable !== false) {
+    // 편집 가능한 셀인지 확인 (editable이 함수일 수 있음)
+    const colDef = event.column?.getColDef ? event.column.getColDef() : event.colDef
+    let allowed = false
+    if (colDef) {
+      if (typeof colDef.editable === 'function') {
+        try {
+          allowed = !!colDef.editable({
+            data: event?.data,
+            node: event?.node,
+            colDef,
+            column: event?.column,
+            api: gridApi.value,
+            columnApi: gridApi.value?.getColumnApi ? gridApi.value.getColumnApi() : undefined,
+            context: undefined
+          })
+        } catch { allowed = false }
+      } else {
+        allowed = colDef.editable !== false
+      }
+    }
+    if (allowed) {
       console.log('AgGrid - 더블클릭 편집 시작:', event.column.getColId(), event.column.getColDef())
       gridApi.value?.startEditingCell({
         rowIndex: event.rowIndex,
@@ -775,7 +793,7 @@ async function save(): Promise<any> {
       for (const row of rows) {
         const rowParams = pickSaveFields(row, saveFields)
         const parameters = {
-          case: 'save',
+          case: props.saveCase || 'save',
           row_state: rowState,
           ...rowParams,
           ...props.extraSaveParams,
@@ -792,14 +810,14 @@ async function save(): Promise<any> {
     await execForRows(changed.modified, 'M')
     await execForRows(changed.deleted, 'D')
 
-    // 성공적으로 저장된 후 상태 초기화
+    // 성공적으로 저장된 후 상태 초기화 (그리드 내부 데이터 기준으로 초기화)
     try {
-      const rows = Array.isArray(props.rowData) ? props.rowData : []
-      rows.forEach((r: any) => { if (r && r.__status) delete r.__status })
+      const allRows: any[] = (exposeMethods as any)?.getAllRows?.() || []
+      allRows.forEach((r: any) => { if (r && r.__status) delete r.__status })
       try { newlyAddedRows.value?.clear?.() } catch {}
       try {
         seenRows.value = new WeakSet<any>()
-        rows.forEach((r: any) => { if (r && typeof r === 'object') seenRows.value.add(r) })
+        allRows.forEach((r: any) => { if (r && typeof r === 'object') seenRows.value.add(r) })
       } catch {}
       refreshStatusCells()
     } catch {}
@@ -1087,8 +1105,8 @@ onMounted(async () => {
       <!-- 우측 액션 버튼: 엑셀, 행 추가/행 삭제/저장 -->
       <div class="ml-auto flex items-center gap-1">
         <Button icon="pi pi-file-excel" label="엑셀" size="small" text severity="success" @click="exportExcel" />
-        <Button v-if="props.editable" icon="pi pi-plus" label="행추가" size="small" text severity="primary" @click="addRow" />
-        <Button v-if="props.editable" icon="pi pi-minus" label="행삭제" size="small" text severity="danger" @click="deleteSelectedRows" />
+        <Button v-if="props.showAddRowButton" icon="pi pi-plus" label="행추가" size="small" text severity="primary" @click="addRow" />
+        <Button v-if="props.showDeleteRowButton" icon="pi pi-minus" label="행삭제" size="small" text severity="danger" @click="deleteSelectedRows" />
         <Button v-if="props.showSaveButton" icon="pi pi-save" :label="props.saveButtonLabel" size="small" text severity="info" :loading="isSaving" @click="handleSave" />
       </div>
     </div>
