@@ -120,6 +120,10 @@ const agGridThemeClass = computed(() => colorMode.value === 'dark' ? 'ag-theme-q
 const agGrid = ref()
 const gridApi = shallowRef<any | null>(null)
 
+// 더블클릭으로 편집 시작할 때의 행 데이터를 임시 저장 (셀 에디터에서 params가 없을 때 사용)
+const lastEditingCellData = ref<any>(null)
+const lastEditingRowIndex = ref<number | null>(null)
+
 // 동적 컬럼 정보
 const dynamicColumnDefs = ref<any[]>([])
 // 저장 파라미터로 사용할 필드 목록(col_save=Y) 저장
@@ -239,7 +243,7 @@ function coerceCheckboxToBit(field: string, value: any): any {
   try {
     const defs = dynamicColumnDefs.value || []
     const def = defs.find((d: any) => d && d.field === field)
-    const t = String(def?.__colType || '').toLowerCase()
+    const t = String(def?.context?.__colType || '').toLowerCase()
     if (t === 'checkbox' || t === 'bool' || t === 'boolean') {
       return coerceBooleanValue(value) ? 1 : 0
     }
@@ -281,29 +285,64 @@ async function loadDynamicColumnDefs() {
     })
     
     if (result.success && result.data && Array.isArray(result.data)) {
+      // 두 번째 결과셋에서 DROP_로 시작하는 col_code의 코드 리스트 추출
+      const codeOptionsMap = new Map<string, any[]>()
+      if (Array.isArray(result.recordsets) && result.recordsets.length > 1) {
+        const codeList = result.recordsets[1] || []
+        console.log(`[AgGrid] 두 번째 결과셋 확인: ${codeList.length}개 항목`)
+        codeList.forEach((item: any) => {
+          const colCode = String(item?.col_code || '').trim()
+          if (colCode) {
+            if (!codeOptionsMap.has(colCode)) {
+              codeOptionsMap.set(colCode, [])
+            }
+            codeOptionsMap.get(colCode)!.push({
+              code: item.code,
+              code_name: item.code_name
+            })
+          }
+        })
+        console.log(`[AgGrid] 코드 옵션 맵:`, Array.from(codeOptionsMap.keys()))
+      } else {
+        console.log(`[AgGrid] 두 번째 결과셋이 없습니다. recordsets:`, result.recordsets)
+      }
+
       // 드롭다운 옵션 사전 로드용 맵
       const dropdownPromises: Promise<void>[] = []
       const saveFields: string[] = []
       const tempDefs: any[] = result.data.map((col: any) => {
+        const colType = toLowerTrimmed(col.col_type || '')
+        const codeGroup = toTrimmedString(col.col_code || '')
+        // col_code가 DROP_로 시작하는 경우 자동으로 select 타입으로 처리
+        const isDropCode = codeGroup.toUpperCase().startsWith('DROP_')
+        const effectiveColType = isDropCode ? 'select' : colType
+
         const def: any = {
           field: toTrimmedString(col.col_id || ''),
           headerName: toTrimmedString(col.col_name || ''),
           width: toNumberOrUndefined(col.col_width) ?? 100,
           hide: toHideBoolean(col.col_hide),
           flex: toNumberOrUndefined(col.col_flex) ?? undefined,
-          __colType: toLowerTrimmed(col.col_type || ''),
+          context: {
+            __colType: effectiveColType,
+            __saveParam: false,
+            __options: []
+          }
         }
-
-        const colType = toLowerTrimmed(col.col_type || '')
+        
         // 편집 정책: 값이 비어있으면 'N'으로 간주 (정책만 사용)
+        // col_code가 DROP_로 시작하는 경우 자동으로 편집 가능하도록 설정
         const rawPolicy = col?.col_edit
         const hasPolicy = String(rawPolicy ?? '').trim() !== ''
         const policy = coerceEditPolicy(rawPolicy)
-        const effectivePolicy: 'A' | 'F' | 'N' = hasPolicy ? policy : 'N'
-        const anyEditable = (effectivePolicy === 'A' || effectivePolicy === 'F')
-        const editableByPolicy: boolean | ((p: any) => boolean) = effectivePolicy === 'A'
-          ? true
-          : (effectivePolicy === 'F' ? ((p: any) => isNewRowFlag(p?.data)) : false)
+        // DROP_로 시작하는 경우 편집 가능하도록 강제
+        const effectivePolicy: 'A' | 'F' | 'N' = isDropCode ? 'A' : (hasPolicy ? policy : 'N')
+        const anyEditable = isDropCode || (effectivePolicy === 'A' || effectivePolicy === 'F')
+        const editableByPolicy: boolean | ((p: any) => boolean) = isDropCode 
+          ? true 
+          : (effectivePolicy === 'A' 
+            ? true 
+            : (effectivePolicy === 'F' ? ((p: any) => isNewRowFlag(p?.data)) : false))
         const isEditableRow = (row: any) => {
           if (effectivePolicy === 'A') return true
           if (effectivePolicy === 'F') return isNewRowFlag(row)
@@ -311,17 +350,17 @@ async function loadDynamicColumnDefs() {
         }
         const saveParam = coerceBooleanValue(col.col_save)
         if (saveParam) {
-          def.__saveParam = true
+          def.context.__saveParam = true
           if (def.field) saveFields.push(def.field)
         }
 
-        if (colType === 'text' || colType === '' || !colType) {
+        if (effectiveColType === 'text' || (effectiveColType === '' && !isDropCode) || (!effectiveColType && !isDropCode)) {
           if (anyEditable) def.cellEditor = 'agTextCellEditor'
           def.editable = editableByPolicy
           def.valueFormatter = (p: any) => (p.value == null ? '' : p.value)
           def.valueGetter = (p: any) => smartGet(p?.data, def.field)
           if (anyEditable) def.valueSetter = (p: any) => smartSet(p?.data, def.field, p.newValue)
-        } else if (colType === 'number') {
+        } else if (effectiveColType === 'number') {
           def.filter = 'agNumberColumnFilter'
           def.valueParser = (p: any) => {
             const v = Number(p.newValue)
@@ -332,7 +371,7 @@ async function loadDynamicColumnDefs() {
           def.valueFormatter = (p: any) => (p.value == null ? '' : p.value)
           def.valueGetter = (p: any) => smartGet(p?.data, def.field)
           if (anyEditable) def.valueSetter = (p: any) => smartSet(p?.data, def.field, (p.newValue == null || p.newValue === '') ? null : Number(p.newValue))
-        } else if (colType === 'checkbox' || colType === 'bool' || colType === 'boolean') {
+        } else if (effectiveColType === 'checkbox' || effectiveColType === 'bool' || effectiveColType === 'boolean') {
           // 클릭으로 직접 토글되도록 실제 DOM 요소 렌더링
           def.cellRenderer = (p: any) => {
             const input = document.createElement('input')
@@ -361,9 +400,9 @@ async function loadDynamicColumnDefs() {
             def.valueGetter = (p: any) => smartGet(p?.data, def.field)
             def.valueSetter = (p: any) => smartSet(p?.data, def.field, coerceBooleanValue(p.newValue))
           }
-        } else if (colType === 'date' || colType === 'datetime') {
+        } else if (effectiveColType === 'date' || effectiveColType === 'datetime') {
           def.filter = 'agDateColumnFilter'
-          def.valueFormatter = (p: any) => formatDateValue(p.value, colType === 'datetime' ? 'datetime' : 'date')
+          def.valueFormatter = (p: any) => formatDateValue(p.value, effectiveColType === 'datetime' ? 'datetime' : 'date')
           def.valueGetter = (p: any) => smartGet(p?.data, def.field)
           if (anyEditable) {
             def.editable = editableByPolicy
@@ -383,12 +422,12 @@ async function loadDynamicColumnDefs() {
             }
             def.valueSetter = (p: any) => smartSet(p?.data, def.field, p.newValue || null)
           }
-        } else if (colType === 'select' || colType === 'dropdown') {
+        } else if (effectiveColType === 'select' || effectiveColType === 'dropdown' || isDropCode) {
           // 옵션 라벨 포맷팅 (옵션 로드 전/후 모두 동작)
           def.valueFormatter = (p: any) => {
             const v = smartGet(p?.data, def.field)
-            const opts = (p.colDef as any)?.__options
-            if (Array.isArray(opts)) {
+            const opts = (p.colDef as any)?.context?.__options || []
+            if (Array.isArray(opts) && opts.length > 0) {
               const m = opts.find((o: any) => String(o.code) === String(v))
               return m ? (m.code_name ?? m.name ?? m.text ?? v ?? '') : (v ?? '')
             }
@@ -396,60 +435,518 @@ async function loadDynamicColumnDefs() {
             return v ?? ''
           }
           def.valueGetter = (p: any) => smartGet(p?.data, def.field)
-          // 코드그룹이 있으면 옵션을 서버에서 로드해 __options에 저장
-          const codeGroup = toTrimmedString(col.col_code || '')
-          if (codeGroup) {
-            dropdownPromises.push((async () => {
-              try {
-                const codeResult = await $fetch<any>('/api/stored-procedure/execute', {
-                  method: 'POST',
-                  body: {
-                    procedureName: 'sp_code_info',
-                    parameters: { case: 'search', plant_code: '1000', code_grp: codeGroup }
-                  }
-                })
-                if (codeResult?.success && Array.isArray(codeResult.data)) {
-                  def.__options = codeResult.data
-                  // 값 -> 라벨 포맷팅
-                  def.valueFormatter = (p: any) => {
-                    const v = smartGet(p?.data, def.field)
-                    const m = (def.__options || []).find((o: any) => String(o.code) === String(v))
-                    return m ? (m.code_name ?? m.name ?? m.text ?? v) : (v ?? '')
-                  }
-                } else {
-                  def.__options = []
-                }
-              } catch {
-                def.__options = []
-              }
-            })())
+          
+          // 드롭다운 가능 표시를 위한 cellRenderer 추가 (우측에 ▽ 아이콘)
+          def.cellRenderer = (params: any) => {
+            const v = smartGet(params?.data, def.field)
+            const opts = (params.colDef as any)?.context?.__options || []
+            let displayText = v ?? ''
+            
+            // 옵션이 있으면 라벨로 변환
+            if (Array.isArray(opts) && opts.length > 0) {
+              const m = opts.find((o: any) => String(o.code) === String(v))
+              displayText = m ? (m.code_name ?? m.name ?? m.text ?? v ?? '') : (v ?? '')
+            }
+            
+            // 다크 테마 감지
+            const isDark = document.documentElement.classList.contains('dark') || 
+                          document.body.classList.contains('dark')
+            const iconColor = isDark ? '#94a3b8' : '#6b7280'
+            
+            // 셀 내용과 우측 아이콘을 함께 표시
+            return `
+              <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; padding-right: 4px;">
+                <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${displayText}</span>
+                <i class="pi pi-chevron-down" style="color: ${iconColor}; font-size: 0.75rem; margin-left: 4px; flex-shrink: 0;"></i>
+              </div>
+            `
           }
-          if (anyEditable) {
-            def.editable = editableByPolicy
+          // 코드그룹이 있으면 옵션을 서버에서 로드해 __options에 저장
+          if (codeGroup) {
+            // col_code가 DROP_로 시작하는 경우: 프로시저에서 받은 두 번째 결과셋 사용
+            if (isDropCode) {
+              const options = codeOptionsMap.get(codeGroup) || []
+              console.log(`[AgGrid] DROP_ 코드 처리: col_id=${def.field}, col_code=${codeGroup}, options=${options.length}개`)
+              if (options.length > 0) {
+                def.context.__options = options
+                // 값 -> 라벨 포맷팅
+                def.valueFormatter = (p: any) => {
+                  const v = smartGet(p?.data, def.field)
+                  const opts = (p.colDef as any)?.context?.__options || []
+                  const m = opts.find((o: any) => String(o.code) === String(v))
+                  return m ? (m.code_name ?? m.name ?? m.text ?? v) : (v ?? '')
+                }
+              } else {
+                console.warn(`[AgGrid] DROP_ 코드에 대한 옵션이 없습니다: col_code=${codeGroup}`)
+                def.context.__options = []
+              }
+            } else {
+              // 기존 방식: sp_code_info 프로시저 호출
+              dropdownPromises.push((async () => {
+                try {
+                  const codeResult = await $fetch<any>('/api/stored-procedure/execute', {
+                    method: 'POST',
+                    body: {
+                      procedureName: 'sp_code_info',
+                      parameters: { case: 'search', plant_code: '1000', code_grp: codeGroup }
+                    }
+                  })
+                  if (codeResult?.success && Array.isArray(codeResult.data)) {
+                    def.context.__options = codeResult.data
+                    // 값 -> 라벨 포맷팅
+                    def.valueFormatter = (p: any) => {
+                      const v = smartGet(p?.data, def.field)
+                      const opts = (p.colDef as any)?.context?.__options || []
+                      const m = opts.find((o: any) => String(o.code) === String(v))
+                      return m ? (m.code_name ?? m.name ?? m.text ?? v) : (v ?? '')
+                    }
+                  } else {
+                    def.context.__options = []
+                  }
+                } catch {
+                  def.context.__options = []
+                }
+              })())
+            }
+          }
+          // select/dropdown 타입이거나 DROP_ 코드인 경우 cellEditor 설정
+          if (anyEditable || isDropCode) {
+            def.editable = isDropCode ? true : editableByPolicy
             def.cellEditorPopup = true
-            def.cellEditor = (params: any) => {
+            
+            // 커스텀 셀 에디터 팩토리 함수 정의
+            // AG Grid가 팩토리 함수로 인식하도록 명시적으로 객체를 반환하는 함수로 정의
+            // def를 클로저로 캡처하여 params가 없을 때도 사용 가능하도록 함
+            const fieldName = def.field
+            const initialOptions = def.context.__options || []
+            
+            // gridApi와 lastEditingCellData를 클로저로 캡처
+            const capturedGridApi = gridApi.value
+            const capturedLastEditingCellData = lastEditingCellData
+            const capturedLastEditingRowIndex = lastEditingRowIndex
+            
+            def.cellEditor = function CustomSelectEditor(params: any) {
+              // AG Grid가 생성자로 호출하는 경우 처리 (new CustomSelectEditor(params))
+              // 또는 팩토리 함수로 호출하는 경우 처리 (CustomSelectEditor(params))
+              // params가 없거나 잘못된 경우 빈 객체로 초기화
+              if (!params || typeof params !== 'object') {
+                params = {}
+              }
+              
+              // 함수가 객체를 반환하면 AG Grid가 팩토리 함수로 인식
               const select = document.createElement('select')
-              const options = (params.colDef as any).__options || []
-              const placeholder = document.createElement('option')
-              placeholder.value = ''
-              placeholder.text = '-- 선택 --'
-              select.appendChild(placeholder)
-              options.forEach((opt: any) => {
-                const o = document.createElement('option')
-                o.value = String(opt.code)
-                o.text = String(opt.code_name ?? opt.name ?? opt.text ?? opt.code)
-                const cur = smartGet(params?.data, def.field)
-                if (String(cur) === String(o.value)) o.selected = true
-                select.appendChild(o)
+              
+              // AG Grid API 참조 (params에서 가져오거나 클로저에서 가져오기)
+              const api = params?.api || capturedGridApi
+              
+              // 편집 중인 셀 정보를 API에서 가져오기 (항상 최신 정보를 가져옴)
+              let editingCellInfo: any = null
+              if (api) {
+                try {
+                  const editingCells = api.getEditingCells?.() || []
+                  if (editingCells.length > 0) {
+                    // 현재 편집 중인 셀 중에서 현재 필드와 일치하는 셀 찾기
+                    editingCellInfo = editingCells.find((cell: any) => 
+                      cell.column?.getColId?.() === fieldName || cell.colId === fieldName
+                    ) || editingCells[0] // 일치하는 셀이 없으면 첫 번째 셀 사용
+                    console.log(`[AgGrid] 편집 중인 셀 정보:`, editingCellInfo, `fieldName=${fieldName}`)
+                  }
+                } catch (e) {
+                  console.warn('[AgGrid] 편집 중인 셀 정보 가져오기 실패:', e)
+                }
+              }
+              
+              // PrimeVue 스타일 클래스 적용
+              select.className = 'p-inputtext p-component'
+              
+              // 다크 테마 감지
+              const isDark = document.documentElement.classList.contains('dark') || 
+                            document.body.classList.contains('dark') ||
+                            window.getComputedStyle(document.documentElement).colorScheme === 'dark'
+              
+              // PrimeVue CSS 변수를 사용한 스타일 적용
+              select.style.width = '100%'
+              select.style.padding = '0.375rem 0.75rem'
+              select.style.fontSize = '0.875rem'
+              select.style.lineHeight = '1.5'
+              select.style.borderRadius = '6px'
+              select.style.border = '1px solid'
+              select.style.outline = 'none'
+              select.style.transition = 'border-color 0.2s, box-shadow 0.2s'
+              
+              // PrimeVue CSS 변수 사용 (다크/라이트 테마 자동 적용)
+              const rootStyle = getComputedStyle(document.documentElement)
+              select.style.backgroundColor = rootStyle.getPropertyValue('--p-inputfield-background').trim() || 
+                                            (isDark ? '#1e293b' : '#ffffff')
+              select.style.color = rootStyle.getPropertyValue('--p-inputfield-text-color').trim() || 
+                                  (isDark ? '#e2e8f0' : '#1f2937')
+              select.style.borderColor = rootStyle.getPropertyValue('--p-inputfield-border-color').trim() || 
+                                        (isDark ? '#475569' : '#d1d5db')
+              
+              // option 요소 스타일도 적용
+              const style = document.createElement('style')
+              style.textContent = `
+                select.p-inputtext option {
+                  background-color: ${isDark ? '#1e293b' : '#ffffff'};
+                  color: ${isDark ? '#e2e8f0' : '#1f2937'};
+                }
+                select.p-inputtext:focus {
+                  border-color: ${isDark ? '#60a5fa' : '#3b82f6'};
+                  box-shadow: ${isDark 
+                    ? '0 0 0 0.2rem rgba(96, 165, 250, 0.2)' 
+                    : '0 0 0 0.2rem rgba(59, 130, 246, 0.2)'};
+                }
+              `
+              document.head.appendChild(style)
+              
+              // params가 없거나 colDef가 없는 경우 def를 사용 (클로저로 캡처됨)
+              const colDef = (params?.colDef || def) as any
+              const options = colDef?.context?.__options || initialOptions
+              
+              // AG Grid 셀 에디터 params 구조 확인 (전체 params 출력)
+              console.log(`[AgGrid] params 전체 구조:`, params)
+              console.log(`[AgGrid] params 주요 속성:`, {
+                hasNode: !!params?.node,
+                hasData: !!params?.data,
+                hasValue: params?.value !== undefined,
+                nodeData: params?.node?.data,
+                paramData: params?.data,
+                value: params?.value,
+                rowIndex: params?.rowIndex,
+                column: params?.column?.getColId?.(),
+                event: params?.event,
+                oldValue: params?.oldValue,
+                newValue: params?.newValue
               })
+              
+              // 데이터 소스 우선순위: params.node.data > params.data > editingCellInfo (현재 편집 중인 셀) > api를 통한 행 데이터
+              // 주의: lastEditingCellData는 사용하지 않음 (이전 행의 데이터가 남아있을 수 있음)
+              let nodeData = params?.node?.data
+              let paramData = params?.data
+              
+              // 편집 중인 셀 정보가 있으면 해당 행 데이터 가져오기 (가장 우선순위가 높음 - 현재 편집 중인 셀의 실제 데이터)
+              if (!nodeData && editingCellInfo && editingCellInfo.rowIndex != null && api) {
+                try {
+                  const editingRowNode = api.getDisplayedRowAtIndex(editingCellInfo.rowIndex)
+                  nodeData = editingRowNode?.data
+                  console.log(`[AgGrid] editingCellInfo에서 행 데이터 가져옴 (rowIndex=${editingCellInfo.rowIndex}):`, nodeData)
+                } catch (e) {
+                  console.warn('[AgGrid] editingCellInfo를 통한 행 데이터 가져오기 실패:', e)
+                }
+              }
+              
+              // params.node.data가 없으면 api를 통해 행 데이터 가져오기
+              const apiToUse = api || params?.api
+              if (!nodeData && apiToUse) {
+                try {
+                  // 방법 1: rowIndex를 통해 가져오기 (editingCellInfo의 rowIndex 우선)
+                  const rowIndex = editingCellInfo?.rowIndex ?? params?.rowIndex
+                  if (rowIndex != null) {
+                    const rowNode = apiToUse.getDisplayedRowAtIndex(rowIndex)
+                    nodeData = rowNode?.data
+                    console.log(`[AgGrid] api.getDisplayedRowAtIndex(${rowIndex}) 결과:`, nodeData)
+                  }
+                  
+                  // 방법 2: 편집 중인 셀을 통해 가져오기 (editingCellInfo가 없을 때만)
+                  if (!nodeData) {
+                    const editingCells = apiToUse.getEditingCells?.() || []
+                    if (editingCells.length > 0) {
+                      // 현재 필드와 일치하는 셀 찾기
+                      const matchingCell = editingCells.find((cell: any) => 
+                        cell.column?.getColId?.() === fieldName || cell.colId === fieldName
+                      ) || editingCells[0]
+                      
+                      if (matchingCell.rowIndex != null) {
+                        const editingRowNode = apiToUse.getDisplayedRowAtIndex(matchingCell.rowIndex)
+                        nodeData = editingRowNode?.data
+                        console.log(`[AgGrid] 편집 중인 셀에서 행 데이터 가져옴 (rowIndex=${matchingCell.rowIndex}):`, nodeData)
+                      }
+                    }
+                  }
+                  
+                  // 방법 3: focusedCell을 통해 가져오기
+                  if (!nodeData) {
+                    const focusedCell = apiToUse.getFocusedCell?.()
+                    if (focusedCell?.rowIndex != null) {
+                      const focusedRowNode = apiToUse.getDisplayedRowAtIndex(focusedCell.rowIndex)
+                      nodeData = focusedRowNode?.data
+                      console.log(`[AgGrid] 포커스된 셀에서 행 데이터 가져옴:`, nodeData)
+                    }
+                  }
+                } catch (e) {
+                  console.warn('[AgGrid] api를 통한 행 데이터 가져오기 실패:', e)
+                }
+              }
+              
+              const cellData = nodeData || paramData || {}
+              
+              // 현재 선택된 값 가져오기
+              let currentValue: any = null
+              
+              // 방법 1: valueGetter 사용 (실제 데이터가 있을 때만)
+              if (colDef?.valueGetter && typeof colDef.valueGetter === 'function' && cellData && Object.keys(cellData).length > 0) {
+                try {
+                  const getterParams = {
+                    data: cellData,
+                    node: params?.node || { data: cellData },
+                    colDef: colDef,
+                    column: params?.column,
+                    api: params?.api,
+                    context: params?.context
+                  }
+                  currentValue = colDef.valueGetter(getterParams)
+                  if (currentValue != null && currentValue !== '') {
+                    console.log(`[AgGrid] valueGetter 결과: ${currentValue}`)
+                  }
+                } catch (e) {
+                  console.warn('[AgGrid] valueGetter 실행 실패:', e)
+                }
+              }
+              
+              // 방법 2: params.value (AG Grid가 제공하는 값)
+              if ((currentValue == null || currentValue === '') && params?.value != null && params.value !== '') {
+                currentValue = params.value
+                console.log(`[AgGrid] params.value 사용: ${currentValue}`)
+              }
+              
+              // 방법 3: nodeData에서 직접 가져오기
+              if ((currentValue == null || currentValue === '') && nodeData && typeof nodeData === 'object' && fieldName in nodeData) {
+                currentValue = nodeData[fieldName]
+                console.log(`[AgGrid] nodeData[${fieldName}] 사용: ${currentValue}`)
+              }
+              
+              // 방법 4: paramData에서 직접 가져오기
+              if ((currentValue == null || currentValue === '') && paramData && typeof paramData === 'object' && fieldName in paramData) {
+                currentValue = paramData[fieldName]
+                console.log(`[AgGrid] paramData[${fieldName}] 사용: ${currentValue}`)
+              }
+              
+              // 방법 5: smartGet 사용
+              if ((currentValue == null || currentValue === '') && cellData && typeof cellData === 'object') {
+                currentValue = smartGet(cellData, fieldName)
+                if (currentValue != null && currentValue !== '') {
+                  console.log(`[AgGrid] smartGet 사용: ${currentValue}`)
+                }
+              }
+              
+              const currentValueStr = (currentValue != null && currentValue !== '' && currentValue !== undefined) 
+                ? String(currentValue).trim() 
+                : ''
+              
+              console.log(`[AgGrid] Select Editor 최종: field=${fieldName}, currentValueStr="${currentValueStr}", options=${options.length}개`)
+              
+              if (options.length > 0) {
+                let hasSelected = false
+                let selectedOption: HTMLOptionElement | null = null
+                
+                // 먼저 옵션들을 추가하고 현재 값과 일치하는 옵션 찾기
+                options.forEach((opt: any) => {
+                  const o = document.createElement('option')
+                  o.value = String(opt.code)
+                  o.text = String(opt.code_name ?? opt.name ?? opt.text ?? opt.code)
+                  o.selected = false // 기본으로 선택하지 않음
+                  
+                  // 현재 값과 일치하면 선택
+                  if (currentValueStr && String(opt.code) === currentValueStr) {
+                    o.selected = true
+                    hasSelected = true
+                    selectedOption = o
+                    console.log(`[AgGrid] 현재 값과 일치하는 옵션 선택: ${opt.code} = ${opt.code_name}`)
+                  }
+                  if (isDark) {
+                    o.style.backgroundColor = '#1e293b'
+                    o.style.color = '#e2e8f0'
+                  }
+                  select.appendChild(o)
+                })
+                
+                // 현재 값이 없거나 옵션에 없으면 placeholder를 맨 앞에 추가하고 선택
+                if (!currentValueStr || !hasSelected) {
+                  const placeholder = document.createElement('option')
+                  placeholder.value = ''
+                  placeholder.text = '-- 선택 --'
+                  placeholder.selected = true
+                  if (isDark) {
+                    placeholder.style.color = '#94a3b8'
+                  }
+                  select.insertBefore(placeholder, select.firstChild)
+                  console.log(`[AgGrid] Placeholder 추가 및 선택: currentValueStr="${currentValueStr}", hasSelected=${hasSelected}`)
+                } else {
+                  console.log(`[AgGrid] 현재 값 유지: ${currentValueStr}`)
+                }
+              } else {
+                // 옵션이 없으면 placeholder만 추가하고 선택
+                const placeholder = document.createElement('option')
+                placeholder.value = ''
+                placeholder.text = '-- 옵션 로딩 중 --'
+                placeholder.selected = true
+                if (isDark) {
+                  placeholder.style.color = '#94a3b8'
+                }
+                select.appendChild(placeholder)
+              }
+              
+              // 포커스/호버 스타일
+              select.addEventListener('focus', () => {
+                select.style.borderColor = isDark ? '#60a5fa' : '#3b82f6'
+                select.style.boxShadow = isDark 
+                  ? '0 0 0 0.2rem rgba(96, 165, 250, 0.2)' 
+                  : '0 0 0 0.2rem rgba(59, 130, 246, 0.2)'
+              })
+              select.addEventListener('blur', () => {
+                select.style.borderColor = isDark ? '#475569' : '#d1d5db'
+                select.style.boxShadow = 'none'
+              })
+              
+              // 셀 크기에 맞게 컨테이너 생성
+              const container = document.createElement('div')
+              container.style.display = 'flex'
+              container.style.alignItems = 'stretch'
+              container.style.margin = '0'
+              container.style.padding = '0'
+              container.appendChild(select)
+              
+              // select를 컨테이너에 꽉 차게 설정
+              select.style.width = '100%'
+              select.style.minHeight = '28px' // AG Grid 기본 행 높이
+              select.style.boxSizing = 'border-box'
+              select.style.margin = '0'
+              
+              // AG Grid ICellEditor 인터페이스 구현 객체 반환
               return {
-                getGui: () => select,
-                afterGuiAttached: () => { select.focus() },
-                getValue: () => select.value || null,
-                isPopup: () => true
+                getGui: () => container, // 컨테이너 반환
+                afterGuiAttached: () => { 
+                  select.focus()
+                  
+                  // 셀의 실제 크기에 맞게 조정
+                  let cellWidth = 200 // 기본값
+                  
+                  // 방법 1: eGridCell 사용
+                  if (params?.eGridCell) {
+                    const cellRect = params.eGridCell.getBoundingClientRect()
+                    cellWidth = cellRect.width
+                  }
+                  // 방법 2: column의 실제 너비 사용
+                  else if (params?.column) {
+                    const columnWidth = params.column.getActualWidth()
+                    if (columnWidth && columnWidth > 0) {
+                      cellWidth = columnWidth
+                    }
+                  }
+                  // 방법 3: colDef의 width 사용
+                  else if (params?.colDef?.width) {
+                    cellWidth = params.colDef.width
+                  }
+                  
+                  // 컨테이너와 select의 너비를 셀 크기에 맞게 설정
+                  container.style.width = `${cellWidth}px`
+                  container.style.minWidth = `${cellWidth}px`
+                  container.style.maxWidth = `${cellWidth}px`
+                  select.style.width = `${cellWidth}px`
+                  select.style.minWidth = `${cellWidth}px`
+                  
+                  // 셀 높이에 맞게 조정
+                  if (params?.eGridCell) {
+                    const cellRect = params.eGridCell.getBoundingClientRect()
+                    const cellHeight = cellRect.height
+                    container.style.height = `${cellHeight}px`
+                    select.style.height = `${cellHeight}px`
+                    select.style.minHeight = `${cellHeight}px`
+                  }
+                  
+                  // 옵션이 나중에 로드되면 업데이트
+                  const currentColDef = (params?.colDef || def) as any
+                  const currentOptions = currentColDef?.context?.__options || []
+                  const updatedCellData = params?.data || params?.node?.data || cellData
+                  
+                  if (currentOptions.length > 0 && select.children.length === 1) {
+                    // 현재 값 가져오기 (여러 방법 시도)
+                    let curValue: any = null
+                    
+                    // valueGetter 사용
+                    if (currentColDef?.valueGetter && typeof currentColDef.valueGetter === 'function') {
+                      try {
+                        curValue = currentColDef.valueGetter({
+                          data: updatedCellData,
+                          node: params?.node,
+                          colDef: currentColDef,
+                          column: params?.column,
+                          api: params?.api,
+                          context: params?.context
+                        })
+                      } catch (e) {}
+                    }
+                    
+                    // params.value 사용
+                    if ((curValue == null || curValue === '') && params?.value != null && params.value !== '') {
+                      curValue = params.value
+                    }
+                    
+                    // cellData에서 직접 가져오기
+                    if ((curValue == null || curValue === '') && updatedCellData && fieldName in updatedCellData) {
+                      curValue = updatedCellData[fieldName]
+                    }
+                    
+                    // smartGet 사용
+                    if ((curValue == null || curValue === '') && updatedCellData) {
+                      curValue = smartGet(updatedCellData, fieldName)
+                    }
+                    
+                    const curValueStr = (curValue != null && curValue !== '' && curValue !== undefined) 
+                      ? String(curValue).trim() 
+                      : ''
+                    
+                    // 기존 placeholder 제거
+                    const oldPlaceholder = select.children[0] as HTMLOptionElement
+                    if (oldPlaceholder && oldPlaceholder.value === '') {
+                      select.removeChild(oldPlaceholder)
+                    }
+                    
+                    let hasSelected = false
+                    // 먼저 모든 옵션을 추가하고 현재 값과 일치하는 옵션 선택
+                    currentOptions.forEach((opt: any) => {
+                      const o = document.createElement('option')
+                      o.value = String(opt.code)
+                      o.text = String(opt.code_name ?? opt.name ?? opt.text ?? opt.code)
+                      o.selected = false // 기본으로 선택하지 않음
+                      // 현재 값과 일치하면 선택
+                      if (curValueStr && String(opt.code) === curValueStr) {
+                        o.selected = true
+                        hasSelected = true
+                      }
+                      if (isDark) {
+                        o.style.backgroundColor = '#1e293b'
+                        o.style.color = '#e2e8f0'
+                      }
+                      select.appendChild(o)
+                    })
+                    
+                    // 현재 값이 없거나 옵션에 없으면 placeholder를 맨 앞에 추가하고 선택
+                    if (!curValueStr || !hasSelected) {
+                      const newPlaceholder = document.createElement('option')
+                      newPlaceholder.value = ''
+                      newPlaceholder.text = '-- 선택 --'
+                      newPlaceholder.selected = true
+                      if (isDark) {
+                        newPlaceholder.style.color = '#94a3b8'
+                      }
+                      select.insertBefore(newPlaceholder, select.firstChild)
+                    }
+                  }
+                },
+                getValue: () => {
+                  const val = select.value
+                  return val === '' ? null : val
+                },
+                isPopup: () => true,
+                isCancelBeforeStart: () => false,
+                isCancelAfterEnd: () => false
               }
             }
             def.valueSetter = (p: any) => smartSet(p?.data, def.field, p.newValue || null)
+          } else {
+            // 편집 불가능한 경우에도 기본 설정
+            def.editable = false
           }
         }
 
@@ -623,6 +1120,10 @@ function onCellDoubleClicked(event: any) {
     }
     if (allowed) {
       console.log('AgGrid - 더블클릭 편집 시작:', event.column.getColId(), event.column.getColDef())
+      // 편집 시작 전에 행 데이터와 rowIndex를 저장 (셀 에디터에서 params가 없을 때 사용)
+      lastEditingCellData.value = event?.data || event?.node?.data || null
+      lastEditingRowIndex.value = event?.rowIndex ?? null
+      console.log('AgGrid - 편집 시작 데이터 저장:', { data: lastEditingCellData.value, rowIndex: lastEditingRowIndex.value })
       gridApi.value?.startEditingCell({
         rowIndex: event.rowIndex,
         colKey: event.column.getColId()

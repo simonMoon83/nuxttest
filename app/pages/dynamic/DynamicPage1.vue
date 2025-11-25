@@ -547,8 +547,8 @@ const resolvedBlocks = computed(() => {
     <div class="w-full mt-0 mb-2 border-b-1 border-gray-400 dark:border-gray-700">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-1">
-          <i :class="pageIcon" class="text-black dark:text-white"></i>
-          <h2 class="text-lg font-semibold text-black dark:text-white m-0">{{ breadcrumbTitle }}</h2>
+          <!-- <i :class="pageIcon" class="text-black dark:text-white"></i> -->
+          <!-- <h2 class="text-lg font-semibold text-black dark:text-white m-0">{{ breadcrumbTitle }}</h2> -->
         </div>
         <div class="flex items-center gap-2">
           <Button label="검색" severity="secondary" size="small" v-if="showSearchButton" @click="onSearchHandled" />
