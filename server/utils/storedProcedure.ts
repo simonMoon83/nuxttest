@@ -111,6 +111,7 @@ export async function executeStoredProcedure(
       success: true,
       data: result.recordset,
       recordset: result.recordset,  // 원본 recordset도 포함
+      recordsets: (result as any).recordsets,  // 여러 결과셋 포함
       rowsAffected: result.rowsAffected,
       output: result.output,
       returnValue: result.returnValue,
