@@ -7,18 +7,39 @@
 ### 파일 구조
 ```
 app/
-├── App.scss                 # 메인 스타일 로더
+├── App.scss                           # 메인 스타일 로더
 ├── assets/sass/
-│   ├── form.scss            # FormKit 전역 스타일 (본 문서 주제)
-│   ├── sidebar.scss         # 사이드바 스타일
-│   └── main.scss           # 기타 글로벌 스타일
-└── pages/form/index.vue     # FormKit 데모 페이지
+│   ├── form.scss                      # FormKit 전역 스타일 (본 문서 주제)
+│   ├── sidebar.scss                   # 사이드바 스타일
+│   └── main.scss                      # 기타 글로벌 스타일
+├── types/
+│   └── formkit-schema.ts              # FormKit 스키마 타입 정의 ⭐ NEW
+├── composables/
+│   └── useFormKitSchemaHelpers.ts     # 스키마 헬퍼 함수 ⭐ NEW
+└── pages/form/index.vue               # FormKit 데모 페이지
 ```
 
 ### 핵심 컴포넌트
 - **FormKitDataEdit**: 데이터 편집용 FormKit 래퍼
 - **FormKitDataView**: 데이터 표시용 FormKit 래퍼  
 - **FormKitDataDebug**: 디버깅용 FormKit 래퍼
+
+### ⭐ 타입 안전한 스키마 헬퍼 (권장)
+```ts
+// 새로운 헬퍼 함수 사용
+const { createSearchSchema, createEditSchema, createStandardSearchButtons } = useFormKitSchemaHelpers()
+
+// 타입 안전한 스키마 생성
+import type { FormKitSchema } from '~/types/formkit-schema'
+
+const schema = computed<FormKitSchema>(() => createSearchSchema(
+  [
+    { name: 'keyword', label: '검색어', width: 'col-4' },
+    { name: 'status', label: '상태', type: 'primeSelect', options: statusOptions },
+  ],
+  createStandardSearchButtons({ onSearch: search, onReset: reset }),
+))
+```
 
 ## 🔧 핵심 개념
 
@@ -590,6 +611,121 @@ const schema = computed(() => [
   :debug-schema="false"
 />
 ```
+
+---
+
+## 🆕 **타입 안전한 스키마 헬퍼 사용법**
+
+### **1. 타입 정의 (`app/types/formkit-schema.ts`)**
+
+프로젝트에 FormKit 스키마 타입이 정의되어 있습니다:
+
+```ts
+import type { FormKitSchema, SearchFieldConfig, EditFieldConfig, ButtonConfig } from '~/types/formkit-schema'
+```
+
+### **2. 헬퍼 함수 (`app/composables/useFormKitSchemaHelpers.ts`)**
+
+```ts
+const {
+  // 기본 헬퍼
+  addElement,           // HTML 엘리먼트 생성
+  addSectionTitle,      // 섹션 제목 생성
+  createInputField,     // 입력 필드 생성
+  createButton,         // 버튼 생성
+  createButtonGroup,    // 버튼 그룹 생성
+
+  // 스키마 팩토리
+  createSearchSchema,   // 검색 폼 스키마 생성
+  createEditSchema,     // 편집 폼 스키마 생성
+
+  // 표준 버튼 세트
+  createStandardSearchButtons,  // 검색/초기화/등록/엑셀 버튼
+  createStandardEditButtons,    // 저장/취소/삭제 버튼
+
+  // 유틸리티
+  col,                  // 컬럼 너비 헬퍼
+} = useFormKitSchemaHelpers()
+```
+
+### **3. 검색 폼 예제**
+
+```ts
+// 타입 안전한 검색 스키마
+const schema = computed<FormKitSchema>(() => createSearchSchema(
+  [
+    { name: 'keyword', label: '검색어', width: 'col-4' },
+    { name: 'status', label: '상태', type: 'primeSelect', width: 'col-4',
+      options: statusOptions, optionLabel: 'name', optionValue: 'id',
+      placeholder: '상태 선택', showClear: true },
+    { name: 'startDate', label: '시작일', type: 'primeDatePicker', width: 'col-4',
+      showIcon: true, dateFormat: 'yy-mm-dd' },
+  ],
+  createStandardSearchButtons({
+    onSearch: () => loadData(),
+    onReset: () => resetFilters(),
+    onCreate: () => openCreateDialog(),
+    onExport: () => exportToExcel(),
+  }),
+))
+```
+
+### **4. 편집 폼 예제**
+
+```ts
+// 타입 안전한 편집 스키마 (computed로 반응형 지원)
+const editSchema = computed<FormKitSchema>(() => createEditSchema(
+  [
+    { name: 'username', label: '아이디', width: 'col-6', required: true },
+    { name: 'email', label: '이메일', width: 'col-6', validation: ['required', 'email'] },
+    { name: 'department_id', label: '부서', type: 'primeSelect', width: 'col-6',
+      options: departmentOptions.value, optionLabel: 'name', optionValue: 'id' },
+    { name: 'is_active', label: '활성', type: 'primeCheckbox', width: 'col-6' },
+  ],
+  createStandardEditButtons(
+    {
+      onSave: saveItem,
+      onCancel: () => { dialogVisible.value = false },
+      onDelete: deleteItem,
+    },
+    { deleting, showDeleteWhen: '$id' },  // 삭제 버튼은 id가 있을 때만 표시
+  ),
+  { includeHiddenId: true },  // hidden id 필드 자동 추가
+))
+```
+
+### **5. 기존 코드와의 비교**
+
+```ts
+// ❌ 기존 방식 (any 타입, 반복 코드)
+const schema = ref<any>([
+  { $formkit: 'primeInputText', name: 'q', label: '검색어', outerClass: 'col-4' },
+  {
+    $el: 'div',
+    attrs: { class: 'col-12 w-full flex justify-end items-center gap-x-2 mt-1' },
+    children: [
+      { $cmp: 'Button', props: { label: '검색', severity: 'primary', onClick: () => search() } },
+      { $cmp: 'Button', props: { label: '초기화', outlined: true, onClick: () => reset() } },
+    ],
+  },
+])
+
+// ✅ 새로운 방식 (타입 안전, 재사용 가능)
+const schema = computed<FormKitSchema>(() => createSearchSchema(
+  [{ name: 'q', label: '검색어', width: 'col-4' }],
+  createStandardSearchButtons({ onSearch: search, onReset: reset }),
+))
+```
+
+### **6. 장점**
+
+| 항목 | 기존 방식 | 새로운 방식 |
+|------|----------|------------|
+| **타입 안전성** | ❌ any 타입 | ✅ 완전한 타입 지원 |
+| **자동완성** | ❌ 없음 | ✅ IDE 자동완성 |
+| **코드 재사용** | ❌ 복사/붙여넣기 | ✅ 팩토리 함수 |
+| **반응형 지원** | ⚠️ 부분적 | ✅ computed 활용 |
+| **유지보수** | ❌ 어려움 | ✅ 중앙 집중 관리 |
 
 이 가이드를 통해 **일관성 있고 사용자 친화적인 폼 인터페이스**를 구축하실 수 있습니다! 🎉
 

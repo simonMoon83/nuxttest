@@ -9,6 +9,33 @@ import { AgGridVue } from 'ag-grid-vue3'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
 
+import type { ColDef, GridApi, ValueFormatterParams } from 'ag-grid-community'
+import type {
+  AgGridProps,
+  ChangedRows,
+  DynamicColumnDef,
+  EditPolicy,
+  GridInfoColumn,
+  SaveResult,
+  StatusRow,
+} from '~/types/ag-grid'
+import {
+  buildAutoColumnDefsFromRow,
+  coerceBooleanValue,
+  coerceCheckboxToBit,
+  coerceEditPolicy,
+  findMatchingKey,
+  formatDateValue,
+  isNewRow,
+  pickSaveFields,
+  smartGet,
+  smartSet,
+  toHideBoolean,
+  toLowerTrimmed,
+  toNumberOrUndefined,
+  toTrimmedString,
+} from '~/composables/useAgGridUtils'
+
 /**
  * 컴포넌트 개요
  * - AG Grid(Vue3) 래퍼 컴포넌트
@@ -22,32 +49,8 @@ import 'ag-grid-community/styles/ag-theme-quartz.css'
  *           getAllRows, getChangedRows
  */
 
-// Props 인터페이스 정의
-interface Props {
-  title?: string // 그리드 제목
-  columnDefs?: any[] // 컬럼 정의 배열
-  rowData?: any[] // 행 데이터 배열
-  searchQuery?: string // 검색 쿼리 문자열
-  gridId?: string // 그리드 ID (동적 컬럼 정보 조회용)
-  treeData?: boolean // 트리 데이터 사용 여부
-  autoGroupColumnName?: string // 자동 그룹 컬럼 헤더 이름
-  editable?: boolean // 편집 가능 여부
-  showAddRowButton?: boolean // 행 추가 버튼 표시 여부 (기본: editable과 동일)
-  showDeleteRowButton?: boolean // 행 삭제 버튼 표시 여부 (기본: editable과 동일)
-  editMode?: 'singleClick' | 'doubleClick' | 'enterKey' // 편집 모드
-  rowSelect?: boolean // 행 선택 기능 사용 여부
-  procedureName?: string // 저장/조회에 사용할 프로시저명
-  saveCase?: string // 저장 시 사용할 case (기본: 'save')
-  menuId?: string | number // 저장 시 전달할 메뉴 ID
-  extraSaveParams?: Record<string, any> // 추가 저장 파라미터
-  saveParamFields?: string[] // 저장 시 사용할 필드 목록
-  showSaveButton?: boolean // 저장 버튼 표시 여부
-  saveButtonLabel?: string // 저장 버튼 레이블
-  savingState?: boolean // 외부에서 저장 중 상태 전달
-}
-
 // Props 기본값 설정
-const props = withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<AgGridProps>(), {
   title: '메뉴 트리',
   columnDefs: () => [],
   rowData: () => [],
@@ -65,7 +68,7 @@ const props = withDefaults(defineProps<Props>(), {
   extraSaveParams: () => ({}),
   showSaveButton: false,
   saveButtonLabel: '저장',
-  savingState: false
+  savingState: false,
 })
 
 // Emits 정의 - 부모 컴포넌트로 이벤트 전달
@@ -81,34 +84,21 @@ const props = withDefaults(defineProps<Props>(), {
  * - save-error: 저장 실패(error 포함)
  */
 const emit = defineEmits<{
-  'grid-ready': [params: any] // 그리드 준비 완료 이벤트
-  'cell-double-clicked': [event: any] // 셀 더블클릭 이벤트
-  'expand-all': [] // 전체 펼치기 이벤트
-  'collapse-all': [] // 전체 접기 이벤트
-  'cell-value-changed': [event: any] // 셀 값 변경 이벤트
-  'row-editing-started': [event: any] // 행 편집 시작 이벤트
-  'row-editing-stopped': [event: any] // 행 편집 종료 이벤트
-  'row-added': [row: any]
-  'rows-deleted': [rows: any[]]
-  'row-clicked': [event: any] // 행 클릭 이벤트
-  'saved': [result: any]
+  'grid-ready': [params: any]
+  'cell-double-clicked': [event: any]
+  'expand-all': []
+  'collapse-all': []
+  'cell-value-changed': [event: any]
+  'row-editing-started': [event: any]
+  'row-editing-stopped': [event: any]
+  'row-added': [row: StatusRow]
+  'rows-deleted': [rows: StatusRow[]]
+  'row-clicked': [event: any]
+  'saved': [result: SaveResult]
   'save-error': [error: any]
 }>()
 
-// 메뉴 아이템 인터페이스 정의
-interface MenuItem {
-  id: number
-  title: string
-  href: string
-  icon: string
-  parent_id: number | null
-  sort_order: number
-  is_separator: boolean
-  is_active: boolean
-}
-
 // AG Grid 모듈 등록 - 필요한 기능들을 활성화
-// (필요한 기능만 번들에 포함되도록 명시적으로 모듈 등록)
 ModuleRegistry.registerModules([AllCommunityModule, TreeDataModule, ExcelExportModule, CellSelectionModule, ClipboardModule])
 
 // 다크모드/라이트모드 감지
@@ -118,10 +108,10 @@ const agGridThemeClass = computed(() => colorMode.value === 'dark' ? 'ag-theme-q
 
 // AG Grid 참조 및 API
 const agGrid = ref()
-const gridApi = shallowRef<any | null>(null)
+const gridApi = shallowRef<GridApi | null>(null)
 
 // 동적 컬럼 정보
-const dynamicColumnDefs = ref<any[]>([])
+const dynamicColumnDefs = ref<DynamicColumnDef[]>([])
 // 저장 파라미터로 사용할 필드 목록(col_save=Y) 저장
 const saveParamFields = ref<string[]>([])
 
@@ -129,145 +119,42 @@ const saveParamFields = ref<string[]>([])
 const internalSaving = ref(false)
 const isSaving = computed(() => props.savingState || internalSaving.value)
 
-// 값 변환 및 포맷 보조 함수들
-function coerceBooleanValue(value: any): boolean {
-  if (value === true || value === false) return value
-  const str = String(value ?? '').trim().toLowerCase()
-  if (str === 'y' || str === 'yes' || str === 'true' || str === '1' || str === 't') return true
-  if (str === 'n' || str === 'no' || str === 'false' || str === '0' || str === 'f' || str === '') return false
-  return Boolean(value)
-}
-
-function formatDateValue(input: any, kind: 'date' | 'datetime'): string {
-  if (input == null || input === '') return ''
-  if (input instanceof Date && !isNaN(input.getTime())) {
-    const y = input.getFullYear()
-    const m = String(input.getMonth() + 1).padStart(2, '0')
-    const d = String(input.getDate()).padStart(2, '0')
-    if (kind === 'datetime') {
-      const hh = String(input.getHours()).padStart(2, '0')
-      const mm = String(input.getMinutes()).padStart(2, '0')
-      return `${y}-${m}-${d} ${hh}:${mm}`
-    }
-    return `${y}-${m}-${d}`
-  }
-  const raw = String(input).trim()
-  // YYYYMMDD
-  if (/^\d{8}$/.test(raw)) {
-    const y = Number(raw.slice(0, 4))
-    const m = Number(raw.slice(4, 6)) - 1
-    const d = Number(raw.slice(6, 8))
-    const dt = new Date(y, m, d)
-    return isNaN(dt.getTime()) ? raw : formatDateValue(dt, kind)
-  }
-  // YYYYMMDDHHmmss
-  if (/^\d{14}$/.test(raw)) {
-    const y = Number(raw.slice(0, 4))
-    const m = Number(raw.slice(4, 6)) - 1
-    const d = Number(raw.slice(6, 8))
-    const hh = Number(raw.slice(8, 10))
-    const mm = Number(raw.slice(10, 12))
-    const ss = Number(raw.slice(12, 14))
-    const dt = new Date(y, m, d, hh, mm, ss)
-    return isNaN(dt.getTime()) ? raw : formatDateValue(dt, kind)
-  }
-  const tryDate = new Date(raw)
-  return isNaN(tryDate.getTime()) ? raw : formatDateValue(tryDate, kind)
-}
-
 /**
- * col_edit 정책을 표준화한다.
- * - 'A': Always, 항상 편집 가능
- * - 'F': First/New row only, 신규 행에서만 편집 가능(__status==='N')
- * - 'N': Never, 편집 불가(기본)
+ * 편집 가능 여부 판단 함수 생성
+ * @param policy 편집 정책
+ * @returns editable 함수 또는 boolean
  */
-function coerceEditPolicy(value: any): 'A' | 'F' | 'N' {
-  const s = String(value ?? '').trim().toUpperCase()
-  if (s === 'A' || s === 'F') return s
-  return 'N'
-}
-/** 신규 행 여부를 반환한다(__status === 'N'). */
-function isNewRowFlag(row: any): boolean {
-  try { return !!row && row.__status === 'N' } catch { return false }
-}
-
-// sp_grid_info 값 정규화 헬퍼들
-function toTrimmedString(value: any): string {
-  return String(value ?? '').trim()
-}
-function toLowerTrimmed(value: any): string {
-  return toTrimmedString(value).toLowerCase()
-}
-function toNumberOrUndefined(value: any): number | undefined {
-  const n = Number(value)
-  return isNaN(n) ? undefined : n
-}
-function toHideBoolean(value: any): boolean {
-  const n = Number(value)
-  return !isNaN(n) ? n === 1 : String(value ?? '').trim() === '1'
-}
-
-// 데이터 키 매칭 유틸 (대소문자/구분자 무시)
-function normalizeKey(input: any): string {
-  return String(input ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
-}
-function findMatchingKey(data: any, expectedField: string): string | null {
-  if (!data || typeof data !== 'object') return null
-  if (expectedField in data) return expectedField
-  const target = normalizeKey(expectedField)
-  const keys = Object.keys(data)
-  for (const k of keys) {
-    if (normalizeKey(k) === target) return k
-  }
-  return null
-}
-function smartGet(data: any, expectedField: string): any {
-  if (!data) return null
-  const key = findMatchingKey(data, expectedField)
-  if (key) return (data as any)[key]
-  return (data as any)[expectedField]
-}
-function smartSet(data: any, expectedField: string, newValue: any): boolean {
-  if (!data) return false
-  const key = findMatchingKey(data, expectedField)
-  if (key) { (data as any)[key] = newValue; return true }
-  if (expectedField) { (data as any)[expectedField] = newValue; return true }
+function createEditableFunction(policy: EditPolicy): boolean | ((params: any) => boolean) {
+  if (policy === 'A')
+    return true
+  if (policy === 'F')
+    return (p: any) => isNewRow(p?.data)
   return false
 }
 
-function coerceCheckboxToBit(field: string, value: any): any {
-  try {
-    const defs = dynamicColumnDefs.value || []
-    const def = defs.find((d: any) => d && d.field === field)
-    const t = String(def?.__colType || '').toLowerCase()
-    if (t === 'checkbox' || t === 'bool' || t === 'boolean') {
-      return coerceBooleanValue(value) ? 1 : 0
-    }
-  } catch {}
-  return value
-}
-
-/** 행 객체에서 지정된 필드만 추출한다(col_save 지정 필드). */
-function pickSaveFields(row: any, fields: string[]): any {
-  if (!row || typeof row !== 'object') return {}
-  const out: any = {}
-  fields.forEach((f) => {
-    const key = findMatchingKey(row, f) || f
-    const raw = (row as any)[key]
-    out[f] = coerceCheckboxToBit(f, raw)
-  })
-  return out
+/**
+ * 행이 편집 가능한지 확인
+ * @param row 행 데이터
+ * @param policy 편집 정책
+ * @returns 편집 가능 여부
+ */
+function isEditableRow(row: StatusRow | null | undefined, policy: EditPolicy): boolean {
+  if (policy === 'A')
+    return true
+  if (policy === 'F')
+    return isNewRow(row)
+  return false
 }
 
 /**
  * 동적 컬럼 정보 조회 함수
  */
-async function loadDynamicColumnDefs() {
+async function loadDynamicColumnDefs(): Promise<void> {
   if (!props.gridId) {
     console.log('gridId가 없어서 동적 컬럼 정보를 로드하지 않습니다.')
     return
   }
-  
+
   try {
     const result = await $fetch<any>('/api/stored-procedure/execute', {
       method: 'POST',
@@ -275,17 +162,18 @@ async function loadDynamicColumnDefs() {
         procedureName: 'sp_grid_info',
         parameters: {
           case: 'search',
-          grid_id: props.gridId
-        }
-      }
+          grid_id: props.gridId,
+        },
+      },
     })
-    
+
     if (result.success && result.data && Array.isArray(result.data)) {
       // 드롭다운 옵션 사전 로드용 맵
       const dropdownPromises: Promise<void>[] = []
       const saveFields: string[] = []
-      const tempDefs: any[] = result.data.map((col: any) => {
-        const def: any = {
+
+      const tempDefs: DynamicColumnDef[] = result.data.map((col: GridInfoColumn) => {
+        const def: DynamicColumnDef = {
           field: toTrimmedString(col.col_id || ''),
           headerName: toTrimmedString(col.col_name || ''),
           width: toNumberOrUndefined(col.col_width) ?? 100,
@@ -299,52 +187,59 @@ async function loadDynamicColumnDefs() {
         const rawPolicy = col?.col_edit
         const hasPolicy = String(rawPolicy ?? '').trim() !== ''
         const policy = coerceEditPolicy(rawPolicy)
-        const effectivePolicy: 'A' | 'F' | 'N' = hasPolicy ? policy : 'N'
+        const effectivePolicy: EditPolicy = hasPolicy ? policy : 'N'
         const anyEditable = (effectivePolicy === 'A' || effectivePolicy === 'F')
-        const editableByPolicy: boolean | ((p: any) => boolean) = effectivePolicy === 'A'
-          ? true
-          : (effectivePolicy === 'F' ? ((p: any) => isNewRowFlag(p?.data)) : false)
-        const isEditableRow = (row: any) => {
-          if (effectivePolicy === 'A') return true
-          if (effectivePolicy === 'F') return isNewRowFlag(row)
-          return false
-        }
+        const editableByPolicy = createEditableFunction(effectivePolicy)
+
         const saveParam = coerceBooleanValue(col.col_save)
         if (saveParam) {
           def.__saveParam = true
-          if (def.field) saveFields.push(def.field)
+          if (def.field)
+            saveFields.push(def.field)
         }
 
         if (colType === 'text' || colType === '' || !colType) {
-          if (anyEditable) def.cellEditor = 'agTextCellEditor'
+          if (anyEditable)
+            def.cellEditor = 'agTextCellEditor'
           def.editable = editableByPolicy
           def.valueFormatter = (p: any) => (p.value == null ? '' : p.value)
-          def.valueGetter = (p: any) => smartGet(p?.data, def.field)
-          if (anyEditable) def.valueSetter = (p: any) => smartSet(p?.data, def.field, p.newValue)
-        } else if (colType === 'number') {
+          def.valueGetter = (p: any) => smartGet(p?.data, def.field!)
+          if (anyEditable)
+            def.valueSetter = (p: any) => smartSet(p?.data, def.field!, p.newValue)
+        }
+        else if (colType === 'number') {
           def.filter = 'agNumberColumnFilter'
           def.valueParser = (p: any) => {
             const v = Number(p.newValue)
-            return isNaN(v) ? null : v
+            return Number.isNaN(v) ? null : v
           }
-          if (anyEditable) def.cellEditor = 'agTextCellEditor'
+          if (anyEditable)
+            def.cellEditor = 'agTextCellEditor'
           def.editable = editableByPolicy
           def.valueFormatter = (p: any) => (p.value == null ? '' : p.value)
-          def.valueGetter = (p: any) => smartGet(p?.data, def.field)
-          if (anyEditable) def.valueSetter = (p: any) => smartSet(p?.data, def.field, (p.newValue == null || p.newValue === '') ? null : Number(p.newValue))
-        } else if (colType === 'checkbox' || colType === 'bool' || colType === 'boolean') {
+          def.valueGetter = (p: any) => smartGet(p?.data, def.field!)
+          if (anyEditable)
+            def.valueSetter = (p: any) => smartSet(p?.data, def.field!, (p.newValue == null || p.newValue === '') ? null : Number(p.newValue))
+        }
+        else if (colType === 'checkbox' || colType === 'bool' || colType === 'boolean') {
           // 클릭으로 직접 토글되도록 실제 DOM 요소 렌더링
           def.cellRenderer = (p: any) => {
             const input = document.createElement('input')
             input.type = 'checkbox'
-            input.checked = coerceBooleanValue(smartGet(p?.data, def.field))
-            input.disabled = !isEditableRow(p?.data)
+            input.checked = coerceBooleanValue(smartGet(p?.data, def.field!))
+            input.disabled = !isEditableRow(p?.data, effectivePolicy)
             input.addEventListener('click', (ev) => ev.stopPropagation())
             input.addEventListener('change', () => {
               const newVal = !!input.checked
-              smartSet(p.data, def.field, newVal)
-              try { p.node.setDataValue?.(def.field, newVal) } catch {}
-              try { p.api?.refreshCells({ force: true, columns: ['__rownum', def.field] }) } catch {}
+              smartSet(p.data, def.field!, newVal)
+              try {
+                p.node.setDataValue?.(def.field, newVal)
+              }
+              catch { /* ignore */ }
+              try {
+                p.api?.refreshCells({ force: true, columns: ['__rownum', def.field] })
+              }
+              catch { /* ignore */ }
             })
             return input
           }
@@ -354,39 +249,45 @@ async function loadDynamicColumnDefs() {
             def.cellEditor = (params: any) => {
               const e = document.createElement('input')
               e.type = 'checkbox'
-              e.checked = coerceBooleanValue(smartGet(params?.data, def.field))
-              e.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') params.stopEditing() })
+              e.checked = coerceBooleanValue(smartGet(params?.data, def.field!))
+              e.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Enter')
+                  params.stopEditing()
+              })
               return { getGui: () => e, afterGuiAttached: () => {}, getValue: () => e.checked, isPopup: () => false }
             }
-            def.valueGetter = (p: any) => smartGet(p?.data, def.field)
-            def.valueSetter = (p: any) => smartSet(p?.data, def.field, coerceBooleanValue(p.newValue))
+            def.valueGetter = (p: any) => smartGet(p?.data, def.field!)
+            def.valueSetter = (p: any) => smartSet(p?.data, def.field!, coerceBooleanValue(p.newValue))
           }
-        } else if (colType === 'date' || colType === 'datetime') {
+        }
+        else if (colType === 'date' || colType === 'datetime') {
           def.filter = 'agDateColumnFilter'
           def.valueFormatter = (p: any) => formatDateValue(p.value, colType === 'datetime' ? 'datetime' : 'date')
-          def.valueGetter = (p: any) => smartGet(p?.data, def.field)
+          def.valueGetter = (p: any) => smartGet(p?.data, def.field!)
           if (anyEditable) {
             def.editable = editableByPolicy
             def.cellEditorPopup = true
             def.cellEditor = (params: any) => {
               const input = document.createElement('input')
               input.type = 'date'
-              const raw = smartGet(params?.data, def.field)
+              const raw = smartGet(params?.data, def.field!)
               const val = raw ? new Date(raw) : null
-              if (val && !isNaN(val.getTime())) input.value = `${val.getFullYear()}-${String(val.getMonth() + 1).padStart(2, '0')}-${String(val.getDate()).padStart(2, '0')}`
+              if (val && !Number.isNaN(val.getTime()))
+                input.value = `${val.getFullYear()}-${String(val.getMonth() + 1).padStart(2, '0')}-${String(val.getDate()).padStart(2, '0')}`
               return {
                 getGui: () => input,
                 afterGuiAttached: () => { input.focus() },
                 getValue: () => input.value || null,
-                isPopup: () => true
+                isPopup: () => true,
               }
             }
-            def.valueSetter = (p: any) => smartSet(p?.data, def.field, p.newValue || null)
+            def.valueSetter = (p: any) => smartSet(p?.data, def.field!, p.newValue || null)
           }
-        } else if (colType === 'select' || colType === 'dropdown') {
+        }
+        else if (colType === 'select' || colType === 'dropdown') {
           // 옵션 라벨 포맷팅 (옵션 로드 전/후 모두 동작)
           def.valueFormatter = (p: any) => {
-            const v = smartGet(p?.data, def.field)
+            const v = smartGet(p?.data, def.field!)
             const opts = (p.colDef as any)?.__options
             if (Array.isArray(opts)) {
               const m = opts.find((o: any) => String(o.code) === String(v))
@@ -395,7 +296,7 @@ async function loadDynamicColumnDefs() {
             // 옵션이 아직 없으면 원시값 표시
             return v ?? ''
           }
-          def.valueGetter = (p: any) => smartGet(p?.data, def.field)
+          def.valueGetter = (p: any) => smartGet(p?.data, def.field!)
           // 코드그룹이 있으면 옵션을 서버에서 로드해 __options에 저장
           const codeGroup = toTrimmedString(col.col_code || '')
           if (codeGroup) {
@@ -405,21 +306,23 @@ async function loadDynamicColumnDefs() {
                   method: 'POST',
                   body: {
                     procedureName: 'sp_code_info',
-                    parameters: { case: 'search', plant_code: '1000', code_grp: codeGroup }
-                  }
+                    parameters: { case: 'search', plant_code: '1000', code_grp: codeGroup },
+                  },
                 })
                 if (codeResult?.success && Array.isArray(codeResult.data)) {
                   def.__options = codeResult.data
                   // 값 -> 라벨 포맷팅
                   def.valueFormatter = (p: any) => {
-                    const v = smartGet(p?.data, def.field)
+                    const v = smartGet(p?.data, def.field!)
                     const m = (def.__options || []).find((o: any) => String(o.code) === String(v))
                     return m ? (m.code_name ?? m.name ?? m.text ?? v) : (v ?? '')
                   }
-                } else {
+                }
+                else {
                   def.__options = []
                 }
-              } catch {
+              }
+              catch {
                 def.__options = []
               }
             })())
@@ -438,39 +341,45 @@ async function loadDynamicColumnDefs() {
                 const o = document.createElement('option')
                 o.value = String(opt.code)
                 o.text = String(opt.code_name ?? opt.name ?? opt.text ?? opt.code)
-                const cur = smartGet(params?.data, def.field)
-                if (String(cur) === String(o.value)) o.selected = true
+                const cur = smartGet(params?.data, def.field!)
+                if (String(cur) === String(o.value))
+                  o.selected = true
                 select.appendChild(o)
               })
               return {
                 getGui: () => select,
                 afterGuiAttached: () => { select.focus() },
                 getValue: () => select.value || null,
-                isPopup: () => true
+                isPopup: () => true,
               }
             }
-            def.valueSetter = (p: any) => smartSet(p?.data, def.field, p.newValue || null)
+            def.valueSetter = (p: any) => smartSet(p?.data, def.field!, p.newValue || null)
           }
         }
 
         return def
       })
+
       // 옵션 로드가 끝나면 일괄 반영
-      try { await Promise.allSettled(dropdownPromises) } catch {}
+      try {
+        await Promise.allSettled(dropdownPromises)
+      }
+      catch { /* ignore */ }
       dynamicColumnDefs.value = tempDefs
       saveParamFields.value = saveFields
-    } else {
+    }
+    else {
       console.warn('동적 컬럼 정보가 없거나 잘못된 형식입니다:', result)
     }
-  } catch (error) {
+  }
+  catch (error) {
     console.error('동적 컬럼 정보 조회 실패:', error)
-    
     dynamicColumnDefs.value = []
   }
 }
 
 // 기본 컬럼 정의 - 모든 컬럼에 적용되는 기본 설정
-const defaultColDef = ref<any>({
+const defaultColDef = ref<ColDef>({
   resizable: true,
   sortable: true,
   filter: true,
@@ -479,129 +388,119 @@ const defaultColDef = ref<any>({
 // AG Grid 옵션 설정 (트리 데이터가 있을 때만 그룹 관련 설정 적용)
 const gridOptions = computed(() => {
   const baseOptions = {
-    rowHeight: 28, // 행 높이
-    headerHeight: 32, // 헤더 높이
-    animateRows: true, // 행 애니메이션 활성화
-    enableRangeSelection: true, // 범위 선택 활성화
-    enableRangeHandle: true, // 범위 핸들 활성화
-    clipboardDelimiter: '\t', // 클립보드 구분자
-    suppressScrollOnNewData: true, // 데이터 변경 시 자동 스크롤 방지
-    // 편집 관련 전역 설정 (컬럼별 editable 정책에 의해 실제 편집 가능 여부가 결정됨)
+    rowHeight: 28,
+    headerHeight: 32,
+    animateRows: true,
+    enableRangeSelection: true,
+    enableRangeHandle: true,
+    clipboardDelimiter: '\t',
+    suppressScrollOnNewData: true,
     stopEditingWhenCellsLoseFocus: true,
     singleClickEdit: props.editMode === 'singleClick',
   }
-  
+
   // 트리 데이터가 있을 때만 그룹 관련 설정 추가
   if (props.treeData) {
     return {
       ...baseOptions,
-      groupDefaultExpanded: 1, // 기본적으로 1레벨까지 펼쳐짐
+      groupDefaultExpanded: 1,
     }
   }
-  
+
   return baseOptions
 })
 
 // 행 선택 설정
-const rowSelection = ref({ 
-  mode: 'multiRow' as const, // 다중 행 선택 모드
-  checkboxes: true, // 체크박스 표시
-  headerCheckbox: true // 헤더 체크박스 표시
+const rowSelection = ref({
+  mode: 'multiRow' as const,
+  checkboxes: true,
+  headerCheckbox: true,
 })
 
 // 자동 그룹 컬럼 정의 (트리 데이터용)
-const autoGroupColumnDef = ref<any>({
-  headerName: props.autoGroupColumnName || '메뉴명', // 동적으로 받아온 이름 또는 기본값
-  cellRendererParams: { suppressCount: true }, // 카운트 숨김
+const autoGroupColumnDef = ref<ColDef>({
+  headerName: props.autoGroupColumnName || '메뉴명',
+  cellRendererParams: { suppressCount: true },
 })
 
 // 고정 좌측 상태/행번호 컬럼
-const rowNumberStatusColDef = {
+const rowNumberStatusColDef: ColDef = {
   headerName: ' ',
   field: '__rownum',
   width: 80,
-  pinned: 'left' as const,
+  pinned: 'left',
   editable: false,
   sortable: false,
   filter: false,
-  suppressMenu: true,
+  suppressHeaderMenuButton: true,
   cellClass: 'ag-rownum-cell',
   valueGetter: (params: any) => (params?.node?.rowIndex != null ? params.node.rowIndex + 1 : ''),
   cellRenderer: (params: any) => {
     const no = params?.value ?? ''
     const status = params?.data?.__status
     let iconHtml = ''
-    if (status === 'N') iconHtml = '<i class="pi pi-plus" style="color:#2563eb;font-size:0.9rem"></i>'
-    else if (status === 'D') iconHtml = '<i class="pi pi-minus" style="color:#dc2626;font-size:0.9rem"></i>'
-    else if (status === 'M') iconHtml = '<i class="pi pi-pencil" style="color:#d97706;font-size:0.9rem"></i>'
+    if (status === 'N')
+      iconHtml = '<i class="pi pi-plus" style="color:#2563eb;font-size:0.9rem"></i>'
+    else if (status === 'D')
+      iconHtml = '<i class="pi pi-minus" style="color:#dc2626;font-size:0.9rem"></i>'
+    else if (status === 'M')
+      iconHtml = '<i class="pi pi-pencil" style="color:#d97706;font-size:0.9rem"></i>'
     return iconHtml ? `${iconHtml} <span>${no}</span>` : `<span>${no}</span>`
-  }
-}
-
-// 자동 컬럼 생성 (rowData 기반) - 동적/props 컬럼이 없을 때만 사용
-function buildAutoColumnDefsFromRow(sample: any): any[] {
-  if (!sample || typeof sample !== 'object') return []
-  const keys = Object.keys(sample).filter(k => k && k !== '__rownum' && k !== '__status')
-  return keys.map(k => ({ field: k, headerName: k }))
+  },
 }
 
 // 최종 컬럼 정의 (동적 컬럼 + props 컬럼 병합 > rowData 자동 생성)
-const finalColumnDefs = computed(() => {
+const finalColumnDefs = computed<ColDef[]>(() => {
   const dynamicDefs = dynamicColumnDefs.value || []
   const propDefs = Array.isArray(props.columnDefs) ? props.columnDefs : []
-  
+
   console.log('AgGrid - 동적 컬럼:', dynamicDefs)
   console.log('AgGrid - Props 컬럼:', propDefs)
-  
+
   // 동적 컬럼과 props 컬럼을 병합
   if (dynamicDefs.length > 0 || propDefs.length > 0) {
     const mergedDefs = [...dynamicDefs]
-    
+
     // props 컬럼을 동적 컬럼과 병합 (같은 field가 있으면 props 컬럼으로 덮어쓰기)
-    propDefs.forEach(propDef => {
+    propDefs.forEach((propDef) => {
       const existingIndex = mergedDefs.findIndex(def => def.field === propDef.field)
       if (existingIndex >= 0) {
-        // 기존 컬럼을 props 컬럼으로 교체
         console.log(`AgGrid - 컬럼 교체: ${propDef.field}`, propDef)
         mergedDefs[existingIndex] = propDef
-      } else {
-        // 새로운 컬럼 추가
+      }
+      else {
         console.log(`AgGrid - 컬럼 추가: ${propDef.field}`, propDef)
         mergedDefs.push(propDef)
       }
     })
-    
+
     console.log('AgGrid - 병합된 컬럼:', mergedDefs)
     return mergedDefs
   }
-  
+
   // 자동 생성
   const firstRow = Array.isArray(props.rowData) && props.rowData.length > 0 ? props.rowData[0] : null
   return buildAutoColumnDefsFromRow(firstRow)
 })
 
 // 표시용 컬럼 정의: 상태/행번호 컬럼 + 실제 컬럼들
-const computedColumnDefs = computed(() => [rowNumberStatusColDef, ...finalColumnDefs.value])
+const computedColumnDefs = computed<ColDef[]>(() => [rowNumberStatusColDef, ...finalColumnDefs.value])
 
 /**
  * AG Grid 준비 완료 이벤트 핸들러
- * @param params AG Grid API 파라미터
  */
-function onGridReady(params: any) { 
-  gridApi.value = params.api // Grid API 저장
-  applyGridFilter() // 초기 필터 적용
-  updateGridTheme() // 테마 업데이트
-  
-  emit('grid-ready', params) // 부모에게 이벤트 전달
+function onGridReady(params: any): void {
+  gridApi.value = params.api
+  applyGridFilter()
+  updateGridTheme()
+  emit('grid-ready', params)
 }
 
 /**
  * 셀 더블클릭 이벤트 핸들러
- * @param event 더블클릭 이벤트 객체
  */
-function onCellDoubleClicked(event: any) { 
-  try { 
-    // 편집 가능한 셀인지 확인 (editable이 함수일 수 있음)
+function onCellDoubleClicked(event: any): void {
+  try {
     const colDef = event.column?.getColDef ? event.column.getColDef() : event.colDef
     let allowed = false
     if (colDef) {
@@ -613,11 +512,14 @@ function onCellDoubleClicked(event: any) {
             colDef,
             column: event?.column,
             api: gridApi.value,
-            columnApi: gridApi.value?.getColumnApi ? gridApi.value.getColumnApi() : undefined,
-            context: undefined
+            context: undefined,
           })
-        } catch { allowed = false }
-      } else {
+        }
+        catch {
+          allowed = false
+        }
+      }
+      else {
         allowed = colDef.editable !== false
       }
     }
@@ -625,35 +527,35 @@ function onCellDoubleClicked(event: any) {
       console.log('AgGrid - 더블클릭 편집 시작:', event.column.getColId(), event.column.getColDef())
       gridApi.value?.startEditingCell({
         rowIndex: event.rowIndex,
-        colKey: event.column.getColId()
+        colKey: event.column.getColId(),
       })
     }
-  } catch (error) {
+  }
+  catch (error) {
     console.error('AgGrid - 더블클릭 편집 시작 실패:', error)
   }
-  emit('cell-double-clicked', event) // 부모에게 이벤트 전달
+  emit('cell-double-clicked', event)
 }
 
 /**
  * 셀 값 변경 이벤트 핸들러
- * @param event 값 변경 이벤트 객체
  */
-function onCellValueChanged(event: any) {
+function onCellValueChanged(event: any): void {
   try {
-    const row = event?.data
+    const row = event?.data as StatusRow | undefined
     if (row && row.__status !== 'N') {
       row.__status = 'M'
       refreshStatusCells()
     }
-  } catch {}
+  }
+  catch { /* ignore */ }
   emit('cell-value-changed', event)
 }
 
 /**
  * 행 편집 시작 이벤트 핸들러
- * @param event 편집 시작 이벤트 객체
  */
-function onRowEditingStarted(event: any) {
+function onRowEditingStarted(event: any): void {
   console.log('AgGrid - 행 편집 시작:', event)
   console.log('AgGrid - 편집 시작 컬럼:', event.column?.getColId())
   console.log('AgGrid - 편집 시작 컬럼 정의:', event.column?.getColDef())
@@ -662,56 +564,58 @@ function onRowEditingStarted(event: any) {
 
 /**
  * 행 편집 종료 이벤트 핸들러
- * @param event 편집 종료 이벤트 객체
  */
-function onRowEditingStopped(event: any) {
+function onRowEditingStopped(event: any): void {
   console.log('AgGrid - 행 편집 종료:', event)
   emit('row-editing-stopped', event)
 }
 
-// 다른 로우로 포커스 이동 시 편집 종료
-function tryStopEditingOnRowChange(newRowIndex: number | null | undefined) {
+/**
+ * 다른 로우로 포커스 이동 시 편집 종료
+ */
+function tryStopEditingOnRowChange(newRowIndex: number | null | undefined): void {
   try {
     const api = gridApi.value
-    if (!api) return
+    if (!api)
+      return
     const editingCells = api.getEditingCells?.() || []
-    if (editingCells.length === 0) return
+    if (editingCells.length === 0)
+      return
     const currentRowIndex = editingCells[0]?.rowIndex
     if (newRowIndex != null && currentRowIndex != null && newRowIndex !== currentRowIndex) {
       api.stopEditing?.()
     }
-  } catch {}
+  }
+  catch { /* ignore */ }
 }
 
-function onCellFocused(event: any) {
+function onCellFocused(event: any): void {
   tryStopEditingOnRowChange(event?.rowIndex)
 }
 
-function onRowClicked(event: any) {
+function onRowClicked(event: any): void {
   tryStopEditingOnRowChange(event?.rowIndex)
   emit('row-clicked', event)
 }
 
 /**
- * 정렬 또는 필터 변경 시 호출되는 함수
+ * 정렬 또는 필터 변경 시 호출
  */
-function onSortOrFilterChanged() {
+function onSortOrFilterChanged(): void {
   refreshStatusCells()
 }
 
 /**
  * 트리 데이터 경로 계산 함수
- * @param data 행 데이터
- * @returns 경로 배열
  */
-function getDataPath(data: any) { 
-  return data.orgHierarchy || [] 
+function getDataPath(data: any): string[] {
+  return data.orgHierarchy || []
 }
 
 /**
- * 전체 펼치기 함수
+ * 전체 펼치기
  */
-function expandAllGrid() { 
+function expandAllGrid(): void {
   if (gridApi.value && props.treeData) {
     gridApi.value.expandAll()
     emit('expand-all')
@@ -719,9 +623,9 @@ function expandAllGrid() {
 }
 
 /**
- * 전체 접기 함수
+ * 전체 접기
  */
-function collapseAllGrid() { 
+function collapseAllGrid(): void {
   if (gridApi.value && props.treeData) {
     gridApi.value.collapseAll()
     emit('collapse-all')
@@ -729,69 +633,274 @@ function collapseAllGrid() {
 }
 
 /**
- * AG Grid 테마 업데이트 함수
- * 다크모드/라이트모드 변경 시 테마 클래스 동적 변경
+ * AG Grid 테마 업데이트
  */
-function updateGridTheme() { 
-  if (import.meta.client) { 
+function updateGridTheme(): void {
+  if (import.meta.client) {
     const div = document.querySelector('.ag-grid-menu4')
-    if (div) { 
-      // 기존 테마 클래스 제거
+    if (div) {
       div.classList.remove('ag-theme-quartz', 'ag-theme-quartz-dark')
-      // 새로운 테마 클래스 추가
-      div.classList.add(agGridThemeClass.value) 
-    } 
-  } 
+      div.classList.add(agGridThemeClass.value)
+    }
+  }
 }
 
 /**
- * AG Grid 필터 적용 함수
- * searchQuery를 기반으로 Quick Filter 적용
+ * AG Grid 필터 적용
  */
-function applyGridFilter() { 
-  if (!gridApi.value) return
+function applyGridFilter(): void {
+  if (!gridApi.value)
+    return
   const q = props.searchQuery.toLowerCase().trim()
-  gridApi.value.setGridOption('quickFilterText', q) 
+  gridApi.value.setGridOption('quickFilterText', q)
 }
 
 /**
  * 외부에서 필터 적용을 위한 메서드
- * 부모 컴포넌트에서 호출 가능
  */
-function applyExternalFilter() {
+function applyExternalFilter(): void {
   applyGridFilter()
 }
 
 /**
- * 엑셀 내보내기 함수
- * 현재 그리드 데이터를 엑셀 파일로 내보내기
+ * 엑셀 내보내기
  */
-function exportExcel() { 
+function exportExcel(): void {
   const api = gridApi.value
-  if (api) api.exportDataAsExcel({ fileName: 'MenuList', sheetName: 'Menus' }) 
+  if (api)
+    api.exportDataAsExcel({ fileName: 'MenuList', sheetName: 'Menus' })
+}
+
+/**
+ * 상태 셀 새로고침
+ */
+function refreshStatusCells(): void {
+  const api = gridApi.value
+  try {
+    api?.refreshCells({ force: true, columns: ['__rownum'] })
+  }
+  catch { /* ignore */ }
+}
+
+// 행 추가 감지 및 상태 관리
+const seenRows = shallowRef<WeakSet<StatusRow>>(new WeakSet<StatusRow>())
+const newlyAddedRows = shallowRef<Set<StatusRow>>(new Set<StatusRow>())
+
+/**
+ * 행 추가
+ */
+function addRow(): void {
+  const fields = finalColumnDefs.value.map((c: ColDef) => c?.field).filter((f): f is string => !!f && f !== '__rownum')
+  const newRow: StatusRow = { __status: 'N' }
+  fields.forEach((f: string) => { newRow[f] = null })
+
+  const api = gridApi.value
+  try {
+    if (api?.applyTransaction) {
+      api.applyTransaction({ add: [newRow] })
+    }
+    else {
+      (props.rowData as StatusRow[]).push(newRow)
+    }
+    try {
+      newlyAddedRows.value.add(newRow)
+    }
+    catch { /* ignore */ }
+    emit('row-added', newRow)
+    nextTick(() => refreshStatusCells())
+  }
+  catch {
+    try {
+      (props.rowData as StatusRow[]).push(newRow)
+      try {
+        newlyAddedRows.value.add(newRow)
+      }
+      catch { /* ignore */ }
+      emit('row-added', newRow)
+      nextTick(() => refreshStatusCells())
+    }
+    catch { /* ignore */ }
+  }
+}
+
+/**
+ * 선택된 행 삭제
+ */
+function deleteSelectedRows(): void {
+  const api = gridApi.value
+  if (!api)
+    return
+
+  // 삭제 전 포커스/스크롤 위치 보존
+  const focusedCell = api.getFocusedCell?.()
+  const prevRowIndex: number | null = focusedCell?.rowIndex ?? null
+  let prevColId: string | null = null
+  try {
+    if (focusedCell?.column) {
+      prevColId = typeof focusedCell.column === 'string' ? focusedCell.column : (focusedCell.column as any)?.getColId?.() ?? null
+    }
+  }
+  catch {
+    prevColId = null
+  }
+
+  // 현재 스크롤 위치 및 첫 표시 행 저장
+  let prevScrollTop: number | null = null
+  let firstDisplayedRow: number | null = null
+  try {
+    const host = (agGrid as any)?.value?.$el as HTMLElement | undefined
+    const viewport = host?.querySelector?.('.ag-body-viewport') as HTMLElement | undefined
+    if (viewport)
+      prevScrollTop = viewport.scrollTop
+  }
+  catch { /* ignore */ }
+  try {
+    firstDisplayedRow = typeof api.getFirstDisplayedRowIndex === 'function' ? api.getFirstDisplayedRowIndex() : null
+  }
+  catch { /* ignore */ }
+
+  let rows = api.getSelectedRows?.() || []
+  // 선택이 없으면 포커스된 셀의 행으로 대체
+  if (!rows.length && api.getFocusedCell) {
+    const focused = api.getFocusedCell()
+    if (focused && focused.rowIndex != null) {
+      const node = api.getDisplayedRowAtIndex?.(focused.rowIndex)
+      if (node?.data)
+        rows = [node.data]
+    }
+  }
+  if (!rows.length)
+    return
+
+  const toRemove: StatusRow[] = []
+  rows.forEach((r: StatusRow) => {
+    if (!r)
+      return
+    if (r.__status === 'N') {
+      toRemove.push(r)
+      try {
+        newlyAddedRows.value.delete(r)
+      }
+      catch { /* ignore */ }
+    }
+    else {
+      r.__status = 'D'
+    }
+  })
+
+  if (toRemove.length) {
+    try {
+      api.applyTransaction?.({ remove: toRemove })
+    }
+    catch { /* ignore */ }
+  }
+  emit('rows-deleted', rows)
+  refreshStatusCells()
+
+  // 삭제 후 포커스/스크롤 복원
+  nextTick(() => {
+    try {
+      const host = (agGrid as any)?.value?.$el as HTMLElement | undefined
+      const viewport = host?.querySelector?.('.ag-body-viewport') as HTMLElement | undefined
+      if (viewport && prevScrollTop != null) {
+        viewport.scrollTop = prevScrollTop
+      }
+
+      const hadFocus = typeof prevRowIndex === 'number'
+      const rowCount = api.getDisplayedRowCount?.() ?? 0
+      if (rowCount <= 0)
+        return
+
+      if (hadFocus) {
+        let targetRowIndex = prevRowIndex as number
+        if (targetRowIndex >= rowCount)
+          targetRowIndex = rowCount - 1
+        api.ensureIndexVisible?.(targetRowIndex)
+        if (prevColId != null)
+          api.setFocusedCell?.(targetRowIndex, prevColId)
+      }
+      else if (firstDisplayedRow != null) {
+        let target = firstDisplayedRow
+        if (target >= rowCount)
+          target = rowCount - 1
+        api.ensureIndexVisible?.(target)
+      }
+    }
+    catch { /* ignore */ }
+  })
+}
+
+/**
+ * 모든 행 데이터 반환
+ */
+function getAllRows(): StatusRow[] {
+  const api = gridApi.value
+  const out: StatusRow[] = []
+  try {
+    if (api?.forEachNode) {
+      api.forEachNode((node: any) => {
+        if (node?.data)
+          out.push(node.data)
+      })
+    }
+    else if (api?.getDisplayedRowCount && api?.getDisplayedRowAtIndex) {
+      const n = api.getDisplayedRowCount()
+      for (let i = 0; i < n; i++) {
+        const node = api.getDisplayedRowAtIndex(i)
+        if (node?.data)
+          out.push(node.data)
+      }
+    }
+  }
+  catch { /* ignore */ }
+  return out
+}
+
+/**
+ * 변경된 행들만 반환
+ */
+function getChangedRows(): ChangedRows {
+  const all = getAllRows()
+  const addedSet = new Set<StatusRow>()
+
+  try {
+    newlyAddedRows.value.forEach((r: StatusRow) => {
+      if (r && r.__status !== 'D')
+        addedSet.add(r)
+    })
+  }
+  catch { /* ignore */ }
+
+  all.forEach((r: StatusRow) => {
+    if (r && r.__status === 'N')
+      addedSet.add(r)
+  })
+
+  const added = Array.from(addedSet)
+  const modified = all.filter((r: StatusRow) => r && r.__status === 'M')
+  const deleted = all.filter((r: StatusRow) => r && r.__status === 'D')
+
+  return { added, modified, deleted }
 }
 
 /**
  * 변경 데이터 저장 실행
- * - props.procedureName / props.saveCase / props.extraSaveParams 사용
- * - getChangedRows()로 추가/수정/삭제 행을 수집하고, col_save 지정 필드만 전송
- * - 성공 시 'saved' 이벤트, 실패 시 'save-error' 이벤트 emit
  */
-async function save(): Promise<any> {
+async function save(): Promise<SaveResult> {
   const procedureName = String(props.procedureName || '').trim()
   if (!procedureName) {
     const err = new Error('procedureName이 설정되지 않았습니다.')
     emit('save-error', err)
     throw err
   }
+
   try {
-    const changed = (exposeMethods as any)?.getChangedRows?.() as { added: any[]; modified: any[]; deleted: any[] } || { added: [], modified: [], deleted: [] }
+    const changed = getChangedRows()
     const saveFields = saveParamFields.value || []
-    
-    // 행 상태별 처리 함수
-    const execForRows = async (rows: any[], rowState: 'A' | 'M' | 'D') => {
+
+    const execForRows = async (rows: StatusRow[], rowState: 'A' | 'M' | 'D') => {
       for (const row of rows) {
-        const rowParams = pickSaveFields(row, saveFields)
+        const rowParams = pickSaveFields(row, saveFields, dynamicColumnDefs.value)
         const parameters = {
           case: props.saveCase || 'save',
           row_state: rowState,
@@ -800,32 +909,47 @@ async function save(): Promise<any> {
         }
         await $fetch<any>('/api/stored-procedure/execute', {
           method: 'POST',
-          body: { procedureName, parameters }
+          body: { procedureName, parameters },
         })
       }
     }
-    
-    // 추가/수정/삭제 처리
+
     await execForRows(changed.added, 'A')
     await execForRows(changed.modified, 'M')
     await execForRows(changed.deleted, 'D')
 
-    // 성공적으로 저장된 후 상태 초기화 (그리드 내부 데이터 기준으로 초기화)
+    // 저장 성공 후 상태 초기화
     try {
-      const allRows: any[] = (exposeMethods as any)?.getAllRows?.() || []
-      allRows.forEach((r: any) => { if (r && r.__status) delete r.__status })
-      try { newlyAddedRows.value?.clear?.() } catch {}
+      const allRows = getAllRows()
+      allRows.forEach((r: StatusRow) => {
+        if (r && r.__status)
+          delete r.__status
+      })
       try {
-        seenRows.value = new WeakSet<any>()
-        allRows.forEach((r: any) => { if (r && typeof r === 'object') seenRows.value.add(r) })
-      } catch {}
+        newlyAddedRows.value?.clear?.()
+      }
+      catch { /* ignore */ }
+      try {
+        seenRows.value = new WeakSet<StatusRow>()
+        allRows.forEach((r: StatusRow) => {
+          if (r && typeof r === 'object')
+            seenRows.value.add(r)
+        })
+      }
+      catch { /* ignore */ }
       refreshStatusCells()
-    } catch {}
+    }
+    catch { /* ignore */ }
 
-    const summary = { added: changed.added.length, modified: changed.modified.length, deleted: changed.deleted.length }
+    const summary: SaveResult = {
+      added: changed.added.length,
+      modified: changed.modified.length,
+      deleted: changed.deleted.length,
+    }
     emit('saved', summary)
     return summary
-  } catch (error) {
+  }
+  catch (error) {
     emit('save-error', error)
     throw error
   }
@@ -833,148 +957,96 @@ async function save(): Promise<any> {
 
 /**
  * 저장 버튼 클릭 핸들러
- * - 내부 저장 중 상태 관리
- * - save() 함수 호출
  */
-async function handleSave() {
-  if (isSaving.value) return
-  
+async function handleSave(): Promise<void> {
+  if (isSaving.value)
+    return
+
   internalSaving.value = true
   try {
     await save()
-  } finally {
+  }
+  finally {
     internalSaving.value = false
   }
 }
 
-// 행 추가/삭제 동작
-function addRow() {
-  const fields = finalColumnDefs.value.map((c: any) => c?.field).filter((f: any) => f && f !== '__rownum')
-  const newRow: any = {}
-  fields.forEach((f: string) => { newRow[f] = null })
-  newRow.__status = 'N'
-  const api = gridApi.value
-  try {
-    if (api?.applyTransaction) {
-      api.applyTransaction({ add: [newRow] })
-    } else {
-      (props.rowData as any[]).push(newRow)
-    }
-    try { newlyAddedRows.value.add(newRow) } catch {}
-    emit('row-added', newRow)
-    nextTick(() => refreshStatusCells())
-  } catch {
-    // fallback push
-    try {
-      (props.rowData as any[]).push(newRow)
-      try { newlyAddedRows.value.add(newRow) } catch {}
-      emit('row-added', newRow)
-      nextTick(() => refreshStatusCells())
-    } catch {}
-  }
-}
-
-/**
- * 외부 공개 메서드 요약
- * - expandAll/collapseAll: 트리 전체 펼치기/접기
- * - exportExcel: 엑셀 내보내기
- * - applyFilter: Quick Filter 적용
- * - getGridApi: 내부 Grid API 반환
- * - loadDynamicColumnDefs/getDynamicColumnDefs: 동적 컬럼 로드/조회
- * - markDeleted/clearStatuses: 행 상태 관리
- * - addRow/deleteSelectedRows/stopEditing: 행 추가/삭제/편집 종료
- * - getAllRows/getChangedRows: 전체/변경 행 조회(added/modified/deleted 구분)
- */
-// 외부에서 호출할 수 있는 메서드들을 expose
+// 외부에서 호출할 수 있는 메서드들
 const exposeMethods = {
-  expandAll: expandAllGrid, // 전체 펼치기
-  collapseAll: collapseAllGrid, // 전체 접기
-  exportExcel, // 엑셀 내보내기
-  applyFilter: applyExternalFilter, // 필터 적용
-  getGridApi: () => gridApi.value, // Grid API 반환
-  loadDynamicColumnDefs, // 동적 컬럼 정보 로드
-  getDynamicColumnDefs: () => dynamicColumnDefs.value, // 동적 컬럼 정보 반환
-  markDeleted: (row: any) => { if (row) { row.__status = 'D'; refreshStatusCells() } },
+  expandAll: expandAllGrid,
+  collapseAll: collapseAllGrid,
+  exportExcel,
+  applyFilter: applyExternalFilter,
+  getGridApi: () => gridApi.value,
+  loadDynamicColumnDefs,
+  getDynamicColumnDefs: () => dynamicColumnDefs.value,
+  markDeleted: (row: StatusRow) => {
+    if (row) {
+      row.__status = 'D'
+      refreshStatusCells()
+    }
+  },
   clearStatuses: () => {
     try {
       const rows = Array.isArray(props.rowData) ? props.rowData : []
-      rows.forEach((r: any) => { if (r && r.__status) delete r.__status })
+      rows.forEach((r: StatusRow) => {
+        if (r && r.__status)
+          delete r.__status
+      })
       refreshStatusCells()
-    } catch {}
+    }
+    catch { /* ignore */ }
   },
   addRow,
   deleteSelectedRows,
-  stopEditing: () => { try { gridApi.value?.stopEditing?.() } catch {} },
-  save, // 저장 메서드 추가
-  // 현재 그리드의 모든 행 데이터 반환 (필터/소트 무시, 내부 스토어 기준)
-  getAllRows: (): any[] => {
-    const api = gridApi.value
-    const out: any[] = []
+  stopEditing: () => {
     try {
-      if (api?.forEachNode) {
-        api.forEachNode((node: any) => { if (node?.data) out.push(node.data) })
-      } else if (api?.getDisplayedRowCount && api?.getDisplayedRowAtIndex) {
-        const n = api.getDisplayedRowCount()
-        for (let i = 0; i < n; i++) {
-          const node = api.getDisplayedRowAtIndex(i)
-          if (node?.data) out.push(node.data)
-        }
-      }
-    } catch {}
-    return out
+      gridApi.value?.stopEditing?.()
+    }
+    catch { /* ignore */ }
   },
-  // 변경된 행들만 반환
-  getChangedRows: (): { added: any[], modified: any[], deleted: any[] } => {
-    const all = (exposeMethods as any).getAllRows?.() as any[] || []
-    const addedSet = new Set<any>()
-    try { newlyAddedRows.value.forEach((r: any) => { if (r && r.__status !== 'D') addedSet.add(r) }) } catch {}
-    all.forEach((r: any) => { if (r && r.__status === 'N') addedSet.add(r) })
-    const added = Array.from(addedSet)
-    const modified = all.filter((r: any) => r && r.__status === 'M')
-    const deleted = all.filter((r: any) => r && r.__status === 'D')
-    return { added, modified, deleted }
-  },
-  getSaveParamFields: () => saveParamFields.value, // 저장 파라미터 필드 목록
-  // save 항목은 위에 이미 포함됨
+  save,
+  getAllRows,
+  getChangedRows,
+  getSaveParamFields: () => saveParamFields.value,
 }
 
-// 부모 컴포넌트에서 메서드 호출 가능하도록 expose
 defineExpose(exposeMethods)
 
-// 감시자들 (Watchers)
-// 다크모드 변경 시 테마 업데이트
+// Watchers
 watch(() => colorMode.value, () => updateGridTheme())
 
-// saveParamFields prop 변경 시 ref에 동기화
 watch(() => props.saveParamFields, (newFields) => {
   if (newFields && Array.isArray(newFields)) {
     saveParamFields.value = [...newFields]
   }
 }, { immediate: true })
 
-// 검색 쿼리 변경 시 필터 적용
 watch(() => props.searchQuery, () => {
   nextTick(() => applyGridFilter())
 })
 
-// 행 데이터 변경 시 필터 적용
 watch(() => props.rowData, () => {
   if (gridApi.value) {
     nextTick(() => applyGridFilter())
   }
 }, { deep: true })
 
-// 행 추가 감지 및 상태 관리: 기존/신규 행 추적
-const seenRows = shallowRef<WeakSet<any>>(new WeakSet<any>())
-// 신규 추가 행들을 별도로 추적하여 저장 시 누락 방지
-const newlyAddedRows = shallowRef<Set<any>>(new Set<any>())
-
-// 배열 레퍼런스가 바뀌면(조회/재조회 등) 현재 데이터는 기준선으로 간주: 상태 제거 및 베이스라인 등록
+// 배열 레퍼런스가 바뀌면 현재 데이터는 기준선으로 간주
 watch(() => props.rowData, (newRows) => {
   const rows = Array.isArray(newRows) ? newRows : []
-  try { rows.forEach(r => { if (r && typeof r === 'object' && r.__status) delete r.__status }) } catch {}
-  seenRows.value = new WeakSet<any>()
-  rows.forEach(r => { if (r && typeof r === 'object') seenRows.value.add(r) })
+  try {
+    rows.forEach((r: StatusRow) => {
+      if (r && typeof r === 'object' && r.__status)
+        delete r.__status
+    })
+  }
+  catch { /* ignore */ }
+  seenRows.value = new WeakSet<StatusRow>()
+  rows.forEach((r: StatusRow) => {
+    if (r && typeof r === 'object')
+      seenRows.value.add(r)
+  })
   refreshStatusCells()
 }, { immediate: true })
 
@@ -982,14 +1054,16 @@ watch(() => props.rowData, (newRows) => {
 watch(() => props.rowData, (newRows) => {
   const rows = Array.isArray(newRows) ? newRows : []
   let marked = false
-  rows.forEach(r => {
+  rows.forEach((r: StatusRow) => {
     if (r && typeof r === 'object' && !seenRows.value.has(r)) {
       seenRows.value.add(r)
-      if (!r.__status) r.__status = 'N'
+      if (!r.__status)
+        r.__status = 'N'
       marked = true
     }
   })
-  if (marked) refreshStatusCells()
+  if (marked)
+    refreshStatusCells()
 }, { deep: true })
 
 // grid_id 변경 시 동적 컬럼 정보 다시 로드
@@ -999,93 +1073,13 @@ watch(() => props.gridId, async (newGridId, oldGridId) => {
   }
 })
 
-function refreshStatusCells() {
-  const api = gridApi.value
-  try { api?.refreshCells({ force: true, columns: ['__rownum'] }) } catch {}
-}
-
-function deleteSelectedRows() {
-  const api = gridApi.value
-  if (!api) return
-  // 삭제 전 포커스/스크롤 위치 보존
-  const focusedCell = api.getFocusedCell?.()
-  let prevRowIndex: number | null = focusedCell?.rowIndex ?? null
-  let prevColId: any = null
-  try {
-    prevColId = focusedCell?.column?.getColId ? focusedCell.column.getColId() : (focusedCell?.column || focusedCell?.colId)
-  } catch {
-    prevColId = focusedCell?.colId
-  }
-  // 현재 스크롤 위치 및 첫 표시 행 저장 (포커스가 없을 때 복원용)
-  let prevScrollTop: number | null = null
-  let firstDisplayedRow: number | null = null
-  try {
-    const host = (agGrid as any)?.value?.$el as HTMLElement | undefined
-    const viewport = host?.querySelector?.('.ag-body-viewport') as HTMLElement | undefined
-    if (viewport) prevScrollTop = viewport.scrollTop
-  } catch {}
-  try { firstDisplayedRow = typeof api.getFirstDisplayedRow === 'function' ? api.getFirstDisplayedRow() : null } catch {}
-  let rows = api.getSelectedRows?.() || []
-  // 선택이 없으면 포커스된 셀의 행으로 대체
-  if (!rows.length && api.getFocusedCell) {
-    const focused = api.getFocusedCell()
-    if (focused && focused.rowIndex != null) {
-      const node = api.getDisplayedRowAtIndex?.(focused.rowIndex)
-      if (node?.data) rows = [node.data]
-    }
-  }
-  if (!rows.length) return
-  const toRemove: any[] = []
-  rows.forEach((r: any) => {
-    if (!r) return
-    if (r.__status === 'N') {
-      toRemove.push(r)
-      try { newlyAddedRows.value.delete(r) } catch {}
-    } else {
-      r.__status = 'D'
-    }
-  })
-  if (toRemove.length) {
-    try { api.applyTransaction?.({ remove: toRemove }) } catch {}
-  }
-  emit('rows-deleted', rows)
-  refreshStatusCells()
-  // 삭제 후 포커스/스크롤 복원
-  nextTick(() => {
-    try {
-      // 1) 스크롤이 있었으면 정확히 스크롤만 복원 (포커스 없어도 동작)
-      const host = (agGrid as any)?.value?.$el as HTMLElement | undefined
-      const viewport = host?.querySelector?.('.ag-body-viewport') as HTMLElement | undefined
-      if (viewport && prevScrollTop != null) {
-        viewport.scrollTop = prevScrollTop
-      }
-
-      // 2) 포커스가 있었던 경우에만 포커스/가시영역 보정 수행
-      const hadFocus = typeof prevRowIndex === 'number'
-      const rowCount = api.getDisplayedRowCount?.() ?? 0
-      if (rowCount <= 0) return
-      if (hadFocus) {
-        let targetRowIndex = prevRowIndex as number
-        if (targetRowIndex >= rowCount) targetRowIndex = rowCount - 1
-        api.ensureIndexVisible?.(targetRowIndex)
-        const colId = typeof prevColId === 'string' ? prevColId : (prevColId?.colId || prevColId)
-        if (colId != null) api.setFocusedCell?.(targetRowIndex, colId)
-      } else if (firstDisplayedRow != null) {
-        // 포커스가 없었다면 기존 첫 표시 행을 그대로 유지
-        let target = firstDisplayedRow
-        if (target >= rowCount) target = rowCount - 1
-        api.ensureIndexVisible?.(target)
-      }
-    } catch {}
-  })
-}
-
 // 컴포넌트 마운트 시 초기화
 onMounted(async () => {
   updateGridTheme()
   if (props.gridId) {
     await loadDynamicColumnDefs()
-  } else {
+  }
+  else {
     console.log('gridId가 없어서 동적 컬럼 정보를 로드하지 않습니다.')
   }
 })
@@ -1095,8 +1089,10 @@ onMounted(async () => {
   <div class="w-full">
     <!-- AG Grid 헤더 영역 - 제목과 컨트롤 버튼들 -->
     <div class="flex items-center gap-2 mb-1">
-      <h5 class="m-0">{{ title }}</h5>
-             <!-- 트리 데이터가 있을 때만 펼치기/접기 버튼 표시 -->
+      <h5 class="m-0">
+        {{ title }}
+      </h5>
+      <!-- 트리 데이터가 있을 때만 펼치기/접기 버튼 표시 -->
       <template v-if="props.treeData">
         <Button icon="pi pi-angle-double-down" text size="small" v-tooltip.bottom="'전체 펼치기'" @click="expandAllGrid" />
         <Button icon="pi pi-angle-double-up" text size="small" v-tooltip.bottom="'전체 접기'" @click="collapseAllGrid" />
@@ -1113,31 +1109,31 @@ onMounted(async () => {
 
     <!-- AG Grid 컨테이너 - 테마 클래스와 스타일 적용 -->
     <div :class="agGridThemeClass" class="ag-grid-menu4" style="height: 550px; width: 100%;">
-      <div class="datatable-header"></div>
+      <div class="datatable-header" />
       <!-- AG Grid Vue 컴포넌트 -->
       <AgGridVue
-         ref="agGrid"
-         :row-data="rowData"
-         :column-defs="computedColumnDefs"
-         :default-col-def="defaultColDef"
-         :row-selection="props.rowSelect ? rowSelection : undefined"
-         :tree-data="props.treeData"
-         :get-data-path="props.treeData ? getDataPath : undefined"
-         :auto-group-column-def="props.treeData ? autoGroupColumnDef : undefined"
-         :grid-options="gridOptions"
-         :animate-rows="true"
-         theme="legacy"
-         style="width: 100%; height: calc(100% - 8px);"
-         @grid-ready="onGridReady"
-         @cell-double-clicked="onCellDoubleClicked"
-         @cell-value-changed="onCellValueChanged"
-         @row-editing-started="onRowEditingStarted"
-         @row-editing-stopped="onRowEditingStopped"
-         @cell-focused="onCellFocused"
-         @row-clicked="onRowClicked"
-         @sort-changed="onSortOrFilterChanged"
-         @filter-changed="onSortOrFilterChanged"
-       />
+        ref="agGrid"
+        :row-data="rowData"
+        :column-defs="computedColumnDefs"
+        :default-col-def="defaultColDef"
+        :row-selection="props.rowSelect ? rowSelection : undefined"
+        :tree-data="props.treeData"
+        :get-data-path="props.treeData ? getDataPath : undefined"
+        :auto-group-column-def="props.treeData ? autoGroupColumnDef : undefined"
+        :grid-options="gridOptions"
+        :animate-rows="true"
+        theme="legacy"
+        style="width: 100%; height: calc(100% - 8px);"
+        @grid-ready="onGridReady"
+        @cell-double-clicked="onCellDoubleClicked"
+        @cell-value-changed="onCellValueChanged"
+        @row-editing-started="onRowEditingStarted"
+        @row-editing-stopped="onRowEditingStopped"
+        @cell-focused="onCellFocused"
+        @row-clicked="onRowClicked"
+        @sort-changed="onSortOrFilterChanged"
+        @filter-changed="onSortOrFilterChanged"
+      />
     </div>
   </div>
 </template>

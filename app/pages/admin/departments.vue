@@ -1,65 +1,36 @@
 <script setup lang='ts'>
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
-import { CellSelectionModule, ClipboardModule, ExcelExportModule, TreeDataModule, } from 'ag-grid-enterprise'
+import { CellSelectionModule, ClipboardModule, ExcelExportModule, TreeDataModule } from 'ag-grid-enterprise'
 import { AgGridVue } from 'ag-grid-vue3'
 import { computed, onMounted, ref, shallowRef, watch } from 'vue'
 import { useConfirmation } from '@/composables/confirmation'
 import { buildDepartmentTypeMap, makeHierarchicalSelectOptions, orderDepartmentsForView } from '@/composables/departments'
+import type { FormKitSchema } from '~/types/formkit-schema'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
 
 definePageMeta({
   layout: 'default',
-  middleware: 'auth'
+  middleware: 'auth',
 })
 
-// i18n 미사용 제거
+// 헬퍼 함수 사용
+const {
+  createSearchSchema,
+  createEditSchema,
+  createStandardSearchButtons,
+  createStandardEditButtons,
+} = useFormKitSchemaHelpers()
+
 const colorMode = useColorMode()
 const toast = useToast()
 const { confirmAction } = useConfirmation()
 
-const agGridThemeClass = computed(() => {
-  return colorMode.value === 'dark' ? 'ag-theme-quartz-dark' : 'ag-theme-quartz'
-})
+const agGridThemeClass = computed(() => colorMode.value === 'dark' ? 'ag-theme-quartz-dark' : 'ag-theme-quartz')
 
-const error = ref('')
-const filters = ref<any>()
-
-onMounted(() => {
-  filters.value = { name: '', code: '', description: '', parentFilterId: null }
-})
-
-const parentOptions = ref<{ id: number, label: string }[]>([])
-
-const schema = ref<any>([
-  // addElement('h5', ['상세검색 조건'], { class: 'col-12 mb-1' }),
-  { $formkit: 'primeInputText', name: 'name', label: '부서명', outerClass: 'col-3' },
-  { $formkit: 'primeInputText', name: 'code', label: '부서코드', outerClass: 'col-3' },
-  { $formkit: 'primeInputText', name: 'description', label: '설명', outerClass: 'col-3' },
-  { $formkit: 'primeSelect', name: 'parentFilterId', label: '상위부서(선택)', outerClass: 'col-3', options: parentOptions, optionLabel: 'label', optionValue: 'id', placeholder: '상위부서 선택', showClear: true, filter: true },
-  {
-    $el: 'div',
-    attrs: { class: 'col-12 w-full flex justify-end items-center gap-x-2 mt-1' },
-    children: [
-      { $cmp: 'Button', props: { label: '검색', severity: 'primary', onClick: () => search() } },
-      { $cmp: 'Button', props: { label: '초기화', outlined: true, severity: 'secondary', type: 'reset', onClick: () => resetForm() } },
-      { $cmp: 'Button', props: { label: '등록', severity: 'secondary', onClick: () => openCreate() } },
-      { $cmp: 'Button', props: { label: '엑셀', outlined: true, severity: 'secondary', onClick: () => exportExcel() } },
-    ],
-  },
-])
-
-function resetForm() {
-  if (filters.value) {
-    filters.value = { name: '', code: '', description: '', parentFilterId: null }
-    error.value = ''
-    loadDepartments()
-  }
-}
-
-// Ag-Grid
 ModuleRegistry.registerModules([AllCommunityModule, TreeDataModule, ExcelExportModule, CellSelectionModule, ClipboardModule])
 
+// 인터페이스 정의
 interface Department {
   id: number
   name: string
@@ -72,6 +43,51 @@ interface Department {
   updated_at?: string
 }
 
+// 상태 관리
+const error = ref('')
+const filters = ref<{
+  name: string
+  code: string
+  description: string
+  parentFilterId: number | null
+}>({ name: '', code: '', description: '', parentFilterId: null })
+
+const parentOptions = ref<{ id: number, label: string }[]>([])
+
+// 검색 스키마 - 타입 안전한 팩토리 함수 사용
+const schema = computed<FormKitSchema>(() => createSearchSchema(
+  [
+    { name: 'name', label: '부서명', width: 'col-3' },
+    { name: 'code', label: '부서코드', width: 'col-3' },
+    { name: 'description', label: '설명', width: 'col-3' },
+    {
+      name: 'parentFilterId',
+      label: '상위부서(선택)',
+      type: 'primeSelect',
+      width: 'col-3',
+      options: parentOptions.value,
+      optionLabel: 'label',
+      optionValue: 'id',
+      placeholder: '상위부서 선택',
+      showClear: true,
+      filter: true,
+    },
+  ],
+  createStandardSearchButtons({
+    onSearch: search,
+    onReset: resetForm,
+    onCreate: openCreate,
+    onExport: exportExcel,
+  }),
+))
+
+function resetForm() {
+  filters.value = { name: '', code: '', description: '', parentFilterId: null }
+  error.value = ''
+  loadDepartments()
+}
+
+// AG Grid 설정
 const rowData = ref<Department[]>([])
 const allDepartments = ref<Department[]>([])
 
@@ -85,7 +101,7 @@ const columnDefs = ref([
 
 const defaultColDef = ref({ flex: 1, minWidth: 100, filter: true })
 const gridOptions = ref({ rowHeight: 28, headerHeight: 32, enableRangeSelection: true, enableRangeHandle: true })
-const cellSelection = ref<boolean | any>(true)
+const cellSelection = ref<boolean | object>(true)
 
 // Tree Data 설정
 const autoGroupColumnDef = ref({
@@ -97,6 +113,7 @@ const getDataPath = (data: any) => data.orgHierarchy || []
 
 const rowSelection = ref({ mode: 'multiRow' as const, checkboxes: true, headerCheckbox: true })
 
+// 테마 업데이트
 const updateGridTheme = () => {
   if (import.meta.client) {
     const gridDiv = document.querySelector('.ag-grid-dept')
@@ -107,12 +124,7 @@ const updateGridTheme = () => {
   }
 }
 
-watch(
-  () => colorMode.value,
-  () => {
-    updateGridTheme()
-  }
-)
+watch(() => colorMode.value, () => updateGridTheme())
 
 onMounted(() => {
   updateGridTheme()
@@ -120,6 +132,7 @@ onMounted(() => {
   loadDepartments()
 })
 
+// 데이터 로드
 async function loadDepartments() {
   const q = filters.value
   const search = [q?.name, q?.code, q?.description].filter(Boolean).join(' ')
@@ -143,86 +156,115 @@ const dialogVisible = ref(false)
 const editTarget = ref<Partial<Department> | null>(null)
 const deleting = ref(false)
 
-// FormKit PrimeVue 다이얼로그 스키마
-const editSchema = ref<any>([
-  { $formkit: 'hidden', name: 'id' },
-  { $formkit: 'primeInputText', name: 'name', label: '부서명', outerClass: 'col-6 md:col-6', validation: 'required' },
-  { $formkit: 'primeInputText', name: 'code', label: '코드', outerClass: 'col-6 md:col-6', validation: 'required' },
-  { $formkit: 'primeSelect', name: 'parent_id', label: '상위부서', outerClass: 'col-12 md:col-6', options: parentOptions, optionLabel: 'label', optionValue: 'id', placeholder: '상위부서 선택(없으면 루트)', showClear: true, filter: true },
-  { $formkit: 'primeTextarea', name: 'description', label: '설명', outerClass: 'col-12', rows: 3 },
-  { $formkit: 'primeInputNumber', name: 'sort_order', label: '순서', outerClass: 'col-6 md:col-6', min: 0 },
-  { $formkit: 'primeCheckbox', name: 'is_active', label: '사용', outerClass: 'col-6 md:col-6' },
-  {
-    $el: 'div',
-    attrs: { class: 'col-12 w-full flex justify-end items-center gap-x-2 mt-2' },
-    children: [
-      { $cmp: 'Button', if: '$id', props: { label: '삭제', severity: 'danger', loading: deleting.value, onClick: () => deleteInDialog() } },
-      { $cmp: 'Button', props: { label: '취소', severity: 'secondary', onClick: () => { dialogVisible.value = false } } },
-      { $cmp: 'Button', props: { label: '저장', onClick: () => saveDepartment() } },
-    ],
-  },
-])
+// 편집 스키마 - computed로 반응형 값 지원
+const editSchema = computed<FormKitSchema>(() => createEditSchema(
+  [
+    { name: 'name', label: '부서명', width: 'col-6', required: true },
+    { name: 'code', label: '코드', width: 'col-6', required: true },
+    {
+      name: 'parent_id',
+      label: '상위부서',
+      type: 'primeSelect',
+      width: 'col-6',
+      options: parentOptions.value,
+      optionLabel: 'label',
+      optionValue: 'id',
+      placeholder: '상위부서 선택(없으면 루트)',
+      showClear: true,
+      filter: true,
+    },
+    { name: 'description', label: '설명', type: 'primeTextarea', width: 'col-12', rows: 3 },
+    { name: 'sort_order', label: '순서', type: 'primeInputNumber', width: 'col-6', min: 0 },
+    { name: 'is_active', label: '사용', type: 'primeCheckbox', width: 'col-6' },
+  ],
+  createStandardEditButtons(
+    {
+      onSave: saveDepartment,
+      onCancel: () => { dialogVisible.value = false },
+      onDelete: deleteInDialog,
+    },
+    { deleting, showDeleteWhen: '$id' },
+  ),
+  { includeHiddenId: true },
+))
 
 function openCreate() {
   editTarget.value = { name: '', code: '', description: '', is_active: true, sort_order: 0 }
   dialogVisible.value = true
 }
+
 function openEdit(row: Department) {
   editTarget.value = { ...row }
   dialogVisible.value = true
 }
 
 async function saveDepartment() {
-  // validation
-  const name = (editTarget.value as any)?.name?.trim?.() || ''
-  const code = (editTarget.value as any)?.code?.trim?.() || ''
+  const name = editTarget.value?.name?.trim() || ''
+  const code = editTarget.value?.code?.trim() || ''
+
+  // 유효성 검사
   if (!name) {
     return toast.add({ severity: 'warn', summary: '유효성 오류', detail: '부서명은 필수입니다.', life: 2500 })
   }
   if (!code) {
     return toast.add({ severity: 'warn', summary: '유효성 오류', detail: '코드는 필수입니다.', life: 2500 })
   }
+
+  // API 호출
   if (!editTarget.value?.id) {
     await $fetch('/api/departments/create', { method: 'POST', body: editTarget.value })
-  } else {
+  }
+  else {
     await $fetch(`/api/departments/${editTarget.value.id}`, { method: 'PUT', body: editTarget.value })
   }
+
   dialogVisible.value = false
   await loadDepartments()
 }
 
-// 선택삭제 제거 (팝업의 개별 삭제로 대체)
-
 function deleteInDialog() {
   const currentId = editTarget.value?.id
-  if (!currentId) return
-  confirmAction(async () => {
-    try {
-      deleting.value = true
-      await $fetch(`/api/departments/${currentId}`, { method: 'DELETE' })
-      dialogVisible.value = false
-      await loadDepartments()
-    } finally {
-      deleting.value = false
-    }
-  }, '삭제 완료', '부서를 삭제했습니다.', '삭제 확인', '해당 부서를 삭제하시겠습니까?', { compact: true, acceptLabel: '삭제', rejectLabel: '취소', icon: 'pi pi-exclamation-triangle' })
+  if (!currentId)
+    return
+
+  confirmAction(
+    async () => {
+      try {
+        deleting.value = true
+        await $fetch(`/api/departments/${currentId}`, { method: 'DELETE' })
+        dialogVisible.value = false
+        await loadDepartments()
+      }
+      finally {
+        deleting.value = false
+      }
+    },
+    '삭제 완료',
+    '부서를 삭제했습니다.',
+    '삭제 확인',
+    '해당 부서를 삭제하시겠습니까?',
+    { compact: true, acceptLabel: '삭제', rejectLabel: '취소', icon: 'pi pi-exclamation-triangle' },
+  )
 }
 
 const agGrid = ref()
 const gridApi = shallowRef<any | null>(null)
+
 function onCellDoubleClicked(event: any) {
   openEdit(event.data)
 }
 
 function exportExcel() {
   const api = gridApi.value
-  if (api) api.exportDataAsExcel({ fileName: 'DepartmentList', sheetName: 'Departments' })
+  if (api)
+    api.exportDataAsExcel({ fileName: 'DepartmentList', sheetName: 'Departments' })
 }
 
 function onGridReady(params: any) {
   gridApi.value = params.api
 }
 
+// 계층 구조 유틸리티 함수
 function buildParentMap(items: Department[]): Map<number, Department> {
   const map = new Map<number, Department>()
   items.forEach(d => map.set(d.id, d))
@@ -234,7 +276,8 @@ function computePath(item: Department, parentMap: Map<number, Department>): stri
   let cur: Department | undefined = item
   const guard = new Set<number>()
   while (cur) {
-    if (guard.has(cur.id)) break
+    if (guard.has(cur.id))
+      break
     guard.add(cur.id)
     path.unshift(cur.name)
     cur = cur.parent_id ? parentMap.get(cur.parent_id) : undefined
@@ -244,7 +287,7 @@ function computePath(item: Department, parentMap: Map<number, Department>): stri
 
 function addHierarchy(visible: Department[], all: Department[]) {
   const parentMap = buildParentMap(all)
-  return visible.map(v => {
+  return visible.map((v) => {
     const path = computePath(v, parentMap)
     const level = Math.max(0, path.length - 1)
     const parentName = v.parent_id ? parentMap.get(v.parent_id)?.name ?? '' : ''
@@ -252,22 +295,19 @@ function addHierarchy(visible: Department[], all: Department[]) {
   })
 }
 
-// legacy util removed (replaced by orderDepartmentsForView)
-
-// legacy util removed (replaced by orderDepartmentsForView)
-
 async function loadParentOptions() {
   const res = await $fetch<any>('/api/departments', { params: { search: '' } })
   if (res?.success) {
-    parentOptions.value = makeHierarchicalSelectOptions((res.data || []), { includeCode: true })
+    parentOptions.value = makeHierarchicalSelectOptions(res.data || [], { includeCode: true })
   }
 }
 </script>
 
 <template>
   <div class="card flex flex-wrap gap-6">
+    <!-- 검색 영역 -->
     <div class="w-full pb-2 mb-2 border-b border-gray-200 dark:border-gray-700">
-      <div v-if="filters" class="compact-form">
+      <div class="compact-form">
         <FormKitDataEdit
           v-model="filters"
           :schema="schema"
@@ -280,8 +320,11 @@ async function loadParentOptions() {
       </div>
     </div>
 
+    <!-- 그리드 영역 -->
     <div class="w-full">
-      <h5 class="mb-2">부서 목록</h5>
+      <h5 class="mb-2">
+        부서 목록
+      </h5>
 
       <ClientOnly>
         <div :class="agGridThemeClass" class="ag-grid-dept" style="height: 550px; width: 100%;">
@@ -310,6 +353,7 @@ async function loadParentOptions() {
       </ClientOnly>
     </div>
 
+    <!-- 등록/수정 다이얼로그 -->
     <Dialog v-model:visible="dialogVisible" header="부서 등록/수정" :modal="true" :style="{ width: '640px' }">
       <div v-if="editTarget" class="w-full compact-form">
         <FormKitDataEdit

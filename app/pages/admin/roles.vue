@@ -3,12 +3,20 @@ import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
 import { CellSelectionModule, ClipboardModule, ExcelExportModule, TreeDataModule } from 'ag-grid-enterprise'
 import { AgGridVue } from 'ag-grid-vue3'
 import { computed, onMounted, ref, shallowRef, watch } from 'vue'
+import type { FormKitSchema } from '~/types/formkit-schema'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-quartz.css'
 
 definePageMeta({ layout: 'default', middleware: ['auth', 'role'], permission: { resource: 'menu:/admin/roles', action: 'read' } })
 
-// const { addElement } = useFormKitSchema()
+// 헬퍼 함수 사용
+const {
+  createSearchSchema,
+  createEditSchema,
+  createStandardSearchButtons,
+  createStandardEditButtons,
+} = useFormKitSchemaHelpers()
+
 const { confirmAction } = useConfirmation()
 const colorMode = useColorMode()
 const toast = useToast()
@@ -16,6 +24,7 @@ const agGridThemeClass = computed(() => colorMode.value === 'dark' ? 'ag-theme-q
 
 ModuleRegistry.registerModules([AllCommunityModule, TreeDataModule, ExcelExportModule, CellSelectionModule, ClipboardModule])
 
+// 인터페이스 정의
 interface RoleRow {
   id: number
   role_name: string
@@ -26,30 +35,28 @@ interface RoleRow {
   permissions?: Record<string, 'read' | 'write'>
 }
 
-const filters = ref<any>()
-onMounted(() => {
-  filters.value = { q: '' }
-})
+// 상태 관리
+const filters = ref<{ q: string }>({ q: '' })
 
-const schema = ref<any>([
-  { $formkit: 'primeInputText', name: 'q', label: '역할명', outerClass: 'col-6' },
-  {
-    $el: 'div',
-    attrs: { class: 'col-12 w-full flex justify-end items-center gap-x-2 mt-1' },
-    children: [
-      { $cmp: 'Button', props: { label: '검색', severity: 'primary', onClick: () => search() } },
-      { $cmp: 'Button', props: { label: '초기화', outlined: true, severity: 'secondary', type: 'reset', onClick: () => resetForm() } },
-      { $cmp: 'Button', props: { label: '등록', severity: 'secondary', onClick: () => openCreate() } },
-      { $cmp: 'Button', props: { label: '엑셀', outlined: true, severity: 'secondary', onClick: () => exportExcel() } },
-    ],
-  },
-])
+// 검색 스키마 - 타입 안전한 팩토리 함수 사용
+const schema = computed<FormKitSchema>(() => createSearchSchema(
+  [
+    { name: 'q', label: '역할명', width: 'col-6' },
+  ],
+  createStandardSearchButtons({
+    onSearch: search,
+    onReset: resetForm,
+    onCreate: openCreate,
+    onExport: exportExcel,
+  }),
+))
 
 function resetForm() {
   filters.value = { q: '' }
   loadRoles()
 }
 
+// AG Grid 설정
 const rowData = ref<RoleRow[]>([])
 const columnDefs = ref([
   { field: 'role_name', headerName: '역할명', filter: true, minWidth: 140 },
@@ -58,11 +65,13 @@ const columnDefs = ref([
 ])
 const defaultColDef = ref({ flex: 1, minWidth: 100, filter: true })
 const gridOptions = ref({ rowHeight: 28, headerHeight: 32, enableRangeSelection: true, enableRangeHandle: true })
-const cellSelection = ref<boolean | any>({ enableHeaderHighlight: true })
+const cellSelection = ref<boolean | object>({ enableHeaderHighlight: true })
 const rowSelection = ref({ mode: 'multiRow' as const, checkboxes: true, headerCheckbox: true })
 
 const agGrid = ref()
 const gridApi = shallowRef<any | null>(null)
+
+// 테마 업데이트
 const updateGridTheme = () => {
   if (import.meta.client) {
     const gridDiv = document.querySelector('.ag-grid-roles')
@@ -70,40 +79,57 @@ const updateGridTheme = () => {
     gridDiv?.classList.add(agGridThemeClass.value)
   }
 }
-watch(() => colorMode.value, () => { updateGridTheme() })
-onMounted(() => { updateGridTheme(); loadRoles(); loadMenus() })
 
+watch(() => colorMode.value, () => updateGridTheme())
+onMounted(() => {
+  updateGridTheme()
+  loadRoles()
+  loadMenus()
+})
+
+// 데이터 로드
 async function loadRoles() {
   const q = filters.value?.q || ''
   const res = await $fetch<any>('/api/roles', { params: { search: q } })
-  if (res?.success) rowData.value = res.data
+  if (res?.success)
+    rowData.value = res.data
 }
-function search() { loadRoles() }
 
+function search() {
+  loadRoles()
+}
+
+// 등록/수정 다이얼로그
 const dialogVisible = ref(false)
 const deleting = ref(false)
 const editTarget = ref<Partial<RoleRow> | null>(null)
 
-const editSchema = ref<any>([
-  { $formkit: 'hidden', name: 'id' },
-  { $formkit: 'primeInputText', name: 'role_name', label: '역할명', outerClass: 'col-6 md:col-6', validation: 'required' },
-  { $formkit: 'primeInputText', name: 'role_description', label: '설명', outerClass: 'col-6 md:col-6' },
-  { $formkit: 'primeCheckbox', name: 'is_active', label: '활성', outerClass: 'col-12 md:col-4' },
-  { $el: 'div', attrs: { class: 'col-12 w-full flex justify-end items-center gap-x-2 mt-2' }, children: [
-    { $cmp: 'Button', if: '$id', props: { label: '삭제', severity: 'danger', loading: deleting.value, onClick: () => deleteInDialog() } },
-    { $cmp: 'Button', props: { label: '취소', severity: 'secondary', onClick: () => { dialogVisible.value = false } } },
-    { $cmp: 'Button', props: { label: '저장', onClick: () => saveRole() } },
-  ] },
-])
+// 편집 스키마 - computed로 반응형 값 지원
+const editSchema = computed<FormKitSchema>(() => createEditSchema(
+  [
+    { name: 'role_name', label: '역할명', width: 'col-6', required: true },
+    { name: 'role_description', label: '설명', width: 'col-6' },
+    { name: 'is_active', label: '활성', type: 'primeCheckbox', width: 'col-4' },
+  ],
+  createStandardEditButtons(
+    {
+      onSave: saveRole,
+      onCancel: () => { dialogVisible.value = false },
+      onDelete: deleteInDialog,
+    },
+    { deleting, showDeleteWhen: '$id' },
+  ),
+  { includeHiddenId: true },
+))
 
 function openCreate() {
-  editTarget.value = { role_name: '', role_description: '', is_active: true, permissions: {} } as any
+  editTarget.value = { role_name: '', role_description: '', is_active: true, permissions: {} }
   selectedRole.value = null
   orgTreeSelection.value = {}
   dialogVisible.value = true
-  // 새 생성 시 메뉴 권한 표시 초기화
   rebuildMenuRowData()
 }
+
 function openEdit(row: RoleRow) {
   editTarget.value = { ...row, permissions: row.permissions || {} }
   selectedRole.value = row
@@ -111,42 +137,73 @@ function openEdit(row: RoleRow) {
   loadAssignedDepts(row.id)
   orgTreeSelection.value = {}
   dialogVisible.value = true
-  // 선택한 역할의 권한으로 메뉴 체크 상태 반영
   rebuildMenuRowData()
 }
 
 async function saveRole() {
-  const roleName = (editTarget.value as any)?.role_name?.trim?.() || ''
-  if (!roleName) return toast.add({ severity: 'warn', summary: '유효성 오류', detail: '역할명은 필수입니다.', life: 2500 })
+  const roleName = editTarget.value?.role_name?.trim() || ''
+  if (!roleName) {
+    return toast.add({ severity: 'warn', summary: '유효성 오류', detail: '역할명은 필수입니다.', life: 2500 })
+  }
+
   const body = { ...editTarget.value, permissions: editTarget.value?.permissions || {} }
+
   if (!editTarget.value?.id) {
     const res = await $fetch<any>('/api/roles', { method: 'POST', body })
     if (res?.success && res?.data?.id) {
       editTarget.value = { ...(res.data || {}) }
       toast.add({ severity: 'success', summary: '저장 완료', detail: '역할이 생성되었습니다. 이제 사용자/부서를 추가할 수 있습니다.', life: 2200 })
-      // 생성 직후에도 메뉴/그리드 상태를 최신화
-      try { await loadRoles() } catch {}
-      try { rebuildMenuRowData() } catch {}
+      try { await loadRoles() }
+      catch {}
+      try { rebuildMenuRowData() }
+      catch {}
     }
-  } else {
+  }
+  else {
     await $fetch(`/api/roles/${editTarget.value.id}`, { method: 'PUT', body })
     dialogVisible.value = false
     await loadRoles()
   }
 }
+
 function deleteInDialog() {
   const currentId = editTarget.value?.id
-  if (!currentId) return
+  if (!currentId)
+    return
   deleting.value = true
   $fetch(`/api/roles/${currentId}`, { method: 'DELETE' })
-    .then(async () => { dialogVisible.value = false; await loadRoles() })
-    .finally(() => { deleting.value = false })
+    .then(async () => {
+      dialogVisible.value = false
+      await loadRoles()
+    })
+    .finally(() => {
+      deleting.value = false
+    })
 }
-function exportExcel() { const api = gridApi.value; if (api) api.exportDataAsExcel({ fileName: 'Roles', sheetName: 'Roles' }) }
-function onGridReady(params: any) { gridApi.value = params.api }
-function onCellDoubleClicked(event: any) { openEdit(event.data) }
 
-interface MenuItem { id: number, title: string, href?: string | null, parent_id?: number | null, permission_key?: string | null }
+function exportExcel() {
+  const api = gridApi.value
+  if (api)
+    api.exportDataAsExcel({ fileName: 'Roles', sheetName: 'Roles' })
+}
+
+function onGridReady(params: any) {
+  gridApi.value = params.api
+}
+
+function onCellDoubleClicked(event: any) {
+  openEdit(event.data)
+}
+
+// 메뉴 권한 관리
+interface MenuItem {
+  id: number
+  title: string
+  href?: string | null
+  parent_id?: number | null
+  permission_key?: string | null
+}
+
 const menuRows = ref<MenuItem[]>([])
 const menuRowData = ref<any[]>([])
 const menuLoading = ref(false)
@@ -165,32 +222,56 @@ const menuGridOptions = ref<any>({
   groupDefaultExpanded: -1,
   getRowId: (p: any) => p?.data?.permission_key || `id:${p?.data?.id}`,
 })
-const menuAutoGroupColumnDef = ref<any>({ headerName: '메뉴', minWidth: 220, cellRendererParams: { suppressCount: true, suppressDoubleClickExpand: true, suppressEnterExpand: true } })
+const menuAutoGroupColumnDef = ref<any>({
+  headerName: '메뉴',
+  minWidth: 220,
+  cellRendererParams: { suppressCount: true, suppressDoubleClickExpand: true, suppressEnterExpand: true },
+})
+
 async function loadMenus() {
   menuLoading.value = true
   try {
     const r = await $fetch<{ success: boolean, data: any[] }>('/api/menu/admin')
-    const list = (r.data || []).map(m => ({ id: m.id, title: m.title, href: m.href, parent_id: m.parent_id, permission_key: m.permission_key || (m.href ? `menu:${m.href}` : `menu:id:${m.id}`) }))
+    const list = (r.data || []).map(m => ({
+      id: m.id,
+      title: m.title,
+      href: m.href,
+      parent_id: m.parent_id,
+      permission_key: m.permission_key || (m.href ? `menu:${m.href}` : `menu:id:${m.id}`),
+    }))
     menuRows.value = list
     rebuildMenuRowData()
-  } finally { menuLoading.value = false }
+  }
+  finally {
+    menuLoading.value = false
+  }
 }
-function getPermLevel(pk: string) { const p = editTarget.value?.permissions || {}; return (p as any)[pk] || 'none' }
+
+function getPermLevel(pk: string) {
+  const p = editTarget.value?.permissions || {}
+  return (p as any)[pk] || 'none'
+}
+
 function setPermLevel(pk: string, v: 'none' | 'read' | 'write') {
   const p = { ...(editTarget.value?.permissions || {}) } as any
-  if (v === 'none') delete p[pk]; else p[pk] = v
+  if (v === 'none')
+    delete p[pk]
+  else p[pk] = v
   editTarget.value = { ...(editTarget.value || {}), permissions: p }
 }
+
 function rebuildMenuRowData() {
   const list = menuRows.value || []
   const map = new Map<number, MenuItem>()
   list.forEach(i => map.set(i.id, i))
+
   const computePath = (item: MenuItem): string[] => {
     const path: string[] = []
     let cur: MenuItem | undefined = item
     const guard = new Set<number>()
     while (cur) {
-      if (guard.has(cur.id)) break
+      if (guard.has(cur.id))
+        break
       guard.add(cur.id)
       path.unshift(cur.title || '')
       const pid = cur.parent_id as any
@@ -198,25 +279,48 @@ function rebuildMenuRowData() {
     }
     return path
   }
-  menuRowData.value = list.map(r => {
+
+  menuRowData.value = list.map((r) => {
     const level = getPermLevel(r.permission_key as string)
     return { ...r, orgHierarchy: computePath(r), level, read: level === 'read' || level === 'write', write: level === 'write' }
   })
 }
-function getMenuDataPath(data: any) { return data.orgHierarchy || [] }
-function onMenuGridReady(params: any) { menuGridApi.value = params.api; try { menuGridApi.value.expandAll?.() } catch {} }
+
+function getMenuDataPath(data: any) {
+  return data.orgHierarchy || []
+}
+
+function onMenuGridReady(params: any) {
+  menuGridApi.value = params.api
+  try { menuGridApi.value.expandAll?.() }
+  catch {}
+}
+
 function onMenuCellValueChanged(event: any) {
   const pk = event?.data?.permission_key as string
-  if (!pk) return
+  if (!pk)
+    return
   const read = !!event?.data?.read
   const write = !!event?.data?.write
   let next: 'none' | 'read' | 'write' = 'none'
-  if (write) next = 'write'
-  else if (read) next = 'read'
+  if (write)
+    next = 'write'
+  else if (read)
+    next = 'read'
   setPermLevel(pk, next)
 }
-function expandAllMenuGrid() { const api = menuGridApi.value; if (api?.expandAll) api.expandAll() }
-function collapseAllMenuGrid() { const api = menuGridApi.value; if (api?.collapseAll) api.collapseAll() }
+
+function expandAllMenuGrid() {
+  const api = menuGridApi.value
+  if (api?.expandAll)
+    api.expandAll()
+}
+
+function collapseAllMenuGrid() {
+  const api = menuGridApi.value
+  if (api?.collapseAll)
+    api.collapseAll()
+}
 
 function menuCheckboxRenderer(params: any) {
   const colId = params?.column?.getColId?.()
@@ -229,22 +333,25 @@ function menuCheckboxRenderer(params: any) {
   const input = document.createElement('input')
   input.type = 'checkbox'
   input.checked = !!params.value
-  input.addEventListener('click', (ev) => { ev.stopPropagation() })
+  input.addEventListener('click', ev => ev.stopPropagation())
   input.addEventListener('change', (ev: any) => {
     ev.stopPropagation()
     const checked = ev.target.checked
     if (colId === 'write') {
       params.node.setDataValue('write', checked)
-    } else if (colId === 'read') {
+    }
+    else if (colId === 'read') {
       params.node.setDataValue('read', checked)
-      // READ 해제시 WRITE는 그대로 두어 독립 동작
     }
     const pk = params?.data?.permission_key
     if (pk) {
       const read = !!params.node.data.read
       const write = !!params.node.data.write
       let next: 'none' | 'read' | 'write' = 'none'
-      if (write) next = 'write'; else if (read) next = 'read'
+      if (write)
+        next = 'write'
+      else if (read)
+        next = 'read'
       setPermLevel(pk, next)
     }
   })
@@ -252,6 +359,7 @@ function menuCheckboxRenderer(params: any) {
   return wrapper
 }
 
+// 할당된 사용자 관리
 const assignedUsers = ref<any[]>([])
 const assignedUsersGridApi = shallowRef<any | null>(null)
 const assignedUsersColDefs = ref<any[]>([
@@ -261,38 +369,56 @@ const assignedUsersColDefs = ref<any[]>([
   { headerName: '삭제', colId: 'remove', width: 90, valueGetter: () => '삭제', cellClass: 'action-cell danger' },
 ])
 const compactGridOpts = ref<any>({ rowHeight: 26, headerHeight: 28, rowSelection: 'multiple', defaultColDef: { filter: true } })
-//
+
 async function loadAssignedUsers(roleId: number) {
   const res = await $fetch<any>(`/api/roles/${roleId}/users`)
   assignedUsers.value = res?.success ? (res.data || []) : []
 }
-function onAssignedUsersGridReady(p: any) { assignedUsersGridApi.value = p.api }
-function onAssignedUsersCellClicked(event: any) {
-  if (event?.column?.getColId?.() === 'remove') removeUserFromRole(event?.data?.id)
+
+function onAssignedUsersGridReady(p: any) {
+  assignedUsersGridApi.value = p.api
 }
+
+function onAssignedUsersCellClicked(event: any) {
+  if (event?.column?.getColId?.() === 'remove')
+    removeUserFromRole(event?.data?.id)
+}
+
 async function removeUserFromRole(userId: number) {
   const roleId = editTarget.value?.id
-  if (!roleId) return
+  if (!roleId)
+    return
   await $fetch(`/api/users/${userId}/roles`, { method: 'DELETE', params: { roleId } })
   await loadAssignedUsers(roleId)
 }
+
 async function removeAllUsersFromRole() {
   const roleId = editTarget.value?.id
-  if (!roleId) return
+  if (!roleId)
+    return
   const count = assignedUsers.value.length
-  if (count === 0) return
-  confirmAction(async () => {
-    for (const u of assignedUsers.value) {
-      const uid = u?.id
-      if (!uid) continue
-      try { await $fetch(`/api/users/${uid}/roles`, { method: 'DELETE', params: { roleId } }) } catch {}
-    }
-    await loadAssignedUsers(roleId)
-  }, '삭제 완료', `사용자 ${count}명 할당을 해제했습니다.`, '전체 삭제 확인', '선택된 역할에서 모든 사용자를 삭제하시겠습니까?', { compact: true, acceptLabel: '삭제', rejectLabel: '취소', icon: 'pi pi-exclamation-triangle' })
+  if (count === 0)
+    return
+  confirmAction(
+    async () => {
+      for (const u of assignedUsers.value) {
+        const uid = u?.id
+        if (!uid)
+          continue
+        try { await $fetch(`/api/users/${uid}/roles`, { method: 'DELETE', params: { roleId } }) }
+        catch {}
+      }
+      await loadAssignedUsers(roleId)
+    },
+    '삭제 완료',
+    `사용자 ${count}명 할당을 해제했습니다.`,
+    '전체 삭제 확인',
+    '선택된 역할에서 모든 사용자를 삭제하시겠습니까?',
+    { compact: true, acceptLabel: '삭제', rejectLabel: '취소', icon: 'pi pi-exclamation-triangle' },
+  )
 }
-//
 
-// 조직/사용자 트리 선택(채팅 초대와 동일 패턴)
+// 조직/사용자 트리 선택
 const orgTreeNodes = ref<any[]>([])
 const orgTreeSelection = ref<Record<string, any>>({})
 const orgTreeLoading = ref(false)
@@ -304,28 +430,35 @@ async function loadOrgTree() {
     const res: any = await $fetch('/api/org/tree')
     const nodes = (res?.data || []) as any[]
     orgTreeNodes.value = nodes
-    // build flat node map for quick lookup
     const map: Record<string, any> = {}
     const dfs = (arr: any[]) => {
       for (const n of arr) {
         map[n.key] = n
-        if (Array.isArray(n.children) && n.children.length) dfs(n.children)
+        if (Array.isArray(n.children) && n.children.length)
+          dfs(n.children)
       }
     }
     dfs(nodes)
     orgNodeMap.value = map
-  } catch { orgTreeNodes.value = [] }
-  finally { orgTreeLoading.value = false }
+  }
+  catch {
+    orgTreeNodes.value = []
+  }
+  finally {
+    orgTreeLoading.value = false
+  }
 }
 
 const invitedUserIds = computed(() => {
   const ids: number[] = []
   for (const key of Object.keys(orgTreeSelection.value || {})) {
     const node = (orgTreeSelection.value as any)[key]
-    if (!node) continue
+    if (!node)
+      continue
     if (key.startsWith('u-') && node?.checked) {
       const id = Number(key.slice(2))
-      if (Number.isFinite(id) && id > 0) ids.push(id)
+      if (Number.isFinite(id) && id > 0)
+        ids.push(id)
     }
   }
   return Array.from(new Set(ids))
@@ -335,10 +468,12 @@ const selectedDeptIds = computed(() => {
   const ids: number[] = []
   for (const key of Object.keys(orgTreeSelection.value || {})) {
     const node = (orgTreeSelection.value as any)[key]
-    if (!node) continue
+    if (!node)
+      continue
     if (key.startsWith('d-') && node?.checked) {
       const id = Number(key.slice(2))
-      if (Number.isFinite(id) && id > 0) ids.push(id)
+      if (Number.isFinite(id) && id > 0)
+        ids.push(id)
     }
   }
   return Array.from(new Set(ids))
@@ -362,85 +497,113 @@ async function addSelectedDeptsToRole() {
     toast.add({ severity: 'warn', summary: '먼저 저장', detail: '역할을 저장한 후 부서 추가가 가능합니다.', life: 2000 })
     return
   }
-  // expand with descendants if option enabled
+
   const expandDescendants = (deptId: number): number[] => {
     const key = `d-${deptId}`
     const node = orgNodeMap.value[key]
     const acc: number[] = [deptId]
     const dfs = (n: any) => {
-      if (!n) return
+      if (!n)
+        return
       if (typeof n.key === 'string' && n.key.startsWith('d-')) {
         const m = n.key.match(/-(\d+)$/)
         const id = m ? Number(m[1]) : null
-        if (id) acc.push(id)
+        if (id)
+          acc.push(id)
       }
-      for (const c of (n.children || [])) dfs(c)
+      for (const c of (n.children || []))
+        dfs(c)
     }
-    // include self and descendants
-    if (node) dfs(node)
+    if (node)
+      dfs(node)
     return acc
   }
+
   const targetDeptIds = new Set<number>()
   for (const did of selectedDeptIds.value) {
-    for (const x of expandDescendants(did)) targetDeptIds.add(x)
+    for (const x of expandDescendants(did))
+      targetDeptIds.add(x)
   }
+
   for (const id of Array.from(targetDeptIds)) {
     await $fetch(`/api/departments/${id}/roles`, { method: 'POST', body: { role_id: roleId } })
   }
   await loadAssignedDepts(roleId)
 }
 
+// 할당된 부서 관리
 const assignedDepts = ref<any[]>([])
 const assignedDeptsGridApi = shallowRef<any | null>(null)
 const assignedDeptsColDefs = ref<any[]>([
   { field: 'name', headerName: '부서', width: 200, minWidth: 140 },
   { headerName: '삭제', colId: 'remove', width: 90, valueGetter: () => '삭제', cellClass: 'action-cell danger' },
 ])
+
 async function loadAssignedDepts(roleId: number) {
   const res = await $fetch<any>(`/api/roles/${roleId}/departments`)
   assignedDepts.value = res?.success ? (res.data || []) : []
 }
-function onAssignedDeptsGridReady(p: any) { assignedDeptsGridApi.value = p.api }
-function onAssignedDeptsCellClicked(event: any) {
-  if (event?.column?.getColId?.() === 'remove') removeDeptFromRole(event?.data?.id)
+
+function onAssignedDeptsGridReady(p: any) {
+  assignedDeptsGridApi.value = p.api
 }
+
+function onAssignedDeptsCellClicked(event: any) {
+  if (event?.column?.getColId?.() === 'remove')
+    removeDeptFromRole(event?.data?.id)
+}
+
 async function removeDeptFromRole(deptId: number) {
   const roleId = editTarget.value?.id
-  if (!roleId) return
+  if (!roleId)
+    return
   await $fetch(`/api/departments/${deptId}/roles`, { method: 'DELETE', params: { roleId } })
   await loadAssignedDepts(roleId)
 }
+
 async function removeAllDeptsFromRole() {
   const roleId = editTarget.value?.id
-  if (!roleId) return
+  if (!roleId)
+    return
   const count = assignedDepts.value.length
-  if (count === 0) return
-  confirmAction(async () => {
-    for (const d of assignedDepts.value) {
-      const did = d?.id
-      if (!did) continue
-      try { await $fetch(`/api/departments/${did}/roles`, { method: 'DELETE', params: { roleId } }) } catch {}
-    }
-    await loadAssignedDepts(roleId)
-  }, '삭제 완료', `부서 ${count}개 할당을 해제했습니다.`, '전체 삭제 확인', '선택된 역할에서 모든 부서를 삭제하시겠습니까?', { compact: true, acceptLabel: '삭제', rejectLabel: '취소', icon: 'pi pi-exclamation-triangle' })
+  if (count === 0)
+    return
+  confirmAction(
+    async () => {
+      for (const d of assignedDepts.value) {
+        const did = d?.id
+        if (!did)
+          continue
+        try { await $fetch(`/api/departments/${did}/roles`, { method: 'DELETE', params: { roleId } }) }
+        catch {}
+      }
+      await loadAssignedDepts(roleId)
+    },
+    '삭제 완료',
+    `부서 ${count}개 할당을 해제했습니다.`,
+    '전체 삭제 확인',
+    '선택된 역할에서 모든 부서를 삭제하시겠습니까?',
+    { compact: true, acceptLabel: '삭제', rejectLabel: '취소', icon: 'pi pi-exclamation-triangle' },
+  )
 }
 
 const selectedRole = ref<RoleRow | null>(null)
-watch(selectedRole, async (v) => { if (v) openEdit(v) })
-onMounted(async () => { /* removed unused loaders */ })
+watch(selectedRole, async (v) => {
+  if (v)
+    openEdit(v)
+})
+
 watch(dialogVisible, async (v) => {
   if (v) {
     orgTreeSelection.value = {}
     await loadOrgTree()
-    // 다이얼로그 열릴 때 현재 editTarget.permissions 기준으로 메뉴 그리드 갱신
-    // 신규 생성(등록)인 경우, 이전 편집에서 남은 할당 목록 초기화
     if (!editTarget.value?.id) {
       assignedUsers.value = []
       assignedDepts.value = []
     }
     rebuildMenuRowData()
-  } else {
-    // 닫힐 때도 선택 상태 초기화
+  }
+  else {
     orgTreeSelection.value = {}
   }
 })
@@ -448,8 +611,9 @@ watch(dialogVisible, async (v) => {
 
 <template>
   <div class="card flex flex-wrap gap-6">
+    <!-- 검색 영역 -->
     <div class="w-full pb-2 mb-2 border-b border-gray-200 dark:border-gray-700">
-      <div v-if="filters" class="compact-form">
+      <div class="compact-form">
         <FormKitDataEdit
           v-model="filters"
           :schema="schema"
@@ -462,8 +626,11 @@ watch(dialogVisible, async (v) => {
       </div>
     </div>
 
+    <!-- 그리드 영역 -->
     <div class="w-full">
-      <h5 class="mb-2">역할 목록</h5>
+      <h5 class="mb-2">
+        역할 목록
+      </h5>
       <ClientOnly>
         <div :class="agGridThemeClass" class="ag-grid-roles" style="height: 550px; width: 100%;">
           <AgGridVue
@@ -488,6 +655,7 @@ watch(dialogVisible, async (v) => {
       </ClientOnly>
     </div>
 
+    <!-- 등록/수정 다이얼로그 -->
     <Dialog v-model:visible="dialogVisible" header="권한(역할) 등록/수정" :modal="true" :style="{ width: '1200px' }">
       <div class="w-full compact-form">
         <FormKitDataEdit
@@ -500,11 +668,14 @@ watch(dialogVisible, async (v) => {
         />
       </div>
 
+      <!-- 메뉴 권한 매핑 -->
       <div class="mt-3">
         <div class="flex items-center gap-2 mb-2 compact-form">
-          <h6 class="m-0">메뉴 권한 매핑</h6>
-          <Button icon="pi pi-angle-double-down" text v-tooltip.bottom="'전체 펼치기'" @click="expandAllMenuGrid" />
-          <Button icon="pi pi-angle-double-up" text v-tooltip.bottom="'전체 접기'" @click="collapseAllMenuGrid" />
+          <h6 class="m-0">
+            메뉴 권한 매핑
+          </h6>
+          <Button icon="pi pi-angle-double-down" text @click="expandAllMenuGrid" />
+          <Button icon="pi pi-angle-double-up" text @click="collapseAllMenuGrid" />
         </div>
         <div :class="agGridThemeClass" style="height: 320px; width: 100%;">
           <AgGridVue
@@ -520,30 +691,34 @@ watch(dialogVisible, async (v) => {
             @grid-ready="onMenuGridReady"
             @cell-value-changed="onMenuCellValueChanged"
             @cell-clicked="(e:any) => {
- if (e?.column?.getColId?.() == 'read' || e?.column?.getColId?.() == 'write'){
- try { e.event?.stopPropagation?.() }
- catch {} 
-} 
-}"
+              if (e?.column?.getColId?.() === 'read' || e?.column?.getColId?.() === 'write') {
+                try { e.event?.stopPropagation?.() } catch {}
+              }
+            }"
           />
         </div>
       </div>
 
+      <!-- 사용자/부서 할당 -->
       <div class="mt-4 grid grid-cols-12 gap-4">
         <div class="col-span-12 md:col-span-6">
-          <h6 class="mb-2">사용자 할당</h6>
+          <h6 class="mb-2">
+            사용자 할당
+          </h6>
           <div class="mb-2">
             <label class="text-xs text-gray-500">조직/사용자 선택</label>
             <div class="mt-1 border rounded p-2 max-h-72 overflow-auto">
-              <div v-if="orgTreeLoading" class="text-sm text-gray-500">로딩중...</div>
+              <div v-if="orgTreeLoading" class="text-sm text-gray-500">
+                로딩중...
+              </div>
               <Tree
-v-else
-                :value="orgTreeNodes"
-                selectionMode="checkbox"
+                v-else
                 v-model:selectionKeys="orgTreeSelection"
+                :value="orgTreeNodes"
+                selection-mode="checkbox"
                 :filter="true"
-                filterMode="lenient"
-                :metaKeySelection="false"
+                filter-mode="lenient"
+                :meta-key-selection="false"
                 class="w-full"
               />
             </div>
@@ -559,12 +734,13 @@ v-else
               </div>
             </div>
           </div>
-
         </div>
 
         <div class="col-span-12 md:col-span-6">
           <div class="mt-3 mb-2 flex items-center justify-between compact-form">
-            <h6 class="m-0">할당된 부서</h6>
+            <h6 class="m-0">
+              할당된 부서
+            </h6>
             <div class="flex items-center gap-2">
               <Button label="전체 삭제" severity="danger" outlined :disabled="!assignedDepts.length" @click="removeAllDeptsFromRole" />
             </div>
@@ -581,7 +757,9 @@ v-else
             />
           </div>
           <div class="mt-3 mb-2 flex items-center justify-between compact-form">
-            <h6 class="m-0">할당된 사용자 ({{ assignedUsers.length }})</h6>
+            <h6 class="m-0">
+              할당된 사용자 ({{ assignedUsers.length }})
+            </h6>
             <div class="flex items-center gap-2">
               <Button label="전체 삭제" severity="danger" outlined :disabled="!assignedUsers.length" @click="removeAllUsersFromRole" />
             </div>
