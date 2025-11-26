@@ -636,6 +636,7 @@ select  @now                  =  format(getdate(), 'yyyyMMddHHmmss')
 
 if      @case  =  'search'
 begin
+    -- 첫 번째 결과셋: s_grid_detail 컬럼 정보
     select  grid_id                  =  a0.grid_id,
             col_id                   =  a0.col_id,
             col_name                 =  a0.col_name,
@@ -651,6 +652,19 @@ begin
 	 where  a0.grid_id               =  @grid_id
 	 order  by
 	        a0.col_seq
+
+    -- 두 번째 결과셋: col_code가 DROP_로 시작하는 경우 c_code에서 코드 리스트 조회
+    select  col_code                 =  a0.col_code,
+            code                     =  c0.code,
+            code_name                =  c0.code_name
+      from  s_grid_detail a0 (nolock)
+     inner join c_code c0 (nolock)
+        on  c0.code_grp             =  a0.col_code
+     where  a0.grid_id               =  @grid_id
+       and  a0.col_code              like 'DROP_%'
+     order  by
+            a0.col_code,
+            c0.code
 end
 else if @case  =  'save'
 begin
